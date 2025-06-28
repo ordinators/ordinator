@@ -1,0 +1,40 @@
+# Ordinator Development Rules
+
+## Core Principle
+**ALWAYS reference PRD.md when making any changes to this project.** The Product Requirements Document (PRD.md) contains the definitive specification for Ordinator's features, design decisions, and technical requirements.
+
+## Before Making Changes
+1. **Read PRD.md first** - Understand the complete project requirements
+2. **Check the relevant section** - Ensure your changes align with the specified features
+3. **Follow the design decisions** - Respect the resolved questions and technical architecture
+4. **Maintain consistency** - Ensure changes don't conflict with established patterns
+
+## Key Requirements to Follow
+- **Secrets Management**: Use Mozilla SOPS + age encryption, per-file handling
+- **System Commands**: Never execute sudo commands directly - generate scripts instead
+- **Dry-Run Mode**: Implement `--dry-run` for all applicable commands
+- **Profile Support**: Support multiple environment profiles (work, personal, laptop)
+- **Git Integration**: Use Git-inspired CLI commands without explicit git invocation
+- **macOS Focus**: Optimize for macOS while maintaining cross-platform compatibility
+- **Security First**: Never expose plaintext secrets unexpectedly
+
+## Code Style & Architecture
+- Write in Rust with safety and performance in mind
+- Use the established module structure (cli, config, git, secrets, bootstrap, utils)
+- Follow the CLI patterns established in the PRD
+- Implement proper error handling and logging
+- Maintain the TOML configuration approach
+
+## When in Doubt
+- **Refer to PRD.md** - It contains the authoritative answers
+- **Check the resolved questions table** - Many design decisions are documented there
+- **Follow the technical architecture** - Use the specified technologies and patterns
+- **Prioritize security and user trust** - This is a core principle of the project
+
+## Testing Requirements
+- Implement dry-run mode for all operations
+- Test secrets handling thoroughly
+- Ensure system commands generate scripts correctly
+- Validate profile-based filtering works as specified
+
+Remember: The PRD.md is the source of truth for this project. Any deviation from it should be carefully considered and documented. 
