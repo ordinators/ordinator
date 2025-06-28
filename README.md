@@ -1,146 +1,73 @@
-# Ordinator
+# Ordinator — Dotfiles and Environment Manager for macOS
 
-> Dotfiles and Environment Manager for macOS
+[![CI](https://github.com/ceterus/ordinator/workflows/CI/badge.svg)](https://github.com/ceterus/ordinator/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Ordinator is a CLI tool written in Rust for managing macOS dotfiles, system settings, and secrets, allowing users to replicate their environment across machines in a secure, repeatable, and non-interactive way — with no GUI wrapper.
+**Ordinator** is a CLI tool written in Rust for managing macOS dotfiles, system settings, and secrets, allowing users to replicate their environment across machines in a secure, repeatable, and non-interactive way.
 
 ## Features
 
-### ✅ Dotfiles Management
-- Track user-defined dotfiles in a Git repository
-- Symlink dotfiles into the home directory with backup and overwrite protection
-- Support nested folders (`.config`, `Library/Preferences`, etc.)
+- ✅ **Dotfiles Management** - Track and sync dotfiles in Git with symlink management
+- ✅ **Bootstrap Process** - Execute setup scripts and install tools non-interactively
+- ✅ **Profile Support** - Environment profiles (work, personal, laptop)
+- ✅ **Secrets Management** - Secure secrets using Mozilla SOPS + age encryption
+- ✅ **Git Integration** - Git-inspired CLI commands without explicit git invocation
+- ✅ **macOS-Specific** - System settings and Homebrew integration
+- ✅ **Dry-Run Mode** - Preview changes before applying them
 
-### ✅ Bootstrap Process
-- Execute user-defined shell/bootstrap script or TOML-defined commands
-- Install tools like Homebrew packages and VS Code extensions
-- Support silent/non-interactive mode for automation
-- Parse system-level commands but generate separate scripts for manual execution
+## Quick Start
 
-### ✅ Profile Support
-- Define environment profiles (e.g., `work`, `personal`, `laptop`)
-- Profile-based filtering of files, overrides, bootstrap steps
+```bash
+# Install via Homebrew
+brew install ceterus/ordinator/ordinator
 
-### ✅ Secrets Management
-- Use Mozilla SOPS with `age` for encrypted secrets files
-- Secrets handled **per file**
-- Secrets decrypted on-demand during bootstrap
-- Log each decryption event (with file path + timestamp)
-- Warn users if plaintext secrets are detected in tracked files
+# Initialize a new dotfiles repository
+ordinator init --remote https://github.com/username/dotfiles
 
-### ✅ Git Integration (Streamlined CLI)
-- Local repo is initialized or linked to a remote (e.g., GitHub)
-- Simple, Git-inspired commands without explicitly invoking `git`:
-  - `ordinator init --remote <url>`
-  - `ordinator commit -m "msg"`
-  - `ordinator push`, `ordinator pull`, `ordinator sync`, `ordinator status`
-- Optionally auto-push after successful apply
+# Add your first dotfile
+ordinator add ~/.zshrc
 
-### ✅ macOS-Specific Enhancements
-- Apply `defaults write` tweaks and other system settings
-- System-level commands never run automatically — only output to script
-- Homebrew Bundle and macOS-specific utilities supported
-
-### ✅ Dry-Run Mode
-- Simulate dotfile linking, secrets decryption, bootstrap steps, and script generation
-- Nothing is written or run
-- `--dry-run` available for all applicable commands
-- CLI and optionally JSON output
-- Useful for testing, debugging, and trust-building
+# Apply your configuration
+ordinator apply
+```
 
 ## Installation
 
-### Via Homebrew (Recommended)
+### Homebrew (Recommended)
 ```bash
 brew install ceterus/ordinator/ordinator
 ```
 
-### Via curl script
+### Manual Installation
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ceterus/ordinator/main/install.sh | sh
+# Clone and build
+git clone https://github.com/ceterus/ordinator.git
+cd ordinator
+cargo install --path .
 ```
 
-## Quick Start
+## Documentation
 
-1. **Initialize a new dotfiles repository:**
-   ```bash
-   ordinator init --remote https://github.com/ceterus/dotfiles.git
-   ```
-
-2. **Add your first dotfile:**
-   ```bash
-   ordinator add ~/.zshrc
-   ```
-
-3. **Commit and push:**
-   ```bash
-   ordinator commit -m "Add zsh configuration"
-   ordinator push
-   ```
-
-4. **Apply on a new machine:**
-   ```bash
-   ordinator apply --profile work
-   ```
-
-## Configuration
-
-Create an `ordinator.toml` file in your dotfiles repository:
-
-```toml
-[profiles.work]
-description = "Work environment configuration"
-bootstrap_script = "scripts/bootstrap-work.sh"
-
-[profiles.personal]
-description = "Personal environment configuration"
-bootstrap_script = "scripts/bootstrap-personal.sh"
-
-[secrets]
-age_key_file = "~/.config/ordinator/age.key"
-```
-
-## Security
-
-- **Secrets Management**: Uses Mozilla SOPS with age encryption for secure secret handling
-- **System Commands**: Never executes sudo commands automatically - generates scripts for manual review
-- **Dry-Run Mode**: Always test changes before applying them
-- **Logging**: All secret operations are logged with timestamps
+- [Product Requirements Document](PRD.md) - Complete feature specification
+- [Development Roadmap](DEVELOPMENT_ROADMAP.md) - Implementation plan
+- [Test Plan](TEST_PLAN.md) - Testing strategy
 
 ## Development
 
-### Prerequisites
-- Rust 1.70+
-- Git
-- SOPS (for secrets management)
-- age (for encryption)
-
-### Building
 ```bash
-cargo build --release
-```
+# Setup development environment
+./scripts/dev-setup.sh
 
-### Testing
-```bash
+# Run tests
 cargo test
+
+# Run linter
+cargo clippy
+
+# Format code
+cargo fmt
 ```
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
-
-## Roadmap
-
-- [ ] Migration tools from existing dotfile managers
-- [ ] Plugin/hook system
-- [ ] Integration with system login scripts
-- [ ] Linux support
-- [ ] UI wrapper (if demand is high) 
+MIT License - see [LICENSE](LICENSE) for details. 

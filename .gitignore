@@ -3,11 +3,14 @@
 **/*.rs.bk
 Cargo.lock
 
-# Logs
-*.log
-logs/
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# OS generated files
+# OS
 .DS_Store
 .DS_Store?
 ._*
@@ -16,17 +19,18 @@ logs/
 ehthumbs.db
 Thumbs.db
 
-# Editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# Logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
 
 # Temporary files
 *.tmp
-*.temp 
-
-# Added by cargo
-
-/target
+*.temp
