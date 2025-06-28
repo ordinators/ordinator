@@ -1,0 +1,51 @@
+[package]
+name = "ordinator"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "Dotfiles and Environment Manager for macOS"
+license = "MIT"
+repository = "https://github.com/yourusername/ordinator"
+keywords = ["dotfiles", "macos", "environment", "cli", "sops"]
+categories = ["command-line-utilities", "development-tools"]
+
+[dependencies]
+# CLI parsing
+clap = { version = "4.4", features = ["derive"] }
+
+# Git integration
+git2 = "0.18"
+
+# TOML configuration
+toml = "0.8"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# File system operations
+walkdir = "2.4"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Path handling
+pathdiff = "0.2"
+
+# Shell command execution
+tokio = { version = "1.0", features = ["full"] }
+
+# SOPS integration (we'll need to shell out to sops)
+which = "6.0"
+
+# Directory utilities
+dirs = "5.0"
+
+[dev-dependencies]
+tempfile = "3.8"
+assert_fs = "1.1"

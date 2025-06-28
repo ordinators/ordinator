@@ -1,0 +1,77 @@
+# Ordinator Configuration Example
+# This file should be placed in your dotfiles repository root
+
+[global]
+default_profile = "work"
+auto_push = true
+backup_existing = true
+
+[profiles.work]
+description = "Work environment configuration"
+bootstrap_script = "scripts/bootstrap-work.sh"
+files = [
+    ".zshrc",
+    ".gitconfig",
+    ".config/nvim/init.vim",
+    "Library/Preferences/com.apple.Terminal.plist"
+]
+exclude = [
+    ".zsh_history",
+    ".git/",
+    "*.tmp"
+]
+system_commands = [
+    "sudo defaults write com.apple.dock autohide -bool true",
+    "sudo defaults write com.apple.finder ShowPathbar -bool true"
+]
+homebrew_packages = [
+    "git",
+    "neovim",
+    "ripgrep",
+    "fd",
+    "bat",
+    "exa"
+]
+vscode_extensions = [
+    "ms-vscode.vscode-json",
+    "rust-lang.rust-analyzer",
+    "ms-python.python"
+]
+
+[profiles.personal]
+description = "Personal environment configuration"
+bootstrap_script = "scripts/bootstrap-personal.sh"
+files = [
+    ".zshrc",
+    ".gitconfig",
+    ".config/alacritty/alacritty.yml",
+    ".config/karabiner/karabiner.json"
+]
+homebrew_packages = [
+    "git",
+    "alacritty",
+    "karabiner-elements",
+    "spotify-tui"
+]
+
+[profiles.laptop]
+description = "Laptop-specific configuration"
+bootstrap_script = "scripts/bootstrap-laptop.sh"
+files = [
+    ".zshrc",
+    ".config/kitty/kitty.conf"
+]
+system_commands = [
+    "sudo pmset -a sleep 0",
+    "sudo pmset -a hibernatemode 0"
+]
+
+[secrets]
+age_key_file = "~/.config/ordinator/age.key"
+sops_config = ".sops.yaml"
+encrypted_patterns = [
+    "*.enc.yaml",
+    "*.enc.yml",
+    "secrets/*.yaml",
+    "secrets/*.yml"
+] 
