@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Your Name <your.email@example.com>"]
 description = "Dotfiles and Environment Manager for macOS"
 license = "MIT"
-repository = "https://github.com/yourusername/ordinator"
+repository = "https://github.com/ceterus/ordinator"
 keywords = ["dotfiles", "macos", "environment", "cli", "sops"]
 categories = ["command-line-utilities", "development-tools"]
 
