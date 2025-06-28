@@ -49,6 +49,7 @@ cargo install --path .
 ## Documentation
 
 - [Product Requirements Document](PRD.md) - Complete feature specification
+- [Configuration Guide](CONFIGURATION.md) - Configuration file format and usage
 - [Development Roadmap](DEVELOPMENT_ROADMAP.md) - Implementation plan
 - [Test Plan](TEST_PLAN.md) - Testing strategy
 
