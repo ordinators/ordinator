@@ -47,5 +47,17 @@ which = "6.0"
 dirs = "5.0"
 
 [dev-dependencies]
+# Testing frameworks
 tempfile = "3.8"
 assert_fs = "1.1"
+assert_cmd = "2.0"
+predicates = "3.0"
+
+# Property-based testing
+proptest = "1.4"
+
+# Fuzz testing
+cargo-fuzz = "0.13"
+
+# Code coverage
+cargo-tarpaulin = "0.26"

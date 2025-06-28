@@ -3,11 +3,21 @@
 ## Core Principle
 **ALWAYS reference PRD.md when making any changes to this project.** The Product Requirements Document (PRD.md) contains the definitive specification for Ordinator's features, design decisions, and technical requirements.
 
+## Testing Requirements
+**ALWAYS reference TEST_PLAN.md when creating tests.** The Test Plan (TEST_PLAN.md) contains the comprehensive testing strategy, including test types, tools, and security considerations.
+
 ## Before Making Changes
 1. **Read PRD.md first** - Understand the complete project requirements
 2. **Check the relevant section** - Ensure your changes align with the specified features
 3. **Follow the design decisions** - Respect the resolved questions and technical architecture
 4. **Maintain consistency** - Ensure changes don't conflict with established patterns
+
+## Before Creating Tests
+1. **Read TEST_PLAN.md first** - Understand the testing strategy and requirements
+2. **Choose appropriate test type** - Unit, Integration, CLI, Property-based, or Security/Fuzz testing
+3. **Use specified tools** - Follow the recommended testing frameworks and libraries
+4. **Consider security implications** - Ensure secrets are handled safely and system commands are not executed
+5. **Use sandboxed environments** - Always test in temporary directories with proper cleanup
 
 ## Key Requirements to Follow
 - **Secrets Management**: Use Mozilla SOPS + age encryption, per-file handling
@@ -18,6 +28,15 @@
 - **macOS Focus**: Optimize for macOS while maintaining cross-platform compatibility
 - **Security First**: Never expose plaintext secrets unexpectedly
 
+## Testing Requirements to Follow
+- **Unit Tests**: Use Rust's built-in `#[test]` framework for internal functions
+- **Integration Tests**: Use `tempfile`, `assert_fs` for multi-component workflows
+- **CLI Tests**: Use `assert_cmd`, `predicates` for full command-line flows
+- **Property-Based Tests**: Use `proptest`, `quickcheck` for edge case resilience
+- **Security Tests**: Use `cargo-fuzz` for memory safety and secret leakage prevention
+- **Sandboxed Testing**: Always use temporary directories and proper cleanup
+- **Mock External Dependencies**: Mock Git, SOPS, and file system operations
+
 ## Code Style & Architecture
 - Write in Rust with safety and performance in mind
 - Use the established module structure (cli, config, git, secrets, bootstrap, utils)
@@ -27,14 +46,16 @@
 
 ## When in Doubt
 - **Refer to PRD.md** - It contains the authoritative answers
+- **Refer to TEST_PLAN.md** - It contains the testing strategy and requirements
 - **Check the resolved questions table** - Many design decisions are documented there
 - **Follow the technical architecture** - Use the specified technologies and patterns
 - **Prioritize security and user trust** - This is a core principle of the project
 
-## Testing Requirements
-- Implement dry-run mode for all operations
-- Test secrets handling thoroughly
-- Ensure system commands generate scripts correctly
-- Validate profile-based filtering works as specified
+## Testing Quality Gates
+- All tests must pass before merging
+- Code coverage should be > 80% via `cargo tarpaulin`
+- No clippy warnings
+- Security tests must pass (no secret leakage, no unauthorized sudo execution)
+- Integration tests must run in clean, isolated environments
 
-Remember: The PRD.md is the source of truth for this project. Any deviation from it should be carefully considered and documented. 
+Remember: The PRD.md is the source of truth for this project, and TEST_PLAN.md is the source of truth for testing. Any deviation from either should be carefully considered and documented. 
