@@ -1,12 +1,13 @@
 use anyhow::Result;
-use std::path::PathBuf;
 use tracing::info;
 
 /// Bootstrap manager for running setup scripts and commands
+#[allow(dead_code)]
 pub struct BootstrapManager {
     dry_run: bool,
 }
 
+#[allow(dead_code)]
 impl BootstrapManager {
     /// Create a new bootstrap manager
     pub fn new(dry_run: bool) -> Self {
@@ -14,7 +15,7 @@ impl BootstrapManager {
     }
 
     /// Run a bootstrap script
-    pub fn run_bootstrap_script(&self, script_path: &PathBuf) -> Result<()> {
+    pub fn run_bootstrap_script(&self, script_path: &std::path::Path) -> Result<()> {
         info!("Running bootstrap script: {:?}", script_path);
         if self.dry_run {
             info!("[DRY RUN] Would run bootstrap script: {:?}", script_path);
@@ -50,7 +51,7 @@ impl BootstrapManager {
     }
 
     /// Generate system script for manual execution
-    pub fn generate_system_script(&self, commands: &[String], output_path: &PathBuf) -> Result<()> {
+    pub fn generate_system_script(&self, _commands: &[String], output_path: &std::path::Path) -> Result<()> {
         info!("Generating system script: {:?}", output_path);
         // TODO: Implement system script generation
         Ok(())

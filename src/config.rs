@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Config {
     /// Global configuration
     #[serde(default)]
@@ -76,16 +76,6 @@ pub struct SecretsConfig {
     pub encrypted_patterns: Vec<String>,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            global: GlobalConfig::default(),
-            profiles: HashMap::new(),
-            secrets: SecretsConfig::default(),
-        }
-    }
-}
-
 impl Default for GlobalConfig {
     fn default() -> Self {
         Self {
@@ -114,6 +104,7 @@ fn default_backup() -> bool {
     true
 }
 
+#[allow(dead_code)]
 impl Config {
     /// Load configuration from a TOML file
     pub fn from_file(path: &PathBuf) -> Result<Self> {
@@ -155,6 +146,7 @@ impl Config {
     }
 }
 
+#[allow(dead_code)]
 impl ProfileConfig {
     /// Create a new profile configuration
     pub fn new(description: Option<String>) -> Self {

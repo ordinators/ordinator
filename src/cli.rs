@@ -148,60 +148,53 @@ pub enum SecretCommands {
     },
 }
 
+#[allow(dead_code)]
 pub async fn run(args: Args) -> Result<()> {
     match args.command {
         Commands::Init { remote, profile } => {
-            println!("Initializing repository with profile: {}", profile);
+            println!("Initializing repository with profile: {profile}");
             if let Some(url) = remote {
-                println!("Remote URL: {}", url);
+                println!("Remote URL: {url}");
             }
             // TODO: Implement init logic
         }
-
         Commands::Add { path, profile } => {
-            println!("Adding file: {}", path);
+            println!("Adding file: {path}");
             if let Some(p) = profile {
-                println!("Profile: {}", p);
+                println!("Profile: {p}");
             }
             // TODO: Implement add logic
         }
-
         Commands::Remove { path } => {
-            println!("Removing file: {}", path);
+            println!("Removing file: {path}");
             // TODO: Implement remove logic
         }
-
         Commands::Commit { message } => {
-            println!("Committing with message: {}", message);
+            println!("Committing with message: {message}");
             // TODO: Implement commit logic
         }
-
         Commands::Push { force } => {
             println!("Pushing changes{}", if force { " (force)" } else { "" });
             // TODO: Implement push logic
         }
-
         Commands::Pull { rebase } => {
             println!("Pulling changes{}", if rebase { " (rebase)" } else { "" });
             // TODO: Implement pull logic
         }
-
         Commands::Sync { force } => {
             println!("Syncing repository{}", if force { " (force)" } else { "" });
             // TODO: Implement sync logic
         }
-
         Commands::Status { verbose } => {
             println!("Showing status{}", if verbose { " (verbose)" } else { "" });
             // TODO: Implement status logic
         }
-
         Commands::Apply {
             profile,
             skip_bootstrap,
             skip_secrets,
         } => {
-            println!("Applying profile: {}", profile);
+            println!("Applying profile: {profile}");
             if skip_bootstrap {
                 println!("Skipping bootstrap");
             }
@@ -210,7 +203,6 @@ pub async fn run(args: Args) -> Result<()> {
             }
             // TODO: Implement apply logic
         }
-
         Commands::Profiles { verbose } => {
             println!(
                 "Listing profiles{}",
@@ -218,15 +210,14 @@ pub async fn run(args: Args) -> Result<()> {
             );
             // TODO: Implement profiles logic
         }
-
         Commands::Secrets { subcommand } => {
             match subcommand {
                 SecretCommands::Encrypt { file } => {
-                    println!("Encrypting file: {}", file);
+                    println!("Encrypting file: {file}");
                     // TODO: Implement encrypt logic
                 }
                 SecretCommands::Decrypt { file } => {
-                    println!("Decrypting file: {}", file);
+                    println!("Decrypting file: {file}");
                     // TODO: Implement decrypt logic
                 }
                 SecretCommands::List { paths_only } => {
@@ -238,15 +229,12 @@ pub async fn run(args: Args) -> Result<()> {
                 }
             }
         }
-
         Commands::GenerateScript { output, profile } => {
             println!(
-                "Generating system script: {} for profile: {}",
-                output, profile
+                "Generating system script: {output} for profile: {profile}"
             );
             // TODO: Implement script generation logic
         }
     }
-
     Ok(())
 }

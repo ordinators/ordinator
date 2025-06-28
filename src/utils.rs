@@ -3,18 +3,20 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Utility functions for Ordinator
-
+#[allow(dead_code)]
 /// Get the home directory
 pub fn get_home_dir() -> Result<PathBuf> {
     dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))
 }
 
+#[allow(dead_code)]
 /// Get the dotfiles directory
 pub fn get_dotfiles_dir() -> Result<PathBuf> {
     Ok(get_home_dir()?.join(".dotfiles"))
 }
 
 /// Create a symlink with backup
+#[allow(dead_code)]
 pub fn create_symlink_with_backup(source: &Path, target: &Path, backup: bool) -> Result<()> {
     if target.exists() {
         if backup {
@@ -41,6 +43,7 @@ pub fn create_symlink_with_backup(source: &Path, target: &Path, backup: bool) ->
 }
 
 /// Check if a path is a symlink
+#[allow(dead_code)]
 pub fn is_symlink(path: &Path) -> bool {
     path.symlink_metadata()
         .map(|m| m.file_type().is_symlink())
@@ -48,11 +51,13 @@ pub fn is_symlink(path: &Path) -> bool {
 }
 
 /// Get the target of a symlink
+#[allow(dead_code)]
 pub fn get_symlink_target(path: &Path) -> Result<PathBuf> {
     Ok(fs::read_link(path)?)
 }
 
 /// Check if a file contains secrets (basic heuristic)
+#[allow(dead_code)]
 pub fn contains_secrets(content: &str) -> bool {
     let secret_patterns = [
         "password",
