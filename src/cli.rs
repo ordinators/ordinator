@@ -1,5 +1,8 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use tracing::{info, warn};
+
+use crate::config::Config;
 
 #[derive(Parser)]
 #[command(name = "ordinator")]
@@ -148,91 +151,365 @@ pub enum SecretCommands {
     },
 }
 
-#[allow(dead_code)]
 pub async fn run(args: Args) -> Result<()> {
+    // Setup logging based on verbose flag
+    let log_level = if args.verbose {
+        tracing::Level::DEBUG
+    } else {
+        tracing::Level::INFO
+    };
+
+    // Only initialize if not already initialized
+    let _ = tracing_subscriber::fmt()
+        .with_max_level(log_level)
+        .try_init();
+
+    info!("Starting Ordinator");
+
+    if args.dry_run {
+        warn!("Running in DRY-RUN mode - no changes will be made");
+        eprintln!("DRY-RUN: No changes will be made");
+    }
+
     match args.command {
         Commands::Init { remote, profile } => {
-            println!("Initializing repository with profile: {profile}");
-            if let Some(url) = remote {
-                println!("Remote URL: {url}");
+            info!("Initializing repository with profile: {}", profile);
+            eprintln!("Initializing repository with profile: {profile}");
+            if let Some(url) = &remote {
+                info!("Remote URL: {}", url);
+                eprintln!("Remote URL: {url}");
             }
-            // TODO: Implement init logic
+
+            if args.dry_run {
+                info!(
+                    "[DRY RUN] Would initialize repository with profile: {}",
+                    profile
+                );
+                eprintln!(
+                    "DRY-RUN: Would initialize repository with profile: {profile}"
+                );
+                if let Some(url) = remote {
+                    info!("[DRY RUN] Would set remote URL: {}", url);
+                    eprintln!("DRY-RUN: Would set remote URL: {url}");
+                }
+                return Ok(());
+            }
+
+            // Initialize the dotfiles repository
+            let config_path = Config::init_dotfiles_repository()?;
+            info!("Created configuration file: {}", config_path.display());
+            eprintln!("Created configuration file: {}", config_path.display());
+
+            // TODO: Initialize Git repository and add remote if provided
+            info!("Repository initialization completed");
+            eprintln!("Repository initialization completed");
         }
         Commands::Add { path, profile } => {
-            println!("Adding file: {path}");
-            if let Some(p) = profile {
-                println!("Profile: {p}");
+            info!("Adding file: {}", path);
+            eprintln!("Adding file: {path}");
+            if let Some(p) = &profile {
+                info!("Profile: {}", p);
+                eprintln!("Profile: {p}");
             }
-            // TODO: Implement add logic
+
+            if args.dry_run {
+                info!(
+                    "[DRY RUN] Would add file: {} to profile: {}",
+                    path,
+                    profile.clone().unwrap_or_else(|| "default".to_string())
+                );
+                eprintln!(
+                    "DRY-RUN: Would add file: {} to profile: {}",
+                    path,
+                    profile.unwrap_or_else(|| "default".to_string())
+                );
+                return Ok(());
+            }
+
+            // Load configuration and add file to profile
+            if let Some(mut config) = Config::load()? {
+                let profile_name = profile.unwrap_or_else(|| "default".to_string());
+                config.add_file_to_profile(&profile_name, path.clone())?;
+
+                // Save the updated configuration
+                if let Some(config_path) = Config::find_config_file()? {
+                    config.save_to_file(&config_path)?;
+                    info!("Added file {} to profile {}", path, profile_name);
+                    eprintln!("Added file {path} to profile {profile_name}");
+                }
+            } else {
+                return Err(anyhow::anyhow!(
+                    "No configuration file found. Run 'ordinator init' first."
+                ));
+            }
         }
         Commands::Remove { path } => {
-            println!("Removing file: {path}");
-            // TODO: Implement remove logic
+            info!("Removing file: {}", path);
+            eprintln!("Removing file: {path}");
+
+            if args.dry_run {
+                info!("[DRY RUN] Would remove file: {}", path);
+                eprintln!("DRY-RUN: Would remove file: {path}");
+                return Ok(());
+            }
+
+            // TODO: Implement actual remove logic
+            info!("File removal not yet implemented");
+            eprintln!("File removal not yet implemented");
         }
         Commands::Commit { message } => {
-            println!("Committing with message: {message}");
-            // TODO: Implement commit logic
+            info!("Committing with message: {}", message);
+            eprintln!("Committing with message: {message}");
+
+            if args.dry_run {
+                info!("[DRY RUN] Would commit with message: {}", message);
+                eprintln!("DRY-RUN: Would commit with message: {message}");
+                return Ok(());
+            }
+
+            // TODO: Implement actual commit logic
+            info!("Commit not yet implemented");
+            eprintln!("Commit not yet implemented");
         }
         Commands::Push { force } => {
-            println!("Pushing changes{}", if force { " (force)" } else { "" });
-            // TODO: Implement push logic
+            info!("Pushing changes{}", if force { " (force)" } else { "" });
+            eprintln!("Pushing changes{}", if force { " (force)" } else { "" });
+
+            if args.dry_run {
+                info!(
+                    "[DRY RUN] Would push changes{}",
+                    if force { " (force)" } else { "" }
+                );
+                eprintln!(
+                    "DRY-RUN: Would push changes{}",
+                    if force { " (force)" } else { "" }
+                );
+                return Ok(());
+            }
+
+            // TODO: Implement actual push logic
+            info!("Push not yet implemented");
+            eprintln!("Push not yet implemented");
         }
         Commands::Pull { rebase } => {
-            println!("Pulling changes{}", if rebase { " (rebase)" } else { "" });
-            // TODO: Implement pull logic
+            info!("Pulling changes{}", if rebase { " (rebase)" } else { "" });
+            eprintln!("Pulling changes{}", if rebase { " (rebase)" } else { "" });
+
+            if args.dry_run {
+                info!(
+                    "[DRY RUN] Would pull changes{}",
+                    if rebase { " (rebase)" } else { "" }
+                );
+                eprintln!(
+                    "DRY-RUN: Would pull changes{}",
+                    if rebase { " (rebase)" } else { "" }
+                );
+                return Ok(());
+            }
+
+            // TODO: Implement actual pull logic
+            info!("Pull not yet implemented");
+            eprintln!("Pull not yet implemented");
         }
         Commands::Sync { force } => {
-            println!("Syncing repository{}", if force { " (force)" } else { "" });
-            // TODO: Implement sync logic
+            info!("Syncing repository{}", if force { " (force)" } else { "" });
+            eprintln!("Syncing repository{}", if force { " (force)" } else { "" });
+
+            if args.dry_run {
+                info!(
+                    "[DRY RUN] Would sync repository{}",
+                    if force { " (force)" } else { "" }
+                );
+                eprintln!(
+                    "DRY-RUN: Would sync repository{}",
+                    if force { " (force)" } else { "" }
+                );
+                return Ok(());
+            }
+
+            // TODO: Implement actual sync logic
+            info!("Sync not yet implemented");
+            eprintln!("Sync not yet implemented");
         }
         Commands::Status { verbose } => {
-            println!("Showing status{}", if verbose { " (verbose)" } else { "" });
-            // TODO: Implement status logic
+            info!("Showing status{}", if verbose { " (verbose)" } else { "" });
+            eprintln!("Showing status{}", if verbose { " (verbose)" } else { "" });
+
+            if args.dry_run {
+                info!(
+                    "[DRY RUN] Would show status{}",
+                    if verbose { " (verbose)" } else { "" }
+                );
+                eprintln!(
+                    "DRY-RUN: Would show status{}",
+                    if verbose { " (verbose)" } else { "" }
+                );
+                return Ok(());
+            }
+
+            // TODO: Implement actual status logic
+            info!("Status not yet implemented");
+            eprintln!("Status not yet implemented");
         }
         Commands::Apply {
             profile,
             skip_bootstrap,
             skip_secrets,
         } => {
-            println!("Applying profile: {profile}");
+            info!("Applying profile: {}", profile);
+            eprintln!("Applying profile: {profile}");
             if skip_bootstrap {
-                println!("Skipping bootstrap");
+                info!("Skipping bootstrap");
+                eprintln!("Skipping bootstrap");
             }
             if skip_secrets {
-                println!("Skipping secrets");
+                info!("Skipping secrets");
+                eprintln!("Skipping secrets");
             }
-            // TODO: Implement apply logic
+
+            if args.dry_run {
+                info!("[DRY RUN] Would apply profile: {}", profile);
+                eprintln!("DRY-RUN: Would apply profile: {profile}");
+                if skip_bootstrap {
+                    info!("[DRY RUN] Would skip bootstrap");
+                    eprintln!("DRY-RUN: Would skip bootstrap");
+                }
+                if skip_secrets {
+                    info!("[DRY RUN] Would skip secrets");
+                    eprintln!("DRY-RUN: Would skip secrets");
+                }
+                return Ok(());
+            }
+
+            // TODO: Implement actual apply logic
+            info!("Apply not yet implemented");
+            eprintln!("Apply not yet implemented");
         }
         Commands::Profiles { verbose } => {
-            println!(
+            info!(
                 "Listing profiles{}",
                 if verbose { " (verbose)" } else { "" }
             );
-            // TODO: Implement profiles logic
+            eprintln!(
+                "Listing profiles{}",
+                if verbose { " (verbose)" } else { "" }
+            );
+
+            if args.dry_run {
+                info!(
+                    "[DRY RUN] Would list profiles{}",
+                    if verbose { " (verbose)" } else { "" }
+                );
+                eprintln!(
+                    "DRY-RUN: Would list profiles{}",
+                    if verbose { " (verbose)" } else { "" }
+                );
+                return Ok(());
+            }
+
+            // Load and display profiles
+            if let Some(config) = Config::load()? {
+                let profiles = config.list_profiles();
+                eprintln!("Available profiles:");
+                for profile_name in profiles {
+                    if let Some(profile) = config.get_profile(profile_name) {
+                        eprintln!(
+                            "  {}: {}",
+                            profile_name,
+                            profile.description.as_deref().unwrap_or("No description")
+                        );
+                    }
+                }
+            } else {
+                return Err(anyhow::anyhow!(
+                    "No configuration file found. Run 'ordinator init' first."
+                ));
+            }
         }
         Commands::Secrets { subcommand } => {
             match subcommand {
                 SecretCommands::Encrypt { file } => {
-                    println!("Encrypting file: {file}");
-                    // TODO: Implement encrypt logic
+                    info!("Encrypting file: {}", file);
+                    eprintln!("Encrypting file: {file}");
+
+                    if args.dry_run {
+                        info!("[DRY RUN] Would encrypt file: {}", file);
+                        eprintln!("DRY-RUN: Would encrypt file: {file}");
+                        return Ok(());
+                    }
+
+                    // TODO: Implement actual encrypt logic
+                    info!("Encryption not yet implemented");
+                    eprintln!("Encryption not yet implemented");
                 }
                 SecretCommands::Decrypt { file } => {
-                    println!("Decrypting file: {file}");
-                    // TODO: Implement decrypt logic
+                    info!("Decrypting file: {}", file);
+                    eprintln!("Decrypting file: {file}");
+
+                    if args.dry_run {
+                        info!("[DRY RUN] Would decrypt file: {}", file);
+                        eprintln!("DRY-RUN: Would decrypt file: {file}");
+                        return Ok(());
+                    }
+
+                    // TODO: Implement actual decrypt logic
+                    info!("Decryption not yet implemented");
+                    eprintln!("Decryption not yet implemented");
                 }
                 SecretCommands::List { paths_only } => {
-                    println!(
-                        "Listing secrets{}",
+                    info!(
+                        "Listing encrypted files{}",
                         if paths_only { " (paths only)" } else { "" }
                     );
-                    // TODO: Implement list logic
+                    eprintln!(
+                        "Listing encrypted files{}",
+                        if paths_only { " (paths only)" } else { "" }
+                    );
+
+                    if args.dry_run {
+                        info!(
+                            "[DRY RUN] Would list encrypted files{}",
+                            if paths_only { " (paths only)" } else { "" }
+                        );
+                        eprintln!(
+                            "DRY-RUN: Would list encrypted files{}",
+                            if paths_only { " (paths only)" } else { "" }
+                        );
+                        return Ok(());
+                    }
+
+                    // TODO: Implement actual list logic
+                    info!("Encrypted files listing not yet implemented");
+                    eprintln!("Encrypted files listing not yet implemented");
                 }
             }
         }
         Commands::GenerateScript { output, profile } => {
-            println!("Generating system script: {output} for profile: {profile}");
-            // TODO: Implement script generation logic
+            info!(
+                "Generating system script: {} for profile: {}",
+                output, profile
+            );
+            eprintln!(
+                "Generating system script: {output} for profile: {profile}"
+            );
+
+            if args.dry_run {
+                info!(
+                    "[DRY RUN] Would generate system script: {} for profile: {}",
+                    output, profile
+                );
+                eprintln!(
+                    "DRY-RUN: Would generate system script: {output} for profile: {profile}"
+                );
+                return Ok(());
+            }
+
+            // TODO: Implement actual script generation logic
+            info!("Script generation not yet implemented");
+            eprintln!("Script generation not yet implemented");
         }
     }
+
+    info!("Ordinator completed successfully");
     Ok(())
 }

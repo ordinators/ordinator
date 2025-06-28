@@ -1,8 +1,7 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Config {
@@ -25,55 +24,13 @@ pub struct GlobalConfig {
     #[serde(default = "default_profile")]
     pub default_profile: String,
 
-    /// Whether to auto-push after successful apply
+    /// Whether to auto-push after successful operations
     #[serde(default)]
     pub auto_push: bool,
 
-    /// Whether to backup existing files before symlinking
+    /// Whether to create backups before making changes
     #[serde(default = "default_backup")]
-    pub backup_existing: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ProfileConfig {
-    /// Description of this profile
-    pub description: Option<String>,
-
-    /// Bootstrap script to run for this profile
-    pub bootstrap_script: Option<String>,
-
-    /// Files to include in this profile
-    #[serde(default)]
-    pub files: Vec<String>,
-
-    /// Files to exclude from this profile
-    #[serde(default)]
-    pub exclude: Vec<String>,
-
-    /// System commands to generate (but not execute)
-    #[serde(default)]
-    pub system_commands: Vec<String>,
-
-    /// Homebrew packages to install
-    #[serde(default)]
-    pub homebrew_packages: Vec<String>,
-
-    /// VS Code extensions to install
-    #[serde(default)]
-    pub vscode_extensions: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SecretsConfig {
-    /// Age key file path
-    pub age_key_file: Option<String>,
-
-    /// SOPS configuration file
-    pub sops_config: Option<String>,
-
-    /// Encrypted files patterns
-    #[serde(default)]
-    pub encrypted_patterns: Vec<String>,
+    pub create_backups: bool,
 }
 
 impl Default for GlobalConfig {
@@ -81,56 +38,198 @@ impl Default for GlobalConfig {
         Self {
             default_profile: default_profile(),
             auto_push: false,
-            backup_existing: default_backup(),
+            create_backups: default_backup(),
         }
     }
 }
 
-impl Default for SecretsConfig {
-    fn default() -> Self {
-        Self {
-            age_key_file: None,
-            sops_config: None,
-            encrypted_patterns: vec!["*.enc.yaml".to_string(), "*.enc.yml".to_string()],
-        }
-    }
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ProfileConfig {
+    /// Files to track for this profile
+    #[serde(default)]
+    pub files: Vec<String>,
+
+    /// Directories to track for this profile
+    #[serde(default)]
+    pub directories: Vec<String>,
+
+    /// Bootstrap script for this profile
+    pub bootstrap_script: Option<String>,
+
+    /// Whether this profile is enabled
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+
+    /// Profile description
+    pub description: Option<String>,
 }
 
-fn default_profile() -> String {
-    "default".to_string()
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct SecretsConfig {
+    /// Age key file path
+    pub age_key_file: Option<PathBuf>,
+
+    /// SOPS configuration file path
+    pub sops_config: Option<PathBuf>,
+
+    /// Patterns for files that should be encrypted
+    #[serde(default)]
+    pub encrypt_patterns: Vec<String>,
+
+    /// Patterns for files that should not be encrypted
+    #[serde(default)]
+    pub exclude_patterns: Vec<String>,
 }
 
-fn default_backup() -> bool {
-    true
-}
-
-#[allow(dead_code)]
 impl Config {
     /// Load configuration from a TOML file
-    pub fn from_file(path: &PathBuf) -> Result<Self> {
-        let content = fs::read_to_string(path)?;
-        let config: Config = toml::from_str(&content)?;
+    pub fn from_file(path: &Path) -> Result<Self> {
+        let content = std::fs::read_to_string(path)
+            .with_context(|| format!("Failed to read config file: {}", path.display()))?;
+
+        let config: Config = toml::from_str(&content)
+            .with_context(|| format!("Failed to parse config file: {}", path.display()))?;
+
         Ok(config)
     }
 
     /// Save configuration to a TOML file
-    pub fn save_to_file(&self, path: &PathBuf) -> Result<()> {
-        let content = toml::to_string_pretty(self)?;
-        fs::write(path, content)?;
+    pub fn save_to_file(&self, path: &Path) -> Result<()> {
+        let content =
+            toml::to_string_pretty(self).with_context(|| "Failed to serialize config to TOML")?;
+
+        // Ensure the directory exists
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
+        }
+
+        std::fs::write(path, content)
+            .with_context(|| format!("Failed to write config file: {}", path.display()))?;
+
         Ok(())
     }
 
-    /// Get a specific profile configuration
-    pub fn get_profile(&self, name: &str) -> Option<&ProfileConfig> {
-        self.profiles.get(name)
+    /// Find the configuration file in the current directory or dotfiles directory
+    pub fn find_config_file() -> Result<Option<PathBuf>> {
+        // Look for ordinator.toml in current directory
+        let current_config = std::env::current_dir()?.join("ordinator.toml");
+        if current_config.exists() {
+            return Ok(Some(current_config));
+        }
+
+        // Look for ordinator.toml in dotfiles directory
+        if let Ok(dotfiles_dir) = get_dotfiles_dir() {
+            let dotfiles_config = dotfiles_dir.join("ordinator.toml");
+            if dotfiles_config.exists() {
+                return Ok(Some(dotfiles_config));
+            }
+        }
+
+        Ok(None)
     }
 
-    /// Get the default profile configuration
-    pub fn get_default_profile(&self) -> Option<&ProfileConfig> {
-        self.get_profile(&self.global.default_profile)
+    /// Load configuration from the standard location
+    pub fn load() -> Result<Option<Self>> {
+        if let Some(config_path) = Self::find_config_file()? {
+            Ok(Some(Self::from_file(&config_path)?))
+        } else {
+            Ok(None)
+        }
     }
 
-    /// Create a new profile
+    /// Create a default configuration
+    pub fn create_default() -> Self {
+        let mut profiles = HashMap::new();
+
+        // Add default profile
+        profiles.insert(
+            "default".to_string(),
+            ProfileConfig {
+                files: vec![],
+                directories: vec![],
+                bootstrap_script: None,
+                enabled: true,
+                description: Some("Default profile for basic dotfiles".to_string()),
+            },
+        );
+
+        // Add work profile
+        profiles.insert(
+            "work".to_string(),
+            ProfileConfig {
+                files: vec![],
+                directories: vec![],
+                bootstrap_script: None,
+                enabled: true,
+                description: Some("Work environment profile".to_string()),
+            },
+        );
+
+        // Add personal profile
+        profiles.insert(
+            "personal".to_string(),
+            ProfileConfig {
+                files: vec![],
+                directories: vec![],
+                bootstrap_script: None,
+                enabled: true,
+                description: Some("Personal environment profile".to_string()),
+            },
+        );
+
+        Config {
+            global: GlobalConfig::default(),
+            profiles,
+            secrets: SecretsConfig::default(),
+        }
+    }
+
+    /// Initialize a new configuration in the dotfiles directory
+    pub fn init_dotfiles_repository() -> Result<PathBuf> {
+        let dotfiles_dir = get_dotfiles_dir()?;
+
+        // Create dotfiles directory if it doesn't exist
+        std::fs::create_dir_all(&dotfiles_dir).with_context(|| {
+            format!(
+                "Failed to create dotfiles directory: {}",
+                dotfiles_dir.display()
+            )
+        })?;
+
+        // Create config file
+        let config_path = dotfiles_dir.join("ordinator.toml");
+        let config = Self::create_default();
+        config.save_to_file(&config_path)?;
+
+        // Create subdirectories
+        let scripts_dir = dotfiles_dir.join("scripts");
+        std::fs::create_dir_all(&scripts_dir).with_context(|| {
+            format!(
+                "Failed to create scripts directory: {}",
+                scripts_dir.display()
+            )
+        })?;
+
+        let files_dir = dotfiles_dir.join("files");
+        std::fs::create_dir_all(&files_dir).with_context(|| {
+            format!("Failed to create files directory: {}", files_dir.display())
+        })?;
+
+        Ok(config_path)
+    }
+
+    /// Get a profile configuration
+    pub fn get_profile(&self, profile_name: &str) -> Option<&ProfileConfig> {
+        self.profiles.get(profile_name)
+    }
+
+    /// Get a mutable profile configuration
+    pub fn get_profile_mut(&mut self, profile_name: &str) -> Option<&mut ProfileConfig> {
+        self.profiles.get_mut(profile_name)
+    }
+
+    /// Add a new profile
     pub fn add_profile(&mut self, name: String, config: ProfileConfig) {
         self.profiles.insert(name, config);
     }
@@ -144,53 +243,180 @@ impl Config {
     pub fn list_profiles(&self) -> Vec<&String> {
         self.profiles.keys().collect()
     }
+
+    /// Check if a profile exists
+    pub fn has_profile(&self, name: &str) -> bool {
+        self.profiles.contains_key(name)
+    }
+
+    /// Get the default profile name
+    pub fn default_profile(&self) -> &str {
+        &self.global.default_profile
+    }
+
+    /// Set the default profile
+    pub fn set_default_profile(&mut self, profile: String) {
+        self.global.default_profile = profile;
+    }
+
+    /// Add a file to a profile
+    pub fn add_file_to_profile(&mut self, profile_name: &str, file_path: String) -> Result<()> {
+        if let Some(profile) = self.get_profile_mut(profile_name) {
+            if !profile.files.contains(&file_path) {
+                profile.files.push(file_path);
+            }
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Profile '{}' not found", profile_name))
+        }
+    }
+
+    /// Remove a file from a profile
+    pub fn remove_file_from_profile(&mut self, profile_name: &str, file_path: &str) -> Result<()> {
+        if let Some(profile) = self.get_profile_mut(profile_name) {
+            profile.files.retain(|f| f != file_path);
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Profile '{}' not found", profile_name))
+        }
+    }
 }
 
-#[allow(dead_code)]
-impl ProfileConfig {
-    /// Create a new profile configuration
-    pub fn new(description: Option<String>) -> Self {
-        Self {
-            description,
+// Helper functions for default values
+fn default_profile() -> String {
+    "default".to_string()
+}
+
+fn default_backup() -> bool {
+    true
+}
+
+fn default_enabled() -> bool {
+    true
+}
+
+/// Get the dotfiles directory path
+fn get_dotfiles_dir() -> Result<PathBuf> {
+    let home_dir =
+        dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?;
+    Ok(home_dir.join(".dotfiles"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+    use std::io::Write;
+
+    #[test]
+    fn test_config_creation() {
+        let config = Config::create_default();
+        assert!(config.has_profile("default"));
+        assert!(config.has_profile("work"));
+        assert!(config.has_profile("personal"));
+        assert_eq!(config.default_profile(), "default");
+    }
+
+    #[test]
+    fn test_config_serialization() {
+        let config = Config::create_default();
+        let temp_file = NamedTempFile::new().unwrap();
+
+        // Save config
+        config.save_to_file(temp_file.path()).unwrap();
+
+        // Load config
+        let loaded_config = Config::from_file(temp_file.path()).unwrap();
+
+        assert_eq!(config.default_profile(), loaded_config.default_profile());
+        assert_eq!(config.profiles.len(), loaded_config.profiles.len());
+    }
+
+    #[test]
+    fn test_profile_management() {
+        let mut config = Config::create_default();
+
+        // Add a new profile
+        let new_profile = ProfileConfig {
+            files: vec!["test.txt".to_string()],
+            directories: vec![],
             bootstrap_script: None,
-            files: Vec::new(),
-            exclude: Vec::new(),
-            system_commands: Vec::new(),
-            homebrew_packages: Vec::new(),
-            vscode_extensions: Vec::new(),
-        }
+            enabled: true,
+            description: Some("Test profile".to_string()),
+        };
+
+        config.add_profile("test".to_string(), new_profile);
+        assert!(config.has_profile("test"));
+
+        // Get profile
+        let profile = config.get_profile("test").unwrap();
+        assert_eq!(profile.files.len(), 1);
+        assert_eq!(profile.files[0], "test.txt");
+
+        // Remove profile
+        let removed = config.remove_profile("test");
+        assert!(removed.is_some());
+        assert!(!config.has_profile("test"));
     }
 
-    /// Add a file to this profile
-    pub fn add_file(&mut self, file: String) {
-        if !self.files.contains(&file) {
-            self.files.push(file);
-        }
+    #[test]
+    fn test_file_management() {
+        let mut config = Config::create_default();
+
+        // Add file to default profile
+        config
+            .add_file_to_profile("default", "~/.zshrc".to_string())
+            .unwrap();
+        let profile = config.get_profile("default").unwrap();
+        assert!(profile.files.contains(&"~/.zshrc".to_string()));
+
+        // Remove file from default profile
+        config
+            .remove_file_from_profile("default", "~/.zshrc")
+            .unwrap();
+        let profile = config.get_profile("default").unwrap();
+        assert!(!profile.files.contains(&"~/.zshrc".to_string()));
     }
 
-    /// Remove a file from this profile
-    pub fn remove_file(&mut self, file: &str) {
-        self.files.retain(|f| f != file);
+    #[test]
+    fn test_error_loading_malformed_config() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        // Write invalid TOML
+        writeln!(temp_file, "not a valid toml").unwrap();
+        let result = Config::from_file(temp_file.path());
+        assert!(result.is_err(), "Malformed config should return an error");
     }
 
-    /// Add a system command to this profile
-    pub fn add_system_command(&mut self, command: String) {
-        if !self.system_commands.contains(&command) {
-            self.system_commands.push(command);
-        }
+    #[test]
+    fn test_add_file_to_nonexistent_profile() {
+        let mut config = Config::create_default();
+        let result = config.add_file_to_profile("does_not_exist", "file.txt".to_string());
+        assert!(
+            result.is_err(),
+            "Adding file to non-existent profile should error"
+        );
     }
 
-    /// Add a Homebrew package to this profile
-    pub fn add_homebrew_package(&mut self, package: String) {
-        if !self.homebrew_packages.contains(&package) {
-            self.homebrew_packages.push(package);
-        }
+    #[test]
+    fn test_remove_file_from_nonexistent_profile() {
+        let mut config = Config::create_default();
+        let result = config.remove_file_from_profile("does_not_exist", "file.txt");
+        assert!(
+            result.is_err(),
+            "Removing file from non-existent profile should error"
+        );
     }
 
-    /// Add a VS Code extension to this profile
-    pub fn add_vscode_extension(&mut self, extension: String) {
-        if !self.vscode_extensions.contains(&extension) {
-            self.vscode_extensions.push(extension);
-        }
+    #[test]
+    fn test_remove_nonexistent_file_from_profile() {
+        let mut config = Config::create_default();
+        // Removing a file that doesn't exist should not error
+        let result = config.remove_file_from_profile("default", "not_in_profile.txt");
+        assert!(
+            result.is_ok(),
+            "Removing non-existent file should be a no-op"
+        );
+        let profile = config.get_profile("default").unwrap();
+        assert!(!profile.files.contains(&"not_in_profile.txt".to_string()));
     }
 }
