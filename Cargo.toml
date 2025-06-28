@@ -1,6 +1,6 @@
 [package]
 name = "ordinator"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Anthony Norfleet <anthony.norfleet@gmail.com>"]
 description = "Dotfiles and Environment Manager for macOS"
