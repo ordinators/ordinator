@@ -34,6 +34,9 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-
     
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+    
     - name: Check formatting
       run: cargo fmt --all -- --check
     
