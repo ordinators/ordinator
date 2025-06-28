@@ -52,19 +52,19 @@ Ordinator is a CLI tool written in Rust for managing macOS dotfiles, system sett
 
 ### Via Homebrew (Recommended)
 ```bash
-brew install yourusername/ordinator/ordinator
+brew install ceterus/ordinator/ordinator
 ```
 
 ### Via curl script
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yourusername/ordinator/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ceterus/ordinator/main/install.sh | sh
 ```
 
 ## Quick Start
 
 1. **Initialize a new dotfiles repository:**
    ```bash
-   ordinator init --remote https://github.com/yourusername/dotfiles.git
+   ordinator init --remote https://github.com/ceterus/dotfiles.git
    ```
 
 2. **Add your first dotfile:**
