@@ -1,11 +1,11 @@
 use clap::Parser;
 use tracing::{error, info};
 
+mod bootstrap;
 mod cli;
 mod config;
 mod git;
 mod secrets;
-mod bootstrap;
 mod utils;
 
 use cli::Args;

@@ -1,5 +1,5 @@
-use clap::{Parser, Subcommand};
 use anyhow::Result;
+use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(name = "ordinator")]
@@ -25,7 +25,7 @@ pub enum Commands {
         /// Remote Git repository URL
         #[arg(long)]
         remote: Option<String>,
-        
+
         /// Profile to use for initialization
         #[arg(long, default_value = "default")]
         profile: String,
@@ -36,7 +36,7 @@ pub enum Commands {
         /// File or directory to add
         #[arg(required = true)]
         path: String,
-        
+
         /// Profile to associate with this file
         #[arg(long)]
         profile: Option<String>,
@@ -89,11 +89,11 @@ pub enum Commands {
         /// Profile to apply
         #[arg(long, default_value = "default")]
         profile: String,
-        
+
         /// Skip bootstrap script execution
         #[arg(long)]
         skip_bootstrap: bool,
-        
+
         /// Skip secrets decryption
         #[arg(long)]
         skip_secrets: bool,
@@ -117,7 +117,7 @@ pub enum Commands {
         /// Output file path
         #[arg(short, long, default_value = "ordinator-system.sh")]
         output: String,
-        
+
         /// Profile to use
         #[arg(long, default_value = "default")]
         profile: String,
@@ -157,7 +157,7 @@ pub async fn run(args: Args) -> Result<()> {
             }
             // TODO: Implement init logic
         }
-        
+
         Commands::Add { path, profile } => {
             println!("Adding file: {}", path);
             if let Some(p) = profile {
@@ -165,38 +165,42 @@ pub async fn run(args: Args) -> Result<()> {
             }
             // TODO: Implement add logic
         }
-        
+
         Commands::Remove { path } => {
             println!("Removing file: {}", path);
             // TODO: Implement remove logic
         }
-        
+
         Commands::Commit { message } => {
             println!("Committing with message: {}", message);
             // TODO: Implement commit logic
         }
-        
+
         Commands::Push { force } => {
             println!("Pushing changes{}", if force { " (force)" } else { "" });
             // TODO: Implement push logic
         }
-        
+
         Commands::Pull { rebase } => {
             println!("Pulling changes{}", if rebase { " (rebase)" } else { "" });
             // TODO: Implement pull logic
         }
-        
+
         Commands::Sync { force } => {
             println!("Syncing repository{}", if force { " (force)" } else { "" });
             // TODO: Implement sync logic
         }
-        
+
         Commands::Status { verbose } => {
             println!("Showing status{}", if verbose { " (verbose)" } else { "" });
             // TODO: Implement status logic
         }
-        
-        Commands::Apply { profile, skip_bootstrap, skip_secrets } => {
+
+        Commands::Apply {
+            profile,
+            skip_bootstrap,
+            skip_secrets,
+        } => {
             println!("Applying profile: {}", profile);
             if skip_bootstrap {
                 println!("Skipping bootstrap");
@@ -206,12 +210,15 @@ pub async fn run(args: Args) -> Result<()> {
             }
             // TODO: Implement apply logic
         }
-        
+
         Commands::Profiles { verbose } => {
-            println!("Listing profiles{}", if verbose { " (verbose)" } else { "" });
+            println!(
+                "Listing profiles{}",
+                if verbose { " (verbose)" } else { "" }
+            );
             // TODO: Implement profiles logic
         }
-        
+
         Commands::Secrets { subcommand } => {
             match subcommand {
                 SecretCommands::Encrypt { file } => {
@@ -223,17 +230,23 @@ pub async fn run(args: Args) -> Result<()> {
                     // TODO: Implement decrypt logic
                 }
                 SecretCommands::List { paths_only } => {
-                    println!("Listing secrets{}", if paths_only { " (paths only)" } else { "" });
+                    println!(
+                        "Listing secrets{}",
+                        if paths_only { " (paths only)" } else { "" }
+                    );
                     // TODO: Implement list logic
                 }
             }
         }
-        
+
         Commands::GenerateScript { output, profile } => {
-            println!("Generating system script: {} for profile: {}", output, profile);
+            println!(
+                "Generating system script: {} for profile: {}",
+                output, profile
+            );
             // TODO: Implement script generation logic
         }
     }
 
     Ok(())
-} 
+}
