@@ -51,7 +51,11 @@ impl BootstrapManager {
     }
 
     /// Generate system script for manual execution
-    pub fn generate_system_script(&self, _commands: &[String], output_path: &std::path::Path) -> Result<()> {
+    pub fn generate_system_script(
+        &self,
+        _commands: &[String],
+        output_path: &std::path::Path,
+    ) -> Result<()> {
         info!("Generating system script: {:?}", output_path);
         // TODO: Implement system script generation
         Ok(())

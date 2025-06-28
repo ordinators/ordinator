@@ -230,9 +230,7 @@ pub async fn run(args: Args) -> Result<()> {
             }
         }
         Commands::GenerateScript { output, profile } => {
-            println!(
-                "Generating system script: {output} for profile: {profile}"
-            );
+            println!("Generating system script: {output} for profile: {profile}");
             // TODO: Implement script generation logic
         }
     }

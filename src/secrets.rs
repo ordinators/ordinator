@@ -11,7 +11,10 @@ pub struct SecretsManager {
 impl SecretsManager {
     /// Create a new secrets manager
     #[allow(dead_code)]
-    pub fn new(age_key_file: Option<std::path::PathBuf>, sops_config: Option<std::path::PathBuf>) -> Self {
+    pub fn new(
+        age_key_file: Option<std::path::PathBuf>,
+        sops_config: Option<std::path::PathBuf>,
+    ) -> Self {
         Self {
             age_key_file,
             sops_config,
@@ -36,7 +39,10 @@ impl SecretsManager {
 
     /// List encrypted files in the repository
     #[allow(dead_code)]
-    pub fn list_encrypted_files(&self, _repo_path: &std::path::Path) -> Result<Vec<std::path::PathBuf>> {
+    pub fn list_encrypted_files(
+        &self,
+        _repo_path: &std::path::Path,
+    ) -> Result<Vec<std::path::PathBuf>> {
         // TODO: Implement listing encrypted files
         Ok(Vec::new())
     }
