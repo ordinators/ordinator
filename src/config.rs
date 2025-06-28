@@ -230,11 +230,13 @@ impl Config {
     }
 
     /// Add a new profile
+    #[allow(dead_code)]
     pub fn add_profile(&mut self, name: String, config: ProfileConfig) {
         self.profiles.insert(name, config);
     }
 
     /// Remove a profile
+    #[allow(dead_code)]
     pub fn remove_profile(&mut self, name: &str) -> Option<ProfileConfig> {
         self.profiles.remove(name)
     }
@@ -245,16 +247,19 @@ impl Config {
     }
 
     /// Check if a profile exists
+    #[allow(dead_code)]
     pub fn has_profile(&self, name: &str) -> bool {
         self.profiles.contains_key(name)
     }
 
     /// Get the default profile name
+    #[allow(dead_code)]
     pub fn default_profile(&self) -> &str {
         &self.global.default_profile
     }
 
     /// Set the default profile
+    #[allow(dead_code)]
     pub fn set_default_profile(&mut self, profile: String) {
         self.global.default_profile = profile;
     }
@@ -272,6 +277,7 @@ impl Config {
     }
 
     /// Remove a file from a profile
+    #[allow(dead_code)]
     pub fn remove_file_from_profile(&mut self, profile_name: &str, file_path: &str) -> Result<()> {
         if let Some(profile) = self.get_profile_mut(profile_name) {
             profile.files.retain(|f| f != file_path);
@@ -305,8 +311,8 @@ fn get_dotfiles_dir() -> Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
     use std::io::Write;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_config_creation() {

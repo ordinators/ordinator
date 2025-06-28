@@ -185,9 +185,7 @@ pub async fn run(args: Args) -> Result<()> {
                     "[DRY RUN] Would initialize repository with profile: {}",
                     profile
                 );
-                eprintln!(
-                    "DRY-RUN: Would initialize repository with profile: {profile}"
-                );
+                eprintln!("DRY-RUN: Would initialize repository with profile: {profile}");
                 if let Some(url) = remote {
                     info!("[DRY RUN] Would set remote URL: {}", url);
                     eprintln!("DRY-RUN: Would set remote URL: {url}");
@@ -489,18 +487,14 @@ pub async fn run(args: Args) -> Result<()> {
                 "Generating system script: {} for profile: {}",
                 output, profile
             );
-            eprintln!(
-                "Generating system script: {output} for profile: {profile}"
-            );
+            eprintln!("Generating system script: {output} for profile: {profile}");
 
             if args.dry_run {
                 info!(
                     "[DRY RUN] Would generate system script: {} for profile: {}",
                     output, profile
                 );
-                eprintln!(
-                    "DRY-RUN: Would generate system script: {output} for profile: {profile}"
-                );
+                eprintln!("DRY-RUN: Would generate system script: {output} for profile: {profile}");
                 return Ok(());
             }
 
