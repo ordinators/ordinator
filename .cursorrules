@@ -58,4 +58,9 @@
 - Security tests must pass (no secret leakage, no unauthorized sudo execution)
 - Integration tests must run in clean, isolated environments
 
-Remember: The PRD.md is the source of truth for this project, and TEST_PLAN.md is the source of truth for testing. Any deviation from either should be carefully considered and documented. 
+Remember: The PRD.md is the source of truth for this project, and TEST_PLAN.md is the source of truth for testing. Any deviation from either should be carefully considered and documented.
+
+# Homebrew Formula Release Rule
+- Homebrew formula files (ordinator.rb) must ONLY be created, updated, or deleted in the homebrew-ordinator/Formula directory.
+- The main ordinator project must NEVER contain a Formula directory or ordinator.rb file.
+- All release automation and formula SHA updates must be performed in the homebrew-ordinator tap repository, not in the main ordinator repo. 
