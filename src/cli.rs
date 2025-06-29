@@ -222,7 +222,7 @@ pub async fn run(args: Args) -> Result<()> {
             if let Some(url) = remote {
                 git_manager.add_remote("origin", &url)?;
                 info!("Remote 'origin' added: {}", url);
-                eprintln!("Remote 'origin' added: {}", url);
+                eprintln!("Remote 'origin' added: {url}");
             }
 
             info!("Repository initialization completed");
@@ -449,7 +449,7 @@ pub async fn run(args: Args) -> Result<()> {
             }
 
             let status = git_manager.status()?;
-            eprintln!("{}", status);
+            eprintln!("{status}");
         }
         Commands::Apply {
             profile,
