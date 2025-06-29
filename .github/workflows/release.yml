@@ -21,11 +21,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install Rust toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
+    - name: Install Rust
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        source $HOME/.cargo/env
+        rustup default stable
 
     - name: Cache dependencies
       uses: actions/cache@v4
@@ -39,7 +39,9 @@ jobs:
           ${{ runner.os }}-cargo-
 
     - name: Build release binary
-      run: cargo build --release
+      run: |
+        source $HOME/.cargo/env
+        cargo build --release
 
     - name: Upload binary
       uses: actions/upload-artifact@v4
