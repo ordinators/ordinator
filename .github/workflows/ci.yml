@@ -38,20 +38,22 @@ jobs:
     - name: Install cargo tools (if not cached)
       run: |
         if ! command -v cargo-audit &> /dev/null; then
-          cargo install cargo-audit
+          echo "Installing cargo-audit..."
+          curl -L https://github.com/rustsec/rustsec/releases/latest/download/cargo-audit-x86_64-apple-darwin.tar.gz | tar xz -C ~/.cargo/bin cargo-audit
         fi
         if ! command -v cargo-tarpaulin &> /dev/null; then
-          cargo install cargo-tarpaulin
+          echo "Installing cargo-tarpaulin..."
+          curl -L https://github.com/xd009642/tarpaulin/releases/latest/download/cargo-tarpaulin-x86_64-apple-darwin.tar.gz | tar xz -C ~/.cargo/bin cargo-tarpaulin
         fi
     
     - name: Check formatting
       run: cargo fmt --all -- --check
     
     - name: Run clippy
-      run: cargo clippy --all-targets --all-features -- -D warnings
+      run: cargo clippy --release --all-targets --all-features -- -D warnings
     
     - name: Run tests and generate coverage
-      run: cargo tarpaulin
+      run: cargo tarpaulin --release
     
     - name: Run security audit
       run: cargo audit --deny warnings 
