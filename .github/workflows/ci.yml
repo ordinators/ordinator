@@ -44,10 +44,7 @@ jobs:
       run: cargo clippy --all-targets --all-features -- -D warnings
     
     - name: Run tests and generate coverage
-      run: cargo tarpaulin --out Xml --output-dir coverage
+      run: cargo tarpaulin
     
     - name: Run security audit
-      run: cargo audit --deny warnings
-    
-    - name: Generate HTML coverage report
-      run: cargo tarpaulin --out Html --output-dir coverage-html 
+      run: cargo audit --deny warnings 
