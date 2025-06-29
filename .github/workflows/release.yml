@@ -57,8 +57,21 @@ jobs:
       with:
         path: dist/
 
+    - name: Debug: List downloaded files
+      run: |
+        echo "Contents of dist/ directory:"
+        ls -la dist/
+        echo "Checking if binary exists:"
+        if [ -f "dist/ordinator-macos" ]; then
+          echo "Binary found!"
+          ls -la dist/ordinator-macos
+        else
+          echo "Binary not found!"
+          find dist/ -type f
+        fi
+
     - name: Create release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: dist/ordinator-macos
         generate_release_notes: true
