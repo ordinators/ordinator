@@ -14,18 +14,18 @@ This roadmap breaks down the Ordinator project into actionable, testable chunks.
 **Testable**: ✅
 
 **Tasks**:
-- [ ] Implement basic CLI command parsing (init, help, version)
-- [ ] Create configuration file loading/saving (`ordinator.toml`)
-- [ ] Add profile support in configuration
-- [ ] Implement dry-run mode flag handling
-- [ ] Add basic logging setup
+- [x] Implement basic CLI command parsing (init, help, version)
+- [x] Create configuration file loading/saving (`ordinator.toml`)
+- [x] Add profile support in configuration
+- [x] Implement dry-run mode flag handling
+- [x] Add basic logging setup
 
 **Tests**:
-- [ ] CLI commands parse correctly
-- [ ] Configuration files load/save properly
-- [ ] Profile switching works
-- [ ] Dry-run mode is respected
-- [ ] Logging outputs correctly
+- [x] CLI commands parse correctly
+- [x] Configuration files load/save properly
+- [x] Profile switching works
+- [x] Dry-run mode is respected
+- [x] Logging outputs correctly
 
 **Acceptance Criteria**:
 ```bash

@@ -63,4 +63,11 @@ Remember: The PRD.md is the source of truth for this project, and TEST_PLAN.md i
 # Homebrew Formula Release Rule
 - Homebrew formula files (ordinator.rb) must ONLY be created, updated, or deleted in the homebrew-ordinator/Formula directory.
 - The main ordinator project must NEVER contain a Formula directory or ordinator.rb file.
-- All release automation and formula SHA updates must be performed in the homebrew-ordinator tap repository, not in the main ordinator repo. 
+- All release automation and formula SHA updates must be performed in the homebrew-ordinator tap repository, not in the main ordinator repo.
+
+# Development Roadmap Tracking Rule
+- **ALWAYS update DEVELOPMENT_ROADMAP.md when features are completed**
+- When you detect that a task or feature in the roadmap has been implemented and tested, mark it as complete by changing `[ ]` to `[x]`
+- This includes both the **Tasks** and **Tests** sections for each phase
+- Update the roadmap immediately after completing implementation and testing
+- The roadmap serves as the progress tracking document, not the PRD 
