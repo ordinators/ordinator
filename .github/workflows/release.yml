@@ -12,6 +12,8 @@ permissions:
   contents: write
   packages: write
   actions: read
+  pull-requests: write
+  issues: write
 
 jobs:
   build:
@@ -106,11 +108,17 @@ jobs:
     - name: Create pull request
       run: |
         cd homebrew-tap
+        echo "Current user: $(git config user.name)"
+        echo "Current email: $(git config user.email)"
+        echo "Repository: $(git remote get-url origin)"
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git checkout -b update-ordinator-${{ steps.get_version.outputs.VERSION }}
         git add Formula/ordinator.rb
         git commit -m "Update ordinator to ${{ steps.get_version.outputs.VERSION }}" || exit 0
+        echo "Attempting to push to origin..."
         git push origin update-ordinator-${{ steps.get_version.outputs.VERSION }}
+        echo "Setting up GitHub CLI authentication..."
         echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+        echo "Creating pull request..."
         gh pr create --title "Update ordinator to ${{ steps.get_version.outputs.VERSION }}" --body "Automated update from ordinator release workflow" --base master || echo "PR creation failed, but formula was updated" 
