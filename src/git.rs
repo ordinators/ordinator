@@ -638,7 +638,7 @@ mod tests {
         let status = git_manager.status().unwrap();
 
         // Print the actual status for debugging
-        println!("Actual status output:\n{}", status);
+        println!("Actual status output:\n{status}");
 
         // Should show both untracked and modified files
         // Check for the presence of both files in the status output
