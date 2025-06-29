@@ -41,7 +41,7 @@ jobs:
           echo "Installing cargo-audit..."
           curl -L https://github.com/rustsec/rustsec/releases/latest/download/cargo-audit-x86_64-apple-darwin.tar.gz | tar xz -C ~/.cargo/bin cargo-audit
         fi
-        if ! command -v cargo-tarpaulin &> /dev/null; then
+        if [ "${{ github.event_name }}" = "pull_request" ] && ! command -v cargo-tarpaulin &> /dev/null; then
           echo "Installing cargo-tarpaulin..."
           curl -L https://github.com/xd009642/tarpaulin/releases/latest/download/cargo-tarpaulin-x86_64-apple-darwin.tar.gz | tar xz -C ~/.cargo/bin cargo-tarpaulin
         fi
@@ -52,7 +52,11 @@ jobs:
     - name: Run clippy
       run: cargo clippy --release --all-targets --all-features -- -D warnings
     
-    - name: Run tests and generate coverage
+    - name: Run tests
+      run: cargo test --release
+    
+    - name: Run tests and generate coverage (PR only)
+      if: github.event_name == 'pull_request'
       run: cargo tarpaulin --release
     
     - name: Run security audit
