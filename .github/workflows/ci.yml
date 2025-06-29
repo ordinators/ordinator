@@ -49,11 +49,10 @@ jobs:
     - name: Check formatting
       run: cargo fmt --all -- --check
     
-    - name: Run clippy
-      run: cargo clippy --release --all-targets --all-features -- -D warnings
-    
-    - name: Run tests
-      run: cargo test --release
+    - name: Run clippy and tests
+      run: |
+        cargo clippy --release --all-targets --all-features -- -D warnings
+        cargo test --release
     
     - name: Run tests and generate coverage (PR only)
       if: github.event_name == 'pull_request'
