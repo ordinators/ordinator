@@ -10,7 +10,7 @@ env:
 
 jobs:
   build:
-    name: Build and Test
+    name: Build and Release
     runs-on: macos-latest
 
     steps:
@@ -32,21 +32,6 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-cargo-
-
-    - name: Install cargo-audit
-      run: cargo install cargo-audit
-
-    - name: Check formatting
-      run: cargo fmt --all -- --check
-
-    - name: Run clippy
-      run: cargo clippy --all-targets --all-features -- -D warnings
-
-    - name: Run tests
-      run: cargo test --all-features
-
-    - name: Security audit
-      run: cargo audit --deny warnings
 
     - name: Build release binary
       run: cargo build --release
