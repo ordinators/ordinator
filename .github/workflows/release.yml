@@ -110,6 +110,7 @@ jobs:
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git checkout -b update-ordinator-${{ steps.get_version.outputs.VERSION }}
         git add Formula/ordinator.rb
-        git commit -m "Update ordinator to ${{ steps.get_version.outputs.VERSION }}"
+        git commit -m "Update ordinator to ${{ steps.get_version.outputs.VERSION }}" || exit 0
         git push origin update-ordinator-${{ steps.get_version.outputs.VERSION }}
-        gh pr create --title "Update ordinator to ${{ steps.get_version.outputs.VERSION }}" --body "Automated update from ordinator release workflow" --base master 
+        echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+        gh pr create --title "Update ordinator to ${{ steps.get_version.outputs.VERSION }}" --body "Automated update from ordinator release workflow" --base master || echo "PR creation failed, but formula was updated" 
