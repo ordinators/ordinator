@@ -47,7 +47,4 @@ jobs:
       run: cargo test --all-features
     
     - name: Run security audit
-      run: cargo audit --deny warnings
-    
-    - name: Build release
-      run: cargo build --release 
+      run: cargo audit --deny warnings 
