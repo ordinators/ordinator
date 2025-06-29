@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Anthony Norfleet <anthony.norfleet@gmail.com>"]
 description = "Dotfiles and Environment Manager for macOS"
 license = "MIT"
-repository = "https://github.com/ceterus/ordinator"
+repository = "https://github.com/ordinators/ordinator"
 keywords = ["dotfiles", "macos", "environment", "cli", "sops"]
 categories = ["command-line-utilities", "development-tools"]
 

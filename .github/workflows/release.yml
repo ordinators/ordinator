@@ -11,6 +11,7 @@ env:
 permissions:
   contents: write
   packages: write
+  actions: read
 
 jobs:
   build:
@@ -85,13 +86,13 @@ jobs:
     - name: Get SHA256 hash
       id: get_sha256
       run: |
-        SHA256=$(curl -sL "https://github.com/${{ github.repository }}/archive/${{ steps.get_version.outputs.VERSION }}.tar.gz" | shasum -a 256 | cut -d' ' -f1)
+        SHA256=$(curl -sL "https://github.com/ordinators/ordinator/archive/${{ steps.get_version.outputs.VERSION }}.tar.gz" | shasum -a 256 | cut -d' ' -f1)
         echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
 
     - name: Checkout homebrew tap
       uses: actions/checkout@v4
       with:
-        repository: ceterus/homebrew-ordinator
+        repository: ordinators/homebrew-ordinator
         token: ${{ secrets.GITHUB_TOKEN }}
         path: homebrew-tap
         ref: master
@@ -99,14 +100,16 @@ jobs:
     - name: Update formula
       run: |
         cd homebrew-tap
-        sed -i "s|url \"https://github.com/ceterus/ordinator/archive/v[0-9.]*\.tar\.gz\"|url \"https://github.com/ceterus/ordinator/archive/${{ steps.get_version.outputs.VERSION }}.tar.gz\"|" Formula/ordinator.rb
+        sed -i "s|url \"https://github.com/ordinators/ordinator/archive/v[0-9.]*\.tar\.gz\"|url \"https://github.com/ordinators/ordinator/archive/${{ steps.get_version.outputs.VERSION }}.tar.gz\"|" Formula/ordinator.rb
         sed -i "s|sha256 \"[a-f0-9]*\"|sha256 \"${{ steps.get_sha256.outputs.SHA256 }}\"|" Formula/ordinator.rb
 
-    - name: Commit and push formula update
+    - name: Create pull request
       run: |
         cd homebrew-tap
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
+        git checkout -b update-ordinator-${{ steps.get_version.outputs.VERSION }}
         git add Formula/ordinator.rb
         git commit -m "Update ordinator to ${{ steps.get_version.outputs.VERSION }}"
-        git push 
+        git push origin update-ordinator-${{ steps.get_version.outputs.VERSION }}
+        gh pr create --title "Update ordinator to ${{ steps.get_version.outputs.VERSION }}" --body "Automated update from ordinator release workflow" --base master 
