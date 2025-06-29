@@ -23,19 +23,26 @@ jobs:
         toolchain: stable
         override: true
     
-    - name: Cache dependencies
+    - name: Cache dependencies and tools
       uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
+          ~/.cargo/bin
           target
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-cargo-
     
-    - name: Install cargo tools
-      run: cargo install cargo-audit cargo-tarpaulin
+    - name: Install cargo tools (if not cached)
+      run: |
+        if ! command -v cargo-audit &> /dev/null; then
+          cargo install cargo-audit
+        fi
+        if ! command -v cargo-tarpaulin &> /dev/null; then
+          cargo install cargo-tarpaulin
+        fi
     
     - name: Check formatting
       run: cargo fmt --all -- --check
