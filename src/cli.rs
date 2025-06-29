@@ -202,14 +202,20 @@ pub async fn run(args: Args) -> Result<()> {
             // Initialize Git repository
             let dotfiles_path = config_path.parent().unwrap().to_path_buf();
             let git_manager = GitManager::new(dotfiles_path.clone());
-            
+
             if !git_manager.exists() {
                 git_manager.init()?;
                 info!("Git repository initialized at: {}", dotfiles_path.display());
                 eprintln!("Git repository initialized at: {}", dotfiles_path.display());
             } else {
-                info!("Git repository already exists at: {}", dotfiles_path.display());
-                eprintln!("Git repository already exists at: {}", dotfiles_path.display());
+                info!(
+                    "Git repository already exists at: {}",
+                    dotfiles_path.display()
+                );
+                eprintln!(
+                    "Git repository already exists at: {}",
+                    dotfiles_path.display()
+                );
             }
 
             // Add remote if provided
@@ -288,14 +294,18 @@ pub async fn run(args: Args) -> Result<()> {
             // Get the dotfiles repository path
             let config_path = Config::find_config_file()
                 .with_context(|| "No configuration file found. Run 'ordinator init' first.")?
-                .ok_or_else(|| anyhow::anyhow!("No configuration file found. Run 'ordinator init' first."))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!("No configuration file found. Run 'ordinator init' first.")
+                })?;
             let dotfiles_path = config_path.parent().unwrap().to_path_buf();
-            
+
             let git_manager = GitManager::new(dotfiles_path);
             if !git_manager.exists() {
-                return Err(anyhow::anyhow!("No Git repository found. Run 'ordinator init' first."));
+                return Err(anyhow::anyhow!(
+                    "No Git repository found. Run 'ordinator init' first."
+                ));
             }
-            
+
             git_manager.commit(&message)?;
             info!("Changes committed successfully");
             eprintln!("Changes committed successfully");
@@ -319,14 +329,18 @@ pub async fn run(args: Args) -> Result<()> {
             // Get the dotfiles repository path
             let config_path = Config::find_config_file()
                 .with_context(|| "No configuration file found. Run 'ordinator init' first.")?
-                .ok_or_else(|| anyhow::anyhow!("No configuration file found. Run 'ordinator init' first."))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!("No configuration file found. Run 'ordinator init' first.")
+                })?;
             let dotfiles_path = config_path.parent().unwrap().to_path_buf();
-            
+
             let git_manager = GitManager::new(dotfiles_path);
             if !git_manager.exists() {
-                return Err(anyhow::anyhow!("No Git repository found. Run 'ordinator init' first."));
+                return Err(anyhow::anyhow!(
+                    "No Git repository found. Run 'ordinator init' first."
+                ));
             }
-            
+
             git_manager.push(force)?;
             info!("Changes pushed successfully");
             eprintln!("Changes pushed successfully");
@@ -350,14 +364,18 @@ pub async fn run(args: Args) -> Result<()> {
             // Get the dotfiles repository path
             let config_path = Config::find_config_file()
                 .with_context(|| "No configuration file found. Run 'ordinator init' first.")?
-                .ok_or_else(|| anyhow::anyhow!("No configuration file found. Run 'ordinator init' first."))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!("No configuration file found. Run 'ordinator init' first.")
+                })?;
             let dotfiles_path = config_path.parent().unwrap().to_path_buf();
-            
+
             let git_manager = GitManager::new(dotfiles_path);
             if !git_manager.exists() {
-                return Err(anyhow::anyhow!("No Git repository found. Run 'ordinator init' first."));
+                return Err(anyhow::anyhow!(
+                    "No Git repository found. Run 'ordinator init' first."
+                ));
             }
-            
+
             git_manager.pull(rebase)?;
             info!("Changes pulled successfully");
             eprintln!("Changes pulled successfully");
@@ -381,14 +399,18 @@ pub async fn run(args: Args) -> Result<()> {
             // Get the dotfiles repository path
             let config_path = Config::find_config_file()
                 .with_context(|| "No configuration file found. Run 'ordinator init' first.")?
-                .ok_or_else(|| anyhow::anyhow!("No configuration file found. Run 'ordinator init' first."))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!("No configuration file found. Run 'ordinator init' first.")
+                })?;
             let dotfiles_path = config_path.parent().unwrap().to_path_buf();
-            
+
             let git_manager = GitManager::new(dotfiles_path);
             if !git_manager.exists() {
-                return Err(anyhow::anyhow!("No Git repository found. Run 'ordinator init' first."));
+                return Err(anyhow::anyhow!(
+                    "No Git repository found. Run 'ordinator init' first."
+                ));
             }
-            
+
             // Pull first, then push
             git_manager.pull(false)?;
             git_manager.push(force)?;
@@ -414,14 +436,18 @@ pub async fn run(args: Args) -> Result<()> {
             // Get the dotfiles repository path
             let config_path = Config::find_config_file()
                 .with_context(|| "No configuration file found. Run 'ordinator init' first.")?
-                .ok_or_else(|| anyhow::anyhow!("No configuration file found. Run 'ordinator init' first."))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!("No configuration file found. Run 'ordinator init' first.")
+                })?;
             let dotfiles_path = config_path.parent().unwrap().to_path_buf();
-            
+
             let git_manager = GitManager::new(dotfiles_path);
             if !git_manager.exists() {
-                return Err(anyhow::anyhow!("No Git repository found. Run 'ordinator init' first."));
+                return Err(anyhow::anyhow!(
+                    "No Git repository found. Run 'ordinator init' first."
+                ));
             }
-            
+
             let status = git_manager.status()?;
             eprintln!("{}", status);
         }
