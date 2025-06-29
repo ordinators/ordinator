@@ -94,6 +94,7 @@ jobs:
         repository: ceterus/homebrew-ordinator
         token: ${{ secrets.GITHUB_TOKEN }}
         path: homebrew-tap
+        ref: master
 
     - name: Update formula
       run: |
