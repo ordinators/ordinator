@@ -41,16 +41,16 @@ ordinator --version                # Shows version
 **Testable**: ✅
 
 **Tasks**:
-- [ ] Implement `ordinator init` with Git repository creation
-- [ ] Add remote repository support
-- [ ] Implement `ordinator status` (Git status)
-- [ ] Basic Git operations (commit, push, pull)
+- [x] Implement `ordinator init` with Git repository creation
+- [x] Add remote repository support
+- [x] Implement `ordinator status` (Git status)
+- [x] Basic Git operations (commit, push, pull)
 
 **Tests**:
-- [ ] Repository initialization works
-- [ ] Remote repositories are added correctly
-- [ ] Git status shows correct information
-- [ ] Basic Git operations work
+- [x] Repository initialization works
+- [x] Remote repositories are added correctly
+- [x] Git status shows correct information
+- [x] Basic Git operations work
 
 **Acceptance Criteria**:
 ```bash

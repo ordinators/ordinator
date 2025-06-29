@@ -1,8 +1,9 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use tracing::{info, warn};
 
 use crate::config::Config;
+use crate::git::GitManager;
 
 #[derive(Parser)]
 #[command(name = "ordinator")]
@@ -198,7 +199,26 @@ pub async fn run(args: Args) -> Result<()> {
             info!("Created configuration file: {}", config_path.display());
             eprintln!("Created configuration file: {}", config_path.display());
 
-            // TODO: Initialize Git repository and add remote if provided
+            // Initialize Git repository
+            let dotfiles_path = config_path.parent().unwrap().to_path_buf();
+            let git_manager = GitManager::new(dotfiles_path.clone());
+            
+            if !git_manager.exists() {
+                git_manager.init()?;
+                info!("Git repository initialized at: {}", dotfiles_path.display());
+                eprintln!("Git repository initialized at: {}", dotfiles_path.display());
+            } else {
+                info!("Git repository already exists at: {}", dotfiles_path.display());
+                eprintln!("Git repository already exists at: {}", dotfiles_path.display());
+            }
+
+            // Add remote if provided
+            if let Some(url) = remote {
+                git_manager.add_remote("origin", &url)?;
+                info!("Remote 'origin' added: {}", url);
+                eprintln!("Remote 'origin' added: {}", url);
+            }
+
             info!("Repository initialization completed");
             eprintln!("Repository initialization completed");
         }
@@ -265,9 +285,20 @@ pub async fn run(args: Args) -> Result<()> {
                 return Ok(());
             }
 
-            // TODO: Implement actual commit logic
-            info!("Commit not yet implemented");
-            eprintln!("Commit not yet implemented");
+            // Get the dotfiles repository path
+            let config_path = Config::find_config_file()
+                .with_context(|| "No configuration file found. Run 'ordinator init' first.")?
+                .ok_or_else(|| anyhow::anyhow!("No configuration file found. Run 'ordinator init' first."))?;
+            let dotfiles_path = config_path.parent().unwrap().to_path_buf();
+            
+            let git_manager = GitManager::new(dotfiles_path);
+            if !git_manager.exists() {
+                return Err(anyhow::anyhow!("No Git repository found. Run 'ordinator init' first."));
+            }
+            
+            git_manager.commit(&message)?;
+            info!("Changes committed successfully");
+            eprintln!("Changes committed successfully");
         }
         Commands::Push { force } => {
             info!("Pushing changes{}", if force { " (force)" } else { "" });
@@ -285,9 +316,20 @@ pub async fn run(args: Args) -> Result<()> {
                 return Ok(());
             }
 
-            // TODO: Implement actual push logic
-            info!("Push not yet implemented");
-            eprintln!("Push not yet implemented");
+            // Get the dotfiles repository path
+            let config_path = Config::find_config_file()
+                .with_context(|| "No configuration file found. Run 'ordinator init' first.")?
+                .ok_or_else(|| anyhow::anyhow!("No configuration file found. Run 'ordinator init' first."))?;
+            let dotfiles_path = config_path.parent().unwrap().to_path_buf();
+            
+            let git_manager = GitManager::new(dotfiles_path);
+            if !git_manager.exists() {
+                return Err(anyhow::anyhow!("No Git repository found. Run 'ordinator init' first."));
+            }
+            
+            git_manager.push(force)?;
+            info!("Changes pushed successfully");
+            eprintln!("Changes pushed successfully");
         }
         Commands::Pull { rebase } => {
             info!("Pulling changes{}", if rebase { " (rebase)" } else { "" });
@@ -305,9 +347,20 @@ pub async fn run(args: Args) -> Result<()> {
                 return Ok(());
             }
 
-            // TODO: Implement actual pull logic
-            info!("Pull not yet implemented");
-            eprintln!("Pull not yet implemented");
+            // Get the dotfiles repository path
+            let config_path = Config::find_config_file()
+                .with_context(|| "No configuration file found. Run 'ordinator init' first.")?
+                .ok_or_else(|| anyhow::anyhow!("No configuration file found. Run 'ordinator init' first."))?;
+            let dotfiles_path = config_path.parent().unwrap().to_path_buf();
+            
+            let git_manager = GitManager::new(dotfiles_path);
+            if !git_manager.exists() {
+                return Err(anyhow::anyhow!("No Git repository found. Run 'ordinator init' first."));
+            }
+            
+            git_manager.pull(rebase)?;
+            info!("Changes pulled successfully");
+            eprintln!("Changes pulled successfully");
         }
         Commands::Sync { force } => {
             info!("Syncing repository{}", if force { " (force)" } else { "" });
@@ -325,9 +378,22 @@ pub async fn run(args: Args) -> Result<()> {
                 return Ok(());
             }
 
-            // TODO: Implement actual sync logic
-            info!("Sync not yet implemented");
-            eprintln!("Sync not yet implemented");
+            // Get the dotfiles repository path
+            let config_path = Config::find_config_file()
+                .with_context(|| "No configuration file found. Run 'ordinator init' first.")?
+                .ok_or_else(|| anyhow::anyhow!("No configuration file found. Run 'ordinator init' first."))?;
+            let dotfiles_path = config_path.parent().unwrap().to_path_buf();
+            
+            let git_manager = GitManager::new(dotfiles_path);
+            if !git_manager.exists() {
+                return Err(anyhow::anyhow!("No Git repository found. Run 'ordinator init' first."));
+            }
+            
+            // Pull first, then push
+            git_manager.pull(false)?;
+            git_manager.push(force)?;
+            info!("Repository synced successfully");
+            eprintln!("Repository synced successfully");
         }
         Commands::Status { verbose } => {
             info!("Showing status{}", if verbose { " (verbose)" } else { "" });
@@ -345,9 +411,19 @@ pub async fn run(args: Args) -> Result<()> {
                 return Ok(());
             }
 
-            // TODO: Implement actual status logic
-            info!("Status not yet implemented");
-            eprintln!("Status not yet implemented");
+            // Get the dotfiles repository path
+            let config_path = Config::find_config_file()
+                .with_context(|| "No configuration file found. Run 'ordinator init' first.")?
+                .ok_or_else(|| anyhow::anyhow!("No configuration file found. Run 'ordinator init' first."))?;
+            let dotfiles_path = config_path.parent().unwrap().to_path_buf();
+            
+            let git_manager = GitManager::new(dotfiles_path);
+            if !git_manager.exists() {
+                return Err(anyhow::anyhow!("No Git repository found. Run 'ordinator init' first."));
+            }
+            
+            let status = git_manager.status()?;
+            eprintln!("{}", status);
         }
         Commands::Apply {
             profile,
