@@ -49,12 +49,12 @@ jobs:
       run: |
         # Generate Cargo.lock for reproducible builds
         cargo generate-lockfile
-        # Create tarball with git archive
-        git archive --format=tar.gz --prefix=ordinator-${{ github.ref_name }}/ ${{ github.ref_name }} > source.tar.gz
-        # Add Cargo.lock to the tarball (decompress, append, recompress)
-        gunzip source.tar.gz
-        tar -rf source.tar --transform "s,Cargo.lock,ordinator-${{ github.ref_name }}/Cargo.lock," Cargo.lock
-        gzip source.tar
+        # Create tarball manually to include Cargo.lock with correct path
+        mkdir -p temp/ordinator-${{ github.ref_name }}
+        git archive --format=tar ${{ github.ref_name }} | tar -x -C temp/ordinator-${{ github.ref_name }}
+        cp Cargo.lock temp/ordinator-${{ github.ref_name }}/
+        cd temp && tar -czf ../source.tar.gz ordinator-${{ github.ref_name }}
+        cd ..
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
