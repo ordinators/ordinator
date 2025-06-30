@@ -45,11 +45,17 @@ jobs:
         source $HOME/.cargo/env
         cargo build --release
 
-    - name: Upload binary
+    - name: Create source tarball
+      run: |
+        git archive --format=tar.gz --prefix=ordinator-${{ github.ref_name }}/ ${{ github.ref_name }} > source.tar.gz
+
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: ordinator-macos
-        path: target/release/ordinator
+        name: release-assets
+        path: |
+          target/release/ordinator
+          source.tar.gz
         retention-days: 1
 
   release:
@@ -61,7 +67,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Download binary
+    - name: Download artifacts
       uses: actions/download-artifact@v4
       with:
         path: dist/
@@ -69,7 +75,9 @@ jobs:
     - name: Create release
       uses: softprops/action-gh-release@v2
       with:
-        files: dist/ordinator-macos
+        files: |
+          dist/ordinator-macos
+          dist/source.tar.gz
         generate_release_notes: true
         draft: false
         prerelease: false
