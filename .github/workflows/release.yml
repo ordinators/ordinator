@@ -127,10 +127,15 @@ jobs:
         cd homebrew-tap
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git checkout -b update-ordinator-${{ steps.get_version.outputs.VERSION }}
+        
+        # Pull latest changes first
+        git pull origin master
+        
+        # Create or reset branch
+        git checkout -B update-ordinator-${{ steps.get_version.outputs.VERSION }}
         git add Formula/ordinator.rb
         git commit -m "Update ordinator to ${{ steps.get_version.outputs.VERSION }}" || exit 0
         git remote set-url origin https://x-access-token:${{ secrets.HOMEBREW_TOKEN }}@github.com/ordinators/homebrew-ordinator.git
-        git push origin update-ordinator-${{ steps.get_version.outputs.VERSION }} || echo "Push failed, but formula was updated locally"
+        git push --force-with-lease origin update-ordinator-${{ steps.get_version.outputs.VERSION }} || echo "Push failed, but formula was updated locally"
         echo "${{ secrets.HOMEBREW_TOKEN }}" | gh auth login --with-token
         gh pr create --title "Update ordinator to ${{ steps.get_version.outputs.VERSION }}" --body "Automated update from ordinator release workflow" --base master || echo "PR creation failed, but formula was updated" 
