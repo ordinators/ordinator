@@ -47,7 +47,12 @@ jobs:
 
     - name: Create source tarball
       run: |
+        # Generate Cargo.lock for reproducible builds
+        cargo generate-lockfile
+        # Create tarball with git archive
         git archive --format=tar.gz --prefix=ordinator-${{ github.ref_name }}/ ${{ github.ref_name }} > source.tar.gz
+        # Add Cargo.lock to the tarball
+        tar -rf source.tar.gz Cargo.lock
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
