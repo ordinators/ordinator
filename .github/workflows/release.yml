@@ -142,4 +142,18 @@ jobs:
         git remote set-url origin https://x-access-token:${{ secrets.HOMEBREW_TOKEN }}@github.com/ordinators/homebrew-ordinator.git
         git push origin update-ordinator-${{ steps.get_version.outputs.VERSION }} || echo "Push failed, but formula was updated locally"
         echo "${{ secrets.HOMEBREW_TOKEN }}" | gh auth login --with-token
-        gh pr create --title "Update ordinator to ${{ steps.get_version.outputs.VERSION }}" --body "Automated update from ordinator release workflow" --base master || echo "PR creation failed, but formula was updated" 
+        gh pr create --title "Update ordinator to ${{ steps.get_version.outputs.VERSION }}" --body "Automated update from ordinator release workflow" --base master || echo "PR creation failed, but formula was updated"
+
+    - name: Merge pull request
+      run: |
+        echo "${{ secrets.HOMEBREW_TOKEN }}" | gh auth login --with-token
+        # Wait a moment for PR to be created
+        sleep 5
+        # Get the PR number
+        PR_NUMBER=$(gh pr list --repo ordinators/homebrew-ordinator --head update-ordinator-${{ steps.get_version.outputs.VERSION }} --json number --jq '.[0].number')
+        if [ ! -z "$PR_NUMBER" ]; then
+          echo "Merging PR #$PR_NUMBER"
+          gh pr merge $PR_NUMBER --repo ordinators/homebrew-ordinator --squash --delete-branch
+        else
+          echo "No PR found to merge"
+        fi 
