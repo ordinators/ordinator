@@ -51,8 +51,10 @@ jobs:
         cargo generate-lockfile
         # Create tarball with git archive
         git archive --format=tar.gz --prefix=ordinator-${{ github.ref_name }}/ ${{ github.ref_name }} > source.tar.gz
-        # Add Cargo.lock to the tarball
-        tar -rf source.tar.gz Cargo.lock
+        # Add Cargo.lock to the tarball (decompress, append, recompress)
+        gunzip source.tar.gz
+        tar -rf source.tar Cargo.lock
+        gzip source.tar
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
