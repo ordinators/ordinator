@@ -53,7 +53,7 @@ jobs:
         git archive --format=tar.gz --prefix=ordinator-${{ github.ref_name }}/ ${{ github.ref_name }} > source.tar.gz
         # Add Cargo.lock to the tarball (decompress, append, recompress)
         gunzip source.tar.gz
-        tar -rf source.tar Cargo.lock
+        tar -rf source.tar --transform "s,Cargo.lock,ordinator-${{ github.ref_name }}/Cargo.lock," Cargo.lock
         gzip source.tar
 
     - name: Upload artifacts
