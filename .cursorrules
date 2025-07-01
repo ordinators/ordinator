@@ -73,4 +73,11 @@ Remember: The PRD.md is the source of truth for this project, and TEST_PLAN.md i
 - The roadmap serves as the progress tracking document, not the PRD
 
 # Ordinator Test Isolation Rule
-- All integration and CLI tests must set the ORDINATOR_HOME environment variable to a temporary directory to ensure test isolation. This prevents tests from modifying the real home directory or user files. 
+- All integration and CLI tests must set the ORDINATOR_HOME environment variable to a temporary directory to ensure test isolation. This prevents tests from modifying the real home directory or user files.
+
+# Pull Request Formatting Rule
+All PRs must follow this structure:
+- **Changes Made:** List all major features, refactors, and fixes.
+- **Testing:** List test types, counts, and any special test isolation or edge cases.
+- **Coverage:** List per-module and overall coverage, and note improvements.
+- **Completion Statement:** End with "This completes the [phase/feature] and prepares for [next phase/feature]."
