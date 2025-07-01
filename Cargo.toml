@@ -1,6 +1,6 @@
 [package]
 name = "ordinator"
-version = "0.1.2"
+version = "0.2.1"
 edition = "2021"
 authors = ["Anthony Norfleet <anthony.norfleet@gmail.com>"]
 description = "Dotfiles and Environment Manager for macOS"
@@ -35,6 +35,9 @@ serde = { version = "1.0", features = ["derive"] }
 
 # Path handling
 pathdiff = "0.2"
+
+globset = "0.4"
+chrono = "0.4"
 
 # Shell command execution
 tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "macros"] }

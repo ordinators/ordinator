@@ -1,4 +1,5 @@
 use anyhow::Result;
+use chrono::Local;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -6,6 +7,9 @@ use std::path::{Path, PathBuf};
 #[allow(dead_code)]
 /// Get the home directory
 pub fn get_home_dir() -> Result<PathBuf> {
+    if let Ok(path) = std::env::var("ORDINATOR_HOME") {
+        return Ok(PathBuf::from(path));
+    }
     dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))
 }
 
@@ -73,4 +77,16 @@ pub fn contains_secrets(content: &str) -> bool {
     secret_patterns
         .iter()
         .any(|pattern| lower_content.contains(pattern))
+}
+
+/// Back up a file to the dotfiles backup directory, appending a timestamp
+pub fn backup_file_to_dotfiles_backup(original: &Path, config_path: &Path) -> Result<PathBuf> {
+    let backup_dir = config_path.parent().unwrap().join("backups");
+    std::fs::create_dir_all(&backup_dir)?;
+    let filename = original.file_name().unwrap_or_default();
+    let timestamp = Local::now().format("%Y%m%d-%H%M%S");
+    let backup_name = format!("{}-{}", filename.to_string_lossy(), timestamp);
+    let backup_path = backup_dir.join(backup_name);
+    std::fs::copy(original, &backup_path)?;
+    Ok(backup_path)
 }

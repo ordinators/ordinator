@@ -1,5 +1,6 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
+use std::path::Path;
 use tracing::{info, warn};
 
 use crate::config::Config;
@@ -227,45 +228,38 @@ pub async fn run(args: Args) -> Result<()> {
 
             info!("Repository initialization completed");
             eprintln!("Repository initialization completed");
+            Ok(())
         }
         Commands::Add { path, profile } => {
-            info!("Adding file: {}", path);
-            eprintln!("Adding file: {path}");
-            if let Some(p) = &profile {
-                info!("Profile: {}", p);
-                eprintln!("Profile: {p}");
-            }
-
-            if args.dry_run {
-                info!(
-                    "[DRY RUN] Would add file: {} to profile: {}",
-                    path,
-                    profile.clone().unwrap_or_else(|| "default".to_string())
-                );
-                eprintln!(
-                    "DRY-RUN: Would add file: {} to profile: {}",
-                    path,
-                    profile.unwrap_or_else(|| "default".to_string())
-                );
-                return Ok(());
-            }
-
-            // Load configuration and add file to profile
-            if let Some(mut config) = Config::load()? {
-                let profile_name = profile.unwrap_or_else(|| "default".to_string());
-                config.add_file_to_profile(&profile_name, path.clone())?;
-
-                // Save the updated configuration
-                if let Some(config_path) = Config::find_config_file()? {
-                    config.save_to_file(&config_path)?;
-                    info!("Added file {} to profile {}", path, profile_name);
-                    eprintln!("Added file {path} to profile {profile_name}");
-                }
-            } else {
+            let (mut config, config_path) = Config::load()?;
+            let profile_name = profile.unwrap_or_else(|| config.global.default_profile.clone());
+            if !config.profiles.contains_key(&profile_name) {
                 return Err(anyhow::anyhow!(
-                    "No configuration file found. Run 'ordinator init' first."
+                    "Profile '{}' does not exist. To create it, run: ordinator profile add {}",
+                    profile_name,
+                    profile_name
                 ));
             }
+            // Exclusion check
+            let exclusion_set = config.exclusion_set_for_profile(&profile_name)?;
+            if exclusion_set.is_match(&path) {
+                return Err(anyhow::anyhow!(
+                    "Path '{}' matches an exclusion pattern and cannot be tracked.",
+                    path
+                ));
+            }
+            if args.dry_run {
+                println!("DRY-RUN: Would add '{path}' to profile '{profile_name}'");
+                return Ok(());
+            }
+            let path_obj = Path::new(&path);
+            if !path_obj.exists() {
+                return Err(anyhow::anyhow!("Path '{}' does not exist on disk.", path));
+            }
+            config.add_file_to_profile(&profile_name, path.clone())?;
+            config.save_to_file(&config_path)?;
+            println!("Added '{path}' to profile '{profile_name}'");
+            Ok(())
         }
         Commands::Remove { path } => {
             info!("Removing file: {}", path);
@@ -280,6 +274,7 @@ pub async fn run(args: Args) -> Result<()> {
             // TODO: Implement actual remove logic
             info!("File removal not yet implemented");
             eprintln!("File removal not yet implemented");
+            Ok(())
         }
         Commands::Commit { message } => {
             info!("Committing with message: {}", message);
@@ -291,24 +286,19 @@ pub async fn run(args: Args) -> Result<()> {
                 return Ok(());
             }
 
-            // Get the dotfiles repository path
-            let config_path = Config::find_config_file()
-                .with_context(|| "No configuration file found. Run 'ordinator init' first.")?
-                .ok_or_else(|| {
-                    anyhow::anyhow!("No configuration file found. Run 'ordinator init' first.")
-                })?;
+            // Load config and get dotfiles repo path
+            let (_config, config_path) = Config::load()?;
             let dotfiles_path = config_path.parent().unwrap().to_path_buf();
-
             let git_manager = GitManager::new(dotfiles_path);
             if !git_manager.exists() {
                 return Err(anyhow::anyhow!(
                     "No Git repository found. Run 'ordinator init' first."
                 ));
             }
-
             git_manager.commit(&message)?;
             info!("Changes committed successfully");
             eprintln!("Changes committed successfully");
+            Ok(())
         }
         Commands::Push { force } => {
             info!("Pushing changes{}", if force { " (force)" } else { "" });
@@ -326,24 +316,19 @@ pub async fn run(args: Args) -> Result<()> {
                 return Ok(());
             }
 
-            // Get the dotfiles repository path
-            let config_path = Config::find_config_file()
-                .with_context(|| "No configuration file found. Run 'ordinator init' first.")?
-                .ok_or_else(|| {
-                    anyhow::anyhow!("No configuration file found. Run 'ordinator init' first.")
-                })?;
+            // Load config and get dotfiles repo path
+            let (_config, config_path) = Config::load()?;
             let dotfiles_path = config_path.parent().unwrap().to_path_buf();
-
             let git_manager = GitManager::new(dotfiles_path);
             if !git_manager.exists() {
                 return Err(anyhow::anyhow!(
                     "No Git repository found. Run 'ordinator init' first."
                 ));
             }
-
             git_manager.push(force)?;
             info!("Changes pushed successfully");
             eprintln!("Changes pushed successfully");
+            Ok(())
         }
         Commands::Pull { rebase } => {
             info!("Pulling changes{}", if rebase { " (rebase)" } else { "" });
@@ -361,24 +346,19 @@ pub async fn run(args: Args) -> Result<()> {
                 return Ok(());
             }
 
-            // Get the dotfiles repository path
-            let config_path = Config::find_config_file()
-                .with_context(|| "No configuration file found. Run 'ordinator init' first.")?
-                .ok_or_else(|| {
-                    anyhow::anyhow!("No configuration file found. Run 'ordinator init' first.")
-                })?;
+            // Load config and get dotfiles repo path
+            let (_config, config_path) = Config::load()?;
             let dotfiles_path = config_path.parent().unwrap().to_path_buf();
-
             let git_manager = GitManager::new(dotfiles_path);
             if !git_manager.exists() {
                 return Err(anyhow::anyhow!(
                     "No Git repository found. Run 'ordinator init' first."
                 ));
             }
-
             git_manager.pull(rebase)?;
             info!("Changes pulled successfully");
             eprintln!("Changes pulled successfully");
+            Ok(())
         }
         Commands::Sync { force } => {
             info!("Syncing repository{}", if force { " (force)" } else { "" });
@@ -396,26 +376,21 @@ pub async fn run(args: Args) -> Result<()> {
                 return Ok(());
             }
 
-            // Get the dotfiles repository path
-            let config_path = Config::find_config_file()
-                .with_context(|| "No configuration file found. Run 'ordinator init' first.")?
-                .ok_or_else(|| {
-                    anyhow::anyhow!("No configuration file found. Run 'ordinator init' first.")
-                })?;
+            // Load config and get dotfiles repo path
+            let (_config, config_path) = Config::load()?;
             let dotfiles_path = config_path.parent().unwrap().to_path_buf();
-
             let git_manager = GitManager::new(dotfiles_path);
             if !git_manager.exists() {
                 return Err(anyhow::anyhow!(
                     "No Git repository found. Run 'ordinator init' first."
                 ));
             }
-
             // Pull first, then push
             git_manager.pull(false)?;
             git_manager.push(force)?;
             info!("Repository synced successfully");
             eprintln!("Repository synced successfully");
+            Ok(())
         }
         Commands::Status { verbose } => {
             info!("Showing status{}", if verbose { " (verbose)" } else { "" });
@@ -433,23 +408,18 @@ pub async fn run(args: Args) -> Result<()> {
                 return Ok(());
             }
 
-            // Get the dotfiles repository path
-            let config_path = Config::find_config_file()
-                .with_context(|| "No configuration file found. Run 'ordinator init' first.")?
-                .ok_or_else(|| {
-                    anyhow::anyhow!("No configuration file found. Run 'ordinator init' first.")
-                })?;
+            // Load config and get dotfiles repo path
+            let (_config, config_path) = Config::load()?;
             let dotfiles_path = config_path.parent().unwrap().to_path_buf();
-
             let git_manager = GitManager::new(dotfiles_path);
             if !git_manager.exists() {
                 return Err(anyhow::anyhow!(
                     "No Git repository found. Run 'ordinator init' first."
                 ));
             }
-
             let status = git_manager.status()?;
             eprintln!("{status}");
+            Ok(())
         }
         Commands::Apply {
             profile,
@@ -481,9 +451,57 @@ pub async fn run(args: Args) -> Result<()> {
                 return Ok(());
             }
 
-            // TODO: Implement actual apply logic
-            info!("Apply not yet implemented");
-            eprintln!("Apply not yet implemented");
+            // Load config and get profile
+            let (config, config_path) = Config::load()?;
+            let profile_cfg = config
+                .get_profile(&profile)
+                .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found in config", profile))?;
+            let create_backups = config.global.create_backups;
+
+            // For each tracked file, symlink with backup if needed
+            use crate::utils::{backup_file_to_dotfiles_backup, get_home_dir, is_symlink};
+            let home_dir = get_home_dir()?;
+            let dotfiles_dir = config_path.parent().unwrap();
+            for file in &profile_cfg.files {
+                // Source: dotfiles repo (files/<file>), Dest: home dir/<file>
+                let source = dotfiles_dir.join("files").join(file);
+                let dest = home_dir.join(file);
+                if dest.exists() {
+                    // If already correct symlink, skip
+                    if is_symlink(&dest) {
+                        if let Ok(target) = std::fs::read_link(&dest) {
+                            if target == source {
+                                eprintln!(
+                                    "Already symlinked: {} -> {}",
+                                    dest.display(),
+                                    source.display()
+                                );
+                                continue;
+                            }
+                        }
+                    }
+                    // Backup if enabled
+                    if create_backups {
+                        let backup_path = backup_file_to_dotfiles_backup(&dest, &config_path)?;
+                        eprintln!("Backed up {} to {}", dest.display(), backup_path.display());
+                    }
+                    // Remove the old file
+                    std::fs::remove_file(&dest)?;
+                }
+                // Create parent dirs if needed
+                if let Some(parent) = dest.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                // Symlink
+                #[cfg(unix)]
+                std::os::unix::fs::symlink(&source, &dest)?;
+                #[cfg(windows)]
+                std::os::windows::fs::symlink_file(&source, &dest)?;
+                eprintln!("Symlinked {} -> {}", dest.display(), source.display());
+            }
+            info!("Apply completed");
+            eprintln!("Apply completed");
+            Ok(())
         }
         Commands::Profiles { verbose } => {
             info!(
@@ -508,23 +526,24 @@ pub async fn run(args: Args) -> Result<()> {
             }
 
             // Load and display profiles
-            if let Some(config) = Config::load()? {
-                let profiles = config.list_profiles();
-                eprintln!("Available profiles:");
-                for profile_name in profiles {
-                    if let Some(profile) = config.get_profile(profile_name) {
-                        eprintln!(
-                            "  {}: {}",
-                            profile_name,
-                            profile.description.as_deref().unwrap_or("No description")
-                        );
-                    }
-                }
-            } else {
+            let (config, _config_path) = Config::load()?;
+            let profiles = config.list_profiles();
+            if profiles.is_empty() {
                 return Err(anyhow::anyhow!(
-                    "No configuration file found. Run 'ordinator init' first."
+                    "No profiles found in configuration. Run 'ordinator init' first."
                 ));
             }
+            eprintln!("Available profiles:");
+            for profile_name in profiles {
+                if let Some(profile) = config.get_profile(profile_name) {
+                    eprintln!(
+                        "  {}: {}",
+                        profile_name,
+                        profile.description.as_deref().unwrap_or("No description")
+                    );
+                }
+            }
+            Ok(())
         }
         Commands::Secrets { subcommand } => {
             match subcommand {
@@ -541,6 +560,7 @@ pub async fn run(args: Args) -> Result<()> {
                     // TODO: Implement actual encrypt logic
                     info!("Encryption not yet implemented");
                     eprintln!("Encryption not yet implemented");
+                    Ok(())
                 }
                 SecretCommands::Decrypt { file } => {
                     info!("Decrypting file: {}", file);
@@ -555,6 +575,7 @@ pub async fn run(args: Args) -> Result<()> {
                     // TODO: Implement actual decrypt logic
                     info!("Decryption not yet implemented");
                     eprintln!("Decryption not yet implemented");
+                    Ok(())
                 }
                 SecretCommands::List { paths_only } => {
                     info!(
@@ -581,6 +602,7 @@ pub async fn run(args: Args) -> Result<()> {
                     // TODO: Implement actual list logic
                     info!("Encrypted files listing not yet implemented");
                     eprintln!("Encrypted files listing not yet implemented");
+                    Ok(())
                 }
             }
         }
@@ -603,9 +625,7 @@ pub async fn run(args: Args) -> Result<()> {
             // TODO: Implement actual script generation logic
             info!("Script generation not yet implemented");
             eprintln!("Script generation not yet implemented");
+            Ok(())
         }
     }
-
-    info!("Ordinator completed successfully");
-    Ok(())
 }

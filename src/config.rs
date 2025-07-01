@@ -1,6 +1,8 @@
 use anyhow::{Context, Result};
+use globset::{Glob, GlobSet, GlobSetBuilder};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::env;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -31,6 +33,10 @@ pub struct GlobalConfig {
     /// Whether to create backups before making changes
     #[serde(default = "default_backup")]
     pub create_backups: bool,
+
+    /// Patterns for files/directories to exclude globally
+    #[serde(default)]
+    pub exclude: Vec<String>,
 }
 
 impl Default for GlobalConfig {
@@ -39,6 +45,7 @@ impl Default for GlobalConfig {
             default_profile: default_profile(),
             auto_push: false,
             create_backups: default_backup(),
+            exclude: Vec::new(),
         }
     }
 }
@@ -62,6 +69,10 @@ pub struct ProfileConfig {
 
     /// Profile description
     pub description: Option<String>,
+
+    /// Patterns for files/directories to exclude in this profile
+    #[serde(default)]
+    pub exclude: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -112,6 +123,14 @@ impl Config {
 
     /// Find the configuration file in the current directory or dotfiles directory
     pub fn find_config_file() -> Result<Option<PathBuf>> {
+        if let Ok(path) = env::var("ORDINATOR_CONFIG") {
+            let pb = PathBuf::from(&path);
+            if pb.exists() {
+                return Ok(Some(pb));
+            } else {
+                return Ok(None);
+            }
+        }
         // Look for ordinator.toml in current directory
         let current_config = std::env::current_dir()?.join("ordinator.toml");
         if current_config.exists() {
@@ -130,11 +149,13 @@ impl Config {
     }
 
     /// Load configuration from the standard location
-    pub fn load() -> Result<Option<Self>> {
+    pub fn load() -> Result<(Self, PathBuf)> {
         if let Some(config_path) = Self::find_config_file()? {
-            Ok(Some(Self::from_file(&config_path)?))
+            Ok((Self::from_file(&config_path)?, config_path))
         } else {
-            Ok(None)
+            Err(anyhow::anyhow!(
+                "No configuration file found. Run 'ordinator init' first."
+            ))
         }
     }
 
@@ -151,6 +172,7 @@ impl Config {
                 bootstrap_script: None,
                 enabled: true,
                 description: Some("Default profile for basic dotfiles".to_string()),
+                exclude: Vec::new(),
             },
         );
 
@@ -163,6 +185,7 @@ impl Config {
                 bootstrap_script: None,
                 enabled: true,
                 description: Some("Work environment profile".to_string()),
+                exclude: Vec::new(),
             },
         );
 
@@ -175,6 +198,7 @@ impl Config {
                 bootstrap_script: None,
                 enabled: true,
                 description: Some("Personal environment profile".to_string()),
+                exclude: Vec::new(),
             },
         );
 
@@ -187,6 +211,33 @@ impl Config {
 
     /// Initialize a new configuration in the dotfiles directory
     pub fn init_dotfiles_repository() -> Result<PathBuf> {
+        if let Ok(path) = env::var("ORDINATOR_CONFIG") {
+            let config_path = PathBuf::from(&path);
+            let repo_dir = config_path.parent().unwrap();
+            // Create parent directory if it doesn't exist
+            std::fs::create_dir_all(repo_dir).with_context(|| {
+                format!(
+                    "Failed to create dotfiles directory: {}",
+                    repo_dir.display()
+                )
+            })?;
+            // Create config file
+            let config = Self::create_default();
+            config.save_to_file(&config_path)?;
+            // Create subdirectories
+            let scripts_dir = repo_dir.join("scripts");
+            std::fs::create_dir_all(&scripts_dir).with_context(|| {
+                format!(
+                    "Failed to create scripts directory: {}",
+                    scripts_dir.display()
+                )
+            })?;
+            let files_dir = repo_dir.join("files");
+            std::fs::create_dir_all(&files_dir).with_context(|| {
+                format!("Failed to create files directory: {}", files_dir.display())
+            })?;
+            return Ok(config_path);
+        }
         let dotfiles_dir = get_dotfiles_dir()?;
 
         // Create dotfiles directory if it doesn't exist
@@ -286,6 +337,20 @@ impl Config {
             Err(anyhow::anyhow!("Profile '{}' not found", profile_name))
         }
     }
+
+    /// Get the effective exclusion GlobSet for a profile (merges global and profile excludes)
+    pub fn exclusion_set_for_profile(&self, profile_name: &str) -> anyhow::Result<GlobSet> {
+        let mut builder = GlobSetBuilder::new();
+        for pat in &self.global.exclude {
+            builder.add(Glob::new(pat)?);
+        }
+        if let Some(profile) = self.get_profile(profile_name) {
+            for pat in &profile.exclude {
+                builder.add(Glob::new(pat)?);
+            }
+        }
+        Ok(builder.build()?)
+    }
 }
 
 // Helper functions for default values
@@ -349,6 +414,7 @@ mod tests {
             bootstrap_script: None,
             enabled: true,
             description: Some("Test profile".to_string()),
+            exclude: Vec::new(),
         };
 
         config.add_profile("test".to_string(), new_profile);

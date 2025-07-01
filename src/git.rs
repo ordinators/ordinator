@@ -20,8 +20,19 @@ impl GitManager {
         &self.repo_path
     }
 
+    fn is_test_mode() -> bool {
+        std::env::var("ORDINATOR_TEST_MODE").ok().as_deref() == Some("1")
+    }
+
     /// Initialize a new Git repository
     pub fn init(&self) -> Result<()> {
+        if Self::is_test_mode() {
+            info!(
+                "[TEST MODE] Skipping git init at {}",
+                self.repo_path.display()
+            );
+            return Ok(());
+        }
         info!(
             "Initializing Git repository at: {}",
             self.repo_path.display()
@@ -64,6 +75,13 @@ impl GitManager {
 
     /// Add a remote to the repository
     pub fn add_remote(&self, name: &str, url: &str) -> Result<()> {
+        if Self::is_test_mode() {
+            info!(
+                "[TEST MODE] Skipping git remote add '{}', url '{}'",
+                name, url
+            );
+            return Ok(());
+        }
         info!("Adding remote '{}' with URL: {}", name, url);
 
         let repo = Repository::open(&self.repo_path).with_context(|| {
@@ -79,6 +97,10 @@ impl GitManager {
 
     /// Commit changes with a message
     pub fn commit(&self, message: &str) -> Result<()> {
+        if Self::is_test_mode() {
+            info!("[TEST MODE] Skipping git commit: {}", message);
+            return Ok(());
+        }
         info!("Committing changes with message: {}", message);
 
         let repo = Repository::open(&self.repo_path).with_context(|| {
@@ -137,10 +159,14 @@ impl GitManager {
 
     /// Push changes to remote
     pub fn push(&self, force: bool) -> Result<()> {
-        info!(
-            "Pushing changes to remote{}",
-            if force { " (force)" } else { "" }
-        );
+        if Self::is_test_mode() {
+            info!(
+                "[TEST MODE] Skipping git push{}",
+                if force { " (force)" } else { "" }
+            );
+            return Ok(());
+        }
+        info!("Pushing changes to remote");
 
         let repo = Repository::open(&self.repo_path).with_context(|| {
             format!("Failed to open repository at {}", self.repo_path.display())
@@ -182,6 +208,13 @@ impl GitManager {
 
     /// Pull changes from remote
     pub fn pull(&self, rebase: bool) -> Result<()> {
+        if Self::is_test_mode() {
+            info!(
+                "[TEST MODE] Skipping git pull{}",
+                if rebase { " (rebase)" } else { "" }
+            );
+            return Ok(());
+        }
         info!(
             "Pulling changes from remote{}",
             if rebase { " (rebase)" } else { "" }
