@@ -70,4 +70,7 @@ Remember: The PRD.md is the source of truth for this project, and TEST_PLAN.md i
 - When you detect that a task or feature in the roadmap has been implemented and tested, mark it as complete by changing `[ ]` to `[x]`
 - This includes both the **Tasks** and **Tests** sections for each phase
 - Update the roadmap immediately after completing implementation and testing
-- The roadmap serves as the progress tracking document, not the PRD 
+- The roadmap serves as the progress tracking document, not the PRD
+
+# Ordinator Test Isolation Rule
+- All integration and CLI tests must set the ORDINATOR_HOME environment variable to a temporary directory to ensure test isolation. This prevents tests from modifying the real home directory or user files. 

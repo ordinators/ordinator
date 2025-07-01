@@ -206,3 +206,119 @@ exclude = ["*.tmp"]
     cmd.args(["add", "should_not_add.tmp"]);
     cmd.assert().failure().stdout(contains("matches an exclusion pattern and cannot be tracked"));
 }
+
+#[test]
+fn test_apply_backs_up_existing_file() {
+    use assert_fs::prelude::*;
+    use std::fs;
+    let temp = assert_fs::TempDir::new().unwrap();
+    let config_file = temp.child("ordinator.toml");
+    let config_path = config_file.path().to_path_buf();
+    let files_dir = temp.child("files");
+    files_dir.create_dir_all().unwrap();
+
+    // Write a config with create_backups = true and track 'dotfile.txt'
+    std::fs::write(&config_path, r#"
+[global]
+default_profile = "default"
+create_backups = true
+[profiles.default]
+files = ["dotfile.txt"]
+directories = []
+exclude = []
+"#).unwrap();
+
+    // Place the managed dotfile in files/
+    let managed = files_dir.child("dotfile.txt");
+    managed.write_str("managed contents").unwrap();
+
+    // Place an existing file at the destination (home dir simulated by temp)
+    let dest = temp.child("dotfile.txt");
+    dest.write_str("original contents").unwrap();
+
+    // Run ordinator apply
+    let mut cmd = Command::cargo_bin("ordinator").unwrap();
+    cmd.current_dir(&temp);
+    cmd.env("ORDINATOR_CONFIG", &config_path);
+    cmd.env("ORDINATOR_TEST_MODE", "1");
+    cmd.env("ORDINATOR_HOME", temp.path());
+    cmd.args(["apply"]);
+    let output = cmd.output().unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "Apply failed: {} {}", stdout, stderr);
+    // Check that the backup exists
+    let backup_dir = temp.child("backups");
+    let backups: Vec<_> = backup_dir
+        .read_dir()
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    assert!(backups.iter().any(|f| f.starts_with("dotfile.txt-")), "No backup file found: {:?}", backups);
+    // Check that the destination is now a symlink
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::FileTypeExt;
+        let meta = fs::symlink_metadata(dest.path()).unwrap();
+        assert!(meta.file_type().is_symlink(), "Destination is not a symlink");
+    }
+}
+
+#[test]
+fn test_apply_skips_backup_if_disabled() {
+    use assert_fs::prelude::*;
+    use std::fs;
+    let temp = assert_fs::TempDir::new().unwrap();
+    let config_file = temp.child("ordinator.toml");
+    let config_path = config_file.path().to_path_buf();
+    let files_dir = temp.child("files");
+    files_dir.create_dir_all().unwrap();
+
+    // Write a config with create_backups = false and track 'dotfile.txt'
+    std::fs::write(&config_path, r#"
+[global]
+default_profile = "default"
+create_backups = false
+[profiles.default]
+files = ["dotfile.txt"]
+directories = []
+exclude = []
+"#).unwrap();
+
+    // Place the managed dotfile in files/
+    let managed = files_dir.child("dotfile.txt");
+    managed.write_str("managed contents").unwrap();
+
+    // Place an existing file at the destination (home dir simulated by temp)
+    let dest = temp.child("dotfile.txt");
+    dest.write_str("original contents").unwrap();
+
+    // Run ordinator apply
+    let mut cmd = Command::cargo_bin("ordinator").unwrap();
+    cmd.current_dir(&temp);
+    cmd.env("ORDINATOR_CONFIG", &config_path);
+    cmd.env("ORDINATOR_TEST_MODE", "1");
+    cmd.env("ORDINATOR_HOME", temp.path());
+    cmd.args(["apply"]);
+    let output = cmd.output().unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "Apply failed: {} {}", stdout, stderr);
+    // Check that the backup directory does not exist or is empty
+    let backup_dir = temp.child("backups");
+    if backup_dir.path().exists() {
+        let backups: Vec<_> = backup_dir
+            .read_dir()
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        assert!(backups.is_empty(), "Backup directory should be empty, found: {:?}", backups);
+    }
+    // Check that the destination is now a symlink
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::FileTypeExt;
+        let meta = fs::symlink_metadata(dest.path()).unwrap();
+        assert!(meta.file_type().is_symlink(), "Destination is not a symlink");
+    }
+}

@@ -73,16 +73,17 @@ ordinator push                      # Pushes to remote
 **Testable**: ✅
 
 **Tasks**:
-- [ ] Implement `ordinator add <file>` command
-- [ ] Add file tracking to configuration
-- [ ] Profile-based file filtering
-- [ ] File exclusion patterns
-- [ ] Backup existing files before symlinking
+- [x] Implement `ordinator add <file>` command
+- [x] Add file tracking to configuration
+- [x] Profile-based file filtering
+- [x] File exclusion patterns
+- [x] Backup existing files before symlinking
 
 **Tests**:
 - [x] Dotfiles can be added to profiles
 - [x] Error cases for add (file missing, already tracked, profile missing) are handled
 - [x] CLI integration tests are isolated and pass reliably
+- [x] Apply/backup logic is tested and passes; all tests use ORDINATOR_HOME for isolation
 
 **Acceptance Criteria**:
 ```bash
@@ -98,7 +99,7 @@ ordinator list-files --profile work    # Shows tracked files
 **Testable**: ✅
 
 **Tasks**:
-- [ ] Implement symlink creation with backup
+- [x] Implement symlink creation with backup
 - [ ] Handle nested directories (`.config`, `Library/Preferences`)
 - [ ] Symlink validation and repair
 - [ ] Conflict resolution (existing files/symlinks)
