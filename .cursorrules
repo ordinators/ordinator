@@ -19,6 +19,33 @@
 4. **Consider security implications** - Ensure secrets are handled safely and system commands are not executed
 5. **Use sandboxed environments** - Always test in temporary directories with proper cleanup
 
+## Pre-PR CI Validation Rule
+**ALWAYS run GitHub Actions workflows locally before creating any PR.** This prevents CI failures and reduces back-and-forth with GitHub.
+
+### Required Local CI Steps:
+1. **Format Check**: `cargo fmt --check`
+2. **Linting**: `cargo clippy --all-targets --all-features -- -D warnings`
+3. **Tests**: `cargo test --all-targets --all-features`
+4. **Build Check**: `cargo build --release`
+5. **Documentation**: `cargo doc --no-deps`
+
+### Local CI Command:
+```bash
+cargo fmt --check && cargo clippy --all-targets --all-features -- -D warnings && cargo test --all-targets --all-features && cargo build --release && cargo doc --no-deps
+```
+
+### When to Run:
+- Before creating any feature branch PR
+- Before merging any changes to main/master
+- After any significant code changes
+- When preparing for release
+
+### Failure Handling:
+- **NEVER create a PR if local CI fails**
+- Fix all issues locally first
+- Re-run the full CI suite after fixes
+- Only proceed when all checks pass locally
+
 ## Key Requirements to Follow
 - **Secrets Management**: Use Mozilla SOPS + age encryption, per-file handling
 - **System Commands**: Never execute sudo commands directly - generate scripts instead
