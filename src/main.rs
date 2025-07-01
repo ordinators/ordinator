@@ -23,7 +23,7 @@ async fn main() {
     // Run the application
     if let Err(e) = cli::run(args).await {
         error!("Application error: {}", e);
-        eprintln!("{}", e); // Print error to stderr for user visibility
+        eprintln!("{e}"); // Print error to stderr for user visibility
         std::process::exit(1);
     }
 

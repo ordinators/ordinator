@@ -249,10 +249,7 @@ pub async fn run(args: Args) -> Result<()> {
                 ));
             }
             if args.dry_run {
-                println!(
-                    "DRY-RUN: Would add '{}' to profile '{}'",
-                    path, profile_name
-                );
+                println!("DRY-RUN: Would add '{path}' to profile '{profile_name}'");
                 return Ok(());
             }
             let path_obj = Path::new(&path);
@@ -261,7 +258,7 @@ pub async fn run(args: Args) -> Result<()> {
             }
             config.add_file_to_profile(&profile_name, path.clone())?;
             config.save_to_file(&config_path)?;
-            println!("Added '{}' to profile '{}'", path, profile_name);
+            println!("Added '{path}' to profile '{profile_name}'");
             Ok(())
         }
         Commands::Remove { path } => {

@@ -79,8 +79,7 @@ fn test_add_file_to_default_profile() {
     // Check config file for tracked file string in the same temp dir
     assert!(
         config_path.exists(),
-        "Config file does not exist at {:?}",
-        config_path
+        "Config file does not exist at {config_path:?}"
     );
     let config_contents = fs::read_to_string(&config_path).unwrap();
     assert!(config_contents.contains("testfile.txt"));
@@ -283,9 +282,7 @@ exclude = []
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         output.status.success(),
-        "Apply failed: {} {}",
-        stdout,
-        stderr
+        "Apply failed: {stdout} {stderr}"
     );
     // Check that the backup exists
     let backup_dir = temp.child("backups");
@@ -296,8 +293,7 @@ exclude = []
         .collect();
     assert!(
         backups.iter().any(|f| f.starts_with("dotfile.txt-")),
-        "No backup file found: {:?}",
-        backups
+        "No backup file found: {backups:?}"
     );
     // Check that the destination is now a symlink
     #[cfg(unix)]
@@ -355,9 +351,7 @@ exclude = []
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         output.status.success(),
-        "Apply failed: {} {}",
-        stdout,
-        stderr
+        "Apply failed: {stdout} {stderr}"
     );
     // Check that the backup directory does not exist or is empty
     let backup_dir = temp.child("backups");
@@ -369,8 +363,7 @@ exclude = []
             .collect();
         assert!(
             backups.is_empty(),
-            "Backup directory should be empty, found: {:?}",
-            backups
+            "Backup directory should be empty, found: {backups:?}"
         );
     }
     // Check that the destination is now a symlink
