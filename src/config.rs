@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::env;
+use globset::{Glob, GlobSet, GlobSetBuilder};
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Config {
@@ -32,6 +33,10 @@ pub struct GlobalConfig {
     /// Whether to create backups before making changes
     #[serde(default = "default_backup")]
     pub create_backups: bool,
+
+    /// Patterns for files/directories to exclude globally
+    #[serde(default)]
+    pub exclude: Vec<String>,
 }
 
 impl Default for GlobalConfig {
@@ -40,6 +45,7 @@ impl Default for GlobalConfig {
             default_profile: default_profile(),
             auto_push: false,
             create_backups: default_backup(),
+            exclude: Vec::new(),
         }
     }
 }
@@ -63,6 +69,10 @@ pub struct ProfileConfig {
 
     /// Profile description
     pub description: Option<String>,
+
+    /// Patterns for files/directories to exclude in this profile
+    #[serde(default)]
+    pub exclude: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -160,6 +170,7 @@ impl Config {
                 bootstrap_script: None,
                 enabled: true,
                 description: Some("Default profile for basic dotfiles".to_string()),
+                exclude: Vec::new(),
             },
         );
 
@@ -172,6 +183,7 @@ impl Config {
                 bootstrap_script: None,
                 enabled: true,
                 description: Some("Work environment profile".to_string()),
+                exclude: Vec::new(),
             },
         );
 
@@ -184,6 +196,7 @@ impl Config {
                 bootstrap_script: None,
                 enabled: true,
                 description: Some("Personal environment profile".to_string()),
+                exclude: Vec::new(),
             },
         );
 
@@ -316,6 +329,20 @@ impl Config {
             Err(anyhow::anyhow!("Profile '{}' not found", profile_name))
         }
     }
+
+    /// Get the effective exclusion GlobSet for a profile (merges global and profile excludes)
+    pub fn exclusion_set_for_profile(&self, profile_name: &str) -> anyhow::Result<GlobSet> {
+        let mut builder = GlobSetBuilder::new();
+        for pat in &self.global.exclude {
+            builder.add(Glob::new(pat)?);
+        }
+        if let Some(profile) = self.get_profile(profile_name) {
+            for pat in &profile.exclude {
+                builder.add(Glob::new(pat)?);
+            }
+        }
+        Ok(builder.build()?)
+    }
 }
 
 // Helper functions for default values
@@ -379,6 +406,7 @@ mod tests {
             bootstrap_script: None,
             enabled: true,
             description: Some("Test profile".to_string()),
+            exclude: Vec::new(),
         };
 
         config.add_profile("test".to_string(), new_profile);
