@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
+use globset::{Glob, GlobSet, GlobSetBuilder};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 use std::env;
-use globset::{Glob, GlobSet, GlobSetBuilder};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Config {
@@ -149,11 +149,11 @@ impl Config {
     }
 
     /// Load configuration from the standard location
-    pub fn load() -> Result<Option<Self>> {
+    pub fn load() -> Result<(Self, PathBuf)> {
         if let Some(config_path) = Self::find_config_file()? {
-            Ok(Some(Self::from_file(&config_path)?))
+            Ok((Self::from_file(&config_path)?, config_path))
         } else {
-            Ok(None)
+            Err(anyhow::anyhow!("No configuration file found. Run 'ordinator init' first."))
         }
     }
 
@@ -214,7 +214,10 @@ impl Config {
             let repo_dir = config_path.parent().unwrap();
             // Create parent directory if it doesn't exist
             std::fs::create_dir_all(repo_dir).with_context(|| {
-                format!("Failed to create dotfiles directory: {}", repo_dir.display())
+                format!(
+                    "Failed to create dotfiles directory: {}",
+                    repo_dir.display()
+                )
             })?;
             // Create config file
             let config = Self::create_default();
@@ -222,7 +225,10 @@ impl Config {
             // Create subdirectories
             let scripts_dir = repo_dir.join("scripts");
             std::fs::create_dir_all(&scripts_dir).with_context(|| {
-                format!("Failed to create scripts directory: {}", scripts_dir.display())
+                format!(
+                    "Failed to create scripts directory: {}",
+                    scripts_dir.display()
+                )
             })?;
             let files_dir = repo_dir.join("files");
             std::fs::create_dir_all(&files_dir).with_context(|| {

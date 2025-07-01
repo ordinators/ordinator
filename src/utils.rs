@@ -1,7 +1,7 @@
 use anyhow::Result;
+use chrono::Local;
 use std::fs;
 use std::path::{Path, PathBuf};
-use chrono::Local;
 
 /// Utility functions for Ordinator
 #[allow(dead_code)]

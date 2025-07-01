@@ -27,7 +27,10 @@ impl GitManager {
     /// Initialize a new Git repository
     pub fn init(&self) -> Result<()> {
         if Self::is_test_mode() {
-            info!("[TEST MODE] Skipping git init at {}", self.repo_path.display());
+            info!(
+                "[TEST MODE] Skipping git init at {}",
+                self.repo_path.display()
+            );
             return Ok(());
         }
         info!(
@@ -73,7 +76,10 @@ impl GitManager {
     /// Add a remote to the repository
     pub fn add_remote(&self, name: &str, url: &str) -> Result<()> {
         if Self::is_test_mode() {
-            info!("[TEST MODE] Skipping git remote add '{}', url '{}'", name, url);
+            info!(
+                "[TEST MODE] Skipping git remote add '{}', url '{}'",
+                name, url
+            );
             return Ok(());
         }
         info!("Adding remote '{}' with URL: {}", name, url);
@@ -154,7 +160,10 @@ impl GitManager {
     /// Push changes to remote
     pub fn push(&self, force: bool) -> Result<()> {
         if Self::is_test_mode() {
-            info!("[TEST MODE] Skipping git push{}", if force { " (force)" } else { "" });
+            info!(
+                "[TEST MODE] Skipping git push{}",
+                if force { " (force)" } else { "" }
+            );
             return Ok(());
         }
         info!("Pushing changes to remote");
@@ -200,7 +209,10 @@ impl GitManager {
     /// Pull changes from remote
     pub fn pull(&self, rebase: bool) -> Result<()> {
         if Self::is_test_mode() {
-            info!("[TEST MODE] Skipping git pull{}", if rebase { " (rebase)" } else { "" });
+            info!(
+                "[TEST MODE] Skipping git pull{}",
+                if rebase { " (rebase)" } else { "" }
+            );
             return Ok(());
         }
         info!(
