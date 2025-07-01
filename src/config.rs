@@ -153,7 +153,9 @@ impl Config {
         if let Some(config_path) = Self::find_config_file()? {
             Ok((Self::from_file(&config_path)?, config_path))
         } else {
-            Err(anyhow::anyhow!("No configuration file found. Run 'ordinator init' first."))
+            Err(anyhow::anyhow!(
+                "No configuration file found. Run 'ordinator init' first."
+            ))
         }
     }
 
