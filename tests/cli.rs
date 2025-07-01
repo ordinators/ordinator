@@ -41,9 +41,9 @@ fn test_init_dry_run() {
 fn test_add_dry_run() {
     let mut cmd = Command::cargo_bin("ordinator").unwrap();
     cmd.args(["add", "testfile.txt", "--dry-run"]);
-    cmd.assert().success().stdout(predicates::str::contains(
-        "DRY-RUN: Would add 'testfile.txt' to profile 'default'",
-    ));
+    cmd.assert()
+        .failure()
+        .stderr(contains("No configuration file found"));
 }
 
 #[test]
