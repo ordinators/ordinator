@@ -478,9 +478,56 @@ pub async fn run(args: Args) -> Result<()> {
                 return Ok(());
             }
 
-            // TODO: Implement actual apply logic
-            info!("Apply not yet implemented");
-            eprintln!("Apply not yet implemented");
+            // Load config and get profile
+            let config_path = Config::find_config_file()
+                .with_context(|| "No configuration file found. Run 'ordinator init' first.")?
+                .ok_or_else(|| {
+                    anyhow::anyhow!("No configuration file found. Run 'ordinator init' first.")
+                })?;
+            let config = Config::from_file(&config_path)?;
+            let profile_cfg = config.get_profile(&profile)
+                .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found in config", profile))?;
+            let create_backups = config.global.create_backups;
+
+            // For each tracked file, symlink with backup if needed
+            use crate::utils::{backup_file_to_dotfiles_backup, is_symlink, get_home_dir};
+            let home_dir = get_home_dir()?;
+            let dotfiles_dir = config_path.parent().unwrap();
+            for file in &profile_cfg.files {
+                // Source: dotfiles repo (files/<file>), Dest: home dir/<file>
+                let source = dotfiles_dir.join("files").join(file);
+                let dest = home_dir.join(file);
+                if dest.exists() {
+                    // If already correct symlink, skip
+                    if is_symlink(&dest) {
+                        if let Ok(target) = std::fs::read_link(&dest) {
+                            if target == source {
+                                eprintln!("Already symlinked: {} -> {}", dest.display(), source.display());
+                                continue;
+                            }
+                        }
+                    }
+                    // Backup if enabled
+                    if create_backups {
+                        let backup_path = backup_file_to_dotfiles_backup(&dest, &config_path)?;
+                        eprintln!("Backed up {} to {}", dest.display(), backup_path.display());
+                    }
+                    // Remove the old file
+                    std::fs::remove_file(&dest)?;
+                }
+                // Create parent dirs if needed
+                if let Some(parent) = dest.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                // Symlink
+                #[cfg(unix)]
+                std::os::unix::fs::symlink(&source, &dest)?;
+                #[cfg(windows)]
+                std::os::windows::fs::symlink_file(&source, &dest)?;
+                eprintln!("Symlinked {} -> {}", dest.display(), source.display());
+            }
+            info!("Apply completed");
+            eprintln!("Apply completed");
             return Ok(());
         }
         Commands::Profiles { verbose } => {
@@ -607,17 +654,5 @@ pub async fn run(args: Args) -> Result<()> {
             eprintln!("Script generation not yet implemented");
             return Ok(());
         }
-    }
-
-    info!("Ordinator completed successfully");
-    Ok(())
-}
-
-#[tokio::main]
-async fn main() {
-    let args = Args::parse();
-    if let Err(e) = run(args).await {
-        eprintln!("Error: {e}");
-        std::process::exit(1);
     }
 }
