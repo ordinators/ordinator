@@ -26,6 +26,7 @@ This roadmap breaks down the Ordinator project into actionable, testable chunks.
 - [x] Profile switching works
 - [x] Dry-run mode is respected
 - [x] Logging outputs correctly
+- [x] CLI integration tests are fully isolated and use .env for config/test mode
 
 **Acceptance Criteria**:
 ```bash
@@ -51,6 +52,7 @@ ordinator --version                # Shows version
 - [x] Remote repositories are added correctly
 - [x] Git status shows correct information
 - [x] Basic Git operations work
+- [x] CLI integration tests use per-test config and are reliable
 
 **Acceptance Criteria**:
 ```bash
@@ -78,10 +80,9 @@ ordinator push                      # Pushes to remote
 - [ ] Backup existing files before symlinking
 
 **Tests**:
-- [ ] Files are added to tracking correctly
-- [ ] Profile filtering works
-- [ ] Exclusions are respected
-- [ ] Backups are created properly
+- [x] Dotfiles can be added to profiles
+- [x] Error cases for add (file missing, already tracked, profile missing) are handled
+- [x] CLI integration tests are isolated and pass reliably
 
 **Acceptance Criteria**:
 ```bash

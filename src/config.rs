@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::env;
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Config {
@@ -112,6 +113,14 @@ impl Config {
 
     /// Find the configuration file in the current directory or dotfiles directory
     pub fn find_config_file() -> Result<Option<PathBuf>> {
+        if let Ok(path) = env::var("ORDINATOR_CONFIG") {
+            let pb = PathBuf::from(&path);
+            if pb.exists() {
+                return Ok(Some(pb));
+            } else {
+                return Ok(None);
+            }
+        }
         // Look for ordinator.toml in current directory
         let current_config = std::env::current_dir()?.join("ordinator.toml");
         if current_config.exists() {
@@ -187,6 +196,27 @@ impl Config {
 
     /// Initialize a new configuration in the dotfiles directory
     pub fn init_dotfiles_repository() -> Result<PathBuf> {
+        if let Ok(path) = env::var("ORDINATOR_CONFIG") {
+            let config_path = PathBuf::from(&path);
+            let repo_dir = config_path.parent().unwrap();
+            // Create parent directory if it doesn't exist
+            std::fs::create_dir_all(repo_dir).with_context(|| {
+                format!("Failed to create dotfiles directory: {}", repo_dir.display())
+            })?;
+            // Create config file
+            let config = Self::create_default();
+            config.save_to_file(&config_path)?;
+            // Create subdirectories
+            let scripts_dir = repo_dir.join("scripts");
+            std::fs::create_dir_all(&scripts_dir).with_context(|| {
+                format!("Failed to create scripts directory: {}", scripts_dir.display())
+            })?;
+            let files_dir = repo_dir.join("files");
+            std::fs::create_dir_all(&files_dir).with_context(|| {
+                format!("Failed to create files directory: {}", files_dir.display())
+            })?;
+            return Ok(config_path);
+        }
         let dotfiles_dir = get_dotfiles_dir()?;
 
         // Create dotfiles directory if it doesn't exist
