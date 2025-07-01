@@ -5,6 +5,11 @@
 default_profile = "work"
 auto_push = true
 backup_existing = true
+exclude = [
+    "*.bak",
+    "*.tmp",
+    ".DS_Store"
+]
 
 [profiles.work]
 description = "Work environment configuration"

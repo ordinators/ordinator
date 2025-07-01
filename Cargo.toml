@@ -36,6 +36,8 @@ serde = { version = "1.0", features = ["derive"] }
 # Path handling
 pathdiff = "0.2"
 
+globset = "0.4"
+
 # Shell command execution
 tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "macros"] }
 

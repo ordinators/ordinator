@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use tracing::{info, warn};
+use std::path::Path;
 
 use crate::config::Config;
 use crate::git::GitManager;
@@ -227,45 +228,35 @@ pub async fn run(args: Args) -> Result<()> {
 
             info!("Repository initialization completed");
             eprintln!("Repository initialization completed");
+            return Ok(());
         }
         Commands::Add { path, profile } => {
-            info!("Adding file: {}", path);
-            eprintln!("Adding file: {path}");
-            if let Some(p) = &profile {
-                info!("Profile: {}", p);
-                eprintln!("Profile: {p}");
-            }
-
-            if args.dry_run {
-                info!(
-                    "[DRY RUN] Would add file: {} to profile: {}",
-                    path,
-                    profile.clone().unwrap_or_else(|| "default".to_string())
-                );
-                eprintln!(
-                    "DRY-RUN: Would add file: {} to profile: {}",
-                    path,
-                    profile.unwrap_or_else(|| "default".to_string())
-                );
-                return Ok(());
-            }
-
-            // Load configuration and add file to profile
-            if let Some(mut config) = Config::load()? {
-                let profile_name = profile.unwrap_or_else(|| "default".to_string());
-                config.add_file_to_profile(&profile_name, path.clone())?;
-
-                // Save the updated configuration
-                if let Some(config_path) = Config::find_config_file()? {
-                    config.save_to_file(&config_path)?;
-                    info!("Added file {} to profile {}", path, profile_name);
-                    eprintln!("Added file {path} to profile {profile_name}");
-                }
-            } else {
+            let config_path = Config::find_config_file()?.ok_or_else(|| anyhow::anyhow!("No configuration file found. Please run 'ordinator init' first."))?;
+            let mut config = Config::from_file(&config_path)?;
+            let profile_name = profile.unwrap_or_else(|| config.global.default_profile.clone());
+            if !config.profiles.contains_key(&profile_name) {
                 return Err(anyhow::anyhow!(
-                    "No configuration file found. Run 'ordinator init' first."
+                    "Profile '{}' does not exist. To create it, run: ordinator profile add {}",
+                    profile_name, profile_name
                 ));
             }
+            // Exclusion check
+            let exclusion_set = config.exclusion_set_for_profile(&profile_name)?;
+            if exclusion_set.is_match(&path) {
+                return Err(anyhow::anyhow!("Path '{}' matches an exclusion pattern and cannot be tracked.", path));
+            }
+            if args.dry_run {
+                println!("DRY-RUN: Would add '{}' to profile '{}'", path, profile_name);
+                return Ok(());
+            }
+            let path_obj = Path::new(&path);
+            if !path_obj.exists() {
+                return Err(anyhow::anyhow!("Path '{}' does not exist on disk.", path));
+            }
+            config.add_file_to_profile(&profile_name, path.clone())?;
+            config.save_to_file(&config_path)?;
+            println!("Added '{}' to profile '{}'", path, profile_name);
+            return Ok(());
         }
         Commands::Remove { path } => {
             info!("Removing file: {}", path);
@@ -280,6 +271,7 @@ pub async fn run(args: Args) -> Result<()> {
             // TODO: Implement actual remove logic
             info!("File removal not yet implemented");
             eprintln!("File removal not yet implemented");
+            return Ok(());
         }
         Commands::Commit { message } => {
             info!("Committing with message: {}", message);
@@ -309,6 +301,7 @@ pub async fn run(args: Args) -> Result<()> {
             git_manager.commit(&message)?;
             info!("Changes committed successfully");
             eprintln!("Changes committed successfully");
+            return Ok(());
         }
         Commands::Push { force } => {
             info!("Pushing changes{}", if force { " (force)" } else { "" });
@@ -344,6 +337,7 @@ pub async fn run(args: Args) -> Result<()> {
             git_manager.push(force)?;
             info!("Changes pushed successfully");
             eprintln!("Changes pushed successfully");
+            return Ok(());
         }
         Commands::Pull { rebase } => {
             info!("Pulling changes{}", if rebase { " (rebase)" } else { "" });
@@ -379,6 +373,7 @@ pub async fn run(args: Args) -> Result<()> {
             git_manager.pull(rebase)?;
             info!("Changes pulled successfully");
             eprintln!("Changes pulled successfully");
+            return Ok(());
         }
         Commands::Sync { force } => {
             info!("Syncing repository{}", if force { " (force)" } else { "" });
@@ -416,6 +411,7 @@ pub async fn run(args: Args) -> Result<()> {
             git_manager.push(force)?;
             info!("Repository synced successfully");
             eprintln!("Repository synced successfully");
+            return Ok(());
         }
         Commands::Status { verbose } => {
             info!("Showing status{}", if verbose { " (verbose)" } else { "" });
@@ -450,6 +446,7 @@ pub async fn run(args: Args) -> Result<()> {
 
             let status = git_manager.status()?;
             eprintln!("{status}");
+            return Ok(());
         }
         Commands::Apply {
             profile,
@@ -484,6 +481,7 @@ pub async fn run(args: Args) -> Result<()> {
             // TODO: Implement actual apply logic
             info!("Apply not yet implemented");
             eprintln!("Apply not yet implemented");
+            return Ok(());
         }
         Commands::Profiles { verbose } => {
             info!(
@@ -525,6 +523,7 @@ pub async fn run(args: Args) -> Result<()> {
                     "No configuration file found. Run 'ordinator init' first."
                 ));
             }
+            return Ok(());
         }
         Commands::Secrets { subcommand } => {
             match subcommand {
@@ -541,6 +540,7 @@ pub async fn run(args: Args) -> Result<()> {
                     // TODO: Implement actual encrypt logic
                     info!("Encryption not yet implemented");
                     eprintln!("Encryption not yet implemented");
+                    return Ok(());
                 }
                 SecretCommands::Decrypt { file } => {
                     info!("Decrypting file: {}", file);
@@ -555,6 +555,7 @@ pub async fn run(args: Args) -> Result<()> {
                     // TODO: Implement actual decrypt logic
                     info!("Decryption not yet implemented");
                     eprintln!("Decryption not yet implemented");
+                    return Ok(());
                 }
                 SecretCommands::List { paths_only } => {
                     info!(
@@ -581,6 +582,7 @@ pub async fn run(args: Args) -> Result<()> {
                     // TODO: Implement actual list logic
                     info!("Encrypted files listing not yet implemented");
                     eprintln!("Encrypted files listing not yet implemented");
+                    return Ok(());
                 }
             }
         }
@@ -603,9 +605,19 @@ pub async fn run(args: Args) -> Result<()> {
             // TODO: Implement actual script generation logic
             info!("Script generation not yet implemented");
             eprintln!("Script generation not yet implemented");
+            return Ok(());
         }
     }
 
     info!("Ordinator completed successfully");
     Ok(())
+}
+
+#[tokio::main]
+async fn main() {
+    let args = Args::parse();
+    if let Err(e) = run(args).await {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    }
 }

@@ -24,12 +24,14 @@ Ordinator uses a single TOML configuration file, typically located at `~/.dotfil
 default_profile = "default"
 auto_push = false
 create_backups = true
+exclude = ["*.bak"]
 
 [profiles.default]
 files = ["~/.zshrc", "~/.gitconfig"]
 directories = ["~/.config/nvim"]
 enabled = true
 description = "Default profile for basic dotfiles"
+exclude = ["*.bak"]
 
 [profiles.work]
 files = ["~/.ssh/config"]
@@ -58,6 +60,7 @@ exclude_patterns = ["*.bak"]
 - `default_profile` (string): The profile to use by default.
 - `auto_push` (bool): If true, automatically push changes after successful operations.
 - `create_backups` (bool): If true, create backups before making changes.
+- `exclude` (array of strings): Glob patterns for files or directories to exclude from tracking or symlinking (applies globally).
 
 ### `[profiles.<name>]`
 - `files` (array of strings): List of files tracked by this profile.
@@ -65,6 +68,7 @@ exclude_patterns = ["*.bak"]
 - `bootstrap_script` (string, optional): Path to a bootstrap script for this profile.
 - `enabled` (bool): Whether this profile is active.
 - `description` (string, optional): Description of the profile.
+- `exclude` (array of strings): Glob patterns for files or directories to exclude for this profile (overrides or adds to global exclusions).
 
 ### `[secrets]`
 - `age_key_file` (string, optional): Path to the age key file for decryption.
@@ -80,16 +84,10 @@ exclude_patterns = ["*.bak"]
 - Add files or directories to profiles to track them with Ordinator.
 - Use the `[secrets]` section to specify which files should be encrypted and how secrets are managed.
 - Use the `[global]` section to set defaults and enable/disable features.
+- Use the `exclude` field in `[global]` or `[profiles.<name>]` to prevent certain files or directories from being tracked or symlinked. Profile-level `exclude` patterns take precedence over global ones.
 
 ---
 
 ## Best Practices
 
-- Keep your `ordinator.toml` in version control, but do **not** commit your secrets or age key files.
-- Use profiles to separate work, personal, and other environments.
-- Use `encrypt_patterns` to ensure sensitive files are always encrypted.
-- Always use `--dry-run` to preview changes before applying them.
-
----
-
-For more details, see the [Product Requirements Document](PRD.md) or run `ordinator --help`. 
+- Keep your `

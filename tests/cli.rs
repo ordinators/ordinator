@@ -146,3 +146,63 @@ fn test_add_to_nonexistent_profile_suggests_profile_add() {
     cmd.args(["add", "testfile.txt", "--profile", "ghost"]);
     cmd.assert().failure().stdout(predicates::str::contains("Profile 'ghost' does not exist. To create it, run: ordinator profile add ghost"));
 }
+
+#[test]
+fn test_add_file_excluded_by_global_pattern() {
+    use assert_fs::prelude::*;
+    let temp = assert_fs::TempDir::new().unwrap();
+    let config_file = temp.child("ordinator.toml");
+    let config_path = config_file.path().to_path_buf();
+
+    // Write a config with a global exclude pattern
+    std::fs::write(&config_path, r#"
+[global]
+default_profile = "default"
+exclude = ["*.bak"]
+[profiles.default]
+files = []
+directories = []
+exclude = []
+"#).unwrap();
+
+    // Create a file that matches the global exclude pattern
+    temp.child("secret.bak").touch().unwrap();
+
+    // Try to add the excluded file
+    let mut cmd = Command::cargo_bin("ordinator").unwrap();
+    cmd.current_dir(&temp);
+    cmd.env("ORDINATOR_CONFIG", &config_path);
+    cmd.env("ORDINATOR_TEST_MODE", "1");
+    cmd.args(["add", "secret.bak"]);
+    cmd.assert().failure().stdout(contains("matches an exclusion pattern and cannot be tracked"));
+}
+
+#[test]
+fn test_add_file_excluded_by_profile_pattern() {
+    use assert_fs::prelude::*;
+    let temp = assert_fs::TempDir::new().unwrap();
+    let config_file = temp.child("ordinator.toml");
+    let config_path = config_file.path().to_path_buf();
+
+    // Write a config with a profile-specific exclude pattern
+    std::fs::write(&config_path, r#"
+[global]
+default_profile = "default"
+exclude = []
+[profiles.default]
+files = []
+directories = []
+exclude = ["*.tmp"]
+"#).unwrap();
+
+    // Create a file that matches the profile exclude pattern
+    temp.child("should_not_add.tmp").touch().unwrap();
+
+    // Try to add the excluded file
+    let mut cmd = Command::cargo_bin("ordinator").unwrap();
+    cmd.current_dir(&temp);
+    cmd.env("ORDINATOR_CONFIG", &config_path);
+    cmd.env("ORDINATOR_TEST_MODE", "1");
+    cmd.args(["add", "should_not_add.tmp"]);
+    cmd.assert().failure().stdout(contains("matches an exclusion pattern and cannot be tracked"));
+}
