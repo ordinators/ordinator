@@ -280,10 +280,7 @@ exclude = []
     let output = cmd.output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        output.status.success(),
-        "Apply failed: {stdout} {stderr}"
-    );
+    assert!(output.status.success(), "Apply failed: {stdout} {stderr}");
     // Check that the backup exists
     let backup_dir = temp.child("backups");
     let backups: Vec<_> = backup_dir
@@ -349,10 +346,7 @@ exclude = []
     let output = cmd.output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        output.status.success(),
-        "Apply failed: {stdout} {stderr}"
-    );
+    assert!(output.status.success(), "Apply failed: {stdout} {stderr}");
     // Check that the backup directory does not exist or is empty
     let backup_dir = temp.child("backups");
     if backup_dir.path().exists() {
