@@ -39,10 +39,17 @@ fn test_init_dry_run() {
 
 #[test]
 fn test_add_dry_run() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    
     let mut cmd = Command::cargo_bin("ordinator").unwrap();
+    cmd.current_dir(&temp);
+    cmd.env("ORDINATOR_CONFIG", "/nonexistent/config.toml");
+    cmd.env("ORDINATOR_TEST_MODE", "1");
     cmd.args(["add", "testfile.txt", "--dry-run"]);
-    // Dry-run should succeed even without config
-    cmd.assert().success();
+    // Dry-run still requires a valid configuration
+    cmd.assert().failure().stderr(predicates::str::contains(
+        "No configuration file found. Run 'ordinator init' first.",
+    ));
 }
 
 #[test]
