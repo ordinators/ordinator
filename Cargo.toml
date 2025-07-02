@@ -1,6 +1,6 @@
 [package]
 name = "ordinator"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 authors = ["Anthony Norfleet <anthony.norfleet@gmail.com>"]
 description = "Dotfiles and Environment Manager for macOS"
@@ -63,3 +63,6 @@ cargo-fuzz = "0.13"
 
 # Note: cargo-tarpaulin removed due to git2 dependency conflicts
 # Can be added back later when needed for code coverage
+
+[lints.clippy]
+uninlined-format-args = "deny"

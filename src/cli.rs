@@ -21,6 +21,10 @@ pub struct Args {
     /// Enable verbose logging
     #[arg(short, long, global = true)]
     pub verbose: bool,
+
+    /// Suppress status messages (only show errors)
+    #[arg(short, long, global = true)]
+    pub quiet: bool,
 }
 
 #[derive(Subcommand)]
@@ -102,6 +106,21 @@ pub enum Commands {
         /// Skip secrets decryption
         #[arg(long)]
         skip_secrets: bool,
+
+        /// Force overwrite existing files (use with caution)
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Repair broken symlinks
+    Repair {
+        /// Profile to repair (defaults to all profiles)
+        #[arg(long)]
+        profile: Option<String>,
+
+        /// Show detailed repair information
+        #[arg(long)]
+        verbose: bool,
     },
 
     /// List available profiles
@@ -154,6 +173,11 @@ pub enum SecretCommands {
 }
 
 pub async fn run(args: Args) -> Result<()> {
+    eprintln!("[DEBUG] args.verbose: {}", args.verbose);
+    eprintln!(
+        "[DEBUG] std::env::args: {:?}",
+        std::env::args().collect::<Vec<_>>()
+    );
     // Setup logging based on verbose flag
     let log_level = if args.verbose {
         tracing::Level::DEBUG
@@ -176,10 +200,14 @@ pub async fn run(args: Args) -> Result<()> {
     match args.command {
         Commands::Init { remote, profile } => {
             info!("Initializing repository with profile: {}", profile);
-            eprintln!("Initializing repository with profile: {profile}");
+            if !args.quiet {
+                eprintln!("Initializing repository with profile: {profile}");
+            }
             if let Some(url) = &remote {
                 info!("Remote URL: {}", url);
-                eprintln!("Remote URL: {url}");
+                if !args.quiet {
+                    eprintln!("Remote URL: {url}");
+                }
             }
 
             if args.dry_run {
@@ -394,7 +422,9 @@ pub async fn run(args: Args) -> Result<()> {
         }
         Commands::Status { verbose } => {
             info!("Showing status{}", if verbose { " (verbose)" } else { "" });
-            eprintln!("Showing status{}", if verbose { " (verbose)" } else { "" });
+            if !args.quiet {
+                eprintln!("Showing status{}", if verbose { " (verbose)" } else { "" });
+            }
 
             if args.dry_run {
                 info!(
@@ -409,32 +439,83 @@ pub async fn run(args: Args) -> Result<()> {
             }
 
             // Load config and get dotfiles repo path
-            let (_config, config_path) = Config::load()?;
+            let (config, config_path) = Config::load()?;
             let dotfiles_path = config_path.parent().unwrap().to_path_buf();
             let git_manager = GitManager::new(dotfiles_path);
-            if !git_manager.exists() {
-                return Err(anyhow::anyhow!(
-                    "No Git repository found. Run 'ordinator init' first."
-                ));
+
+            // Show Git status if repository exists
+            if git_manager.exists() {
+                let status = git_manager.status()?;
+                eprintln!("{status}");
+            } else {
+                eprintln!("No Git repository found. Showing symlink status only.");
             }
-            let status = git_manager.status()?;
-            eprintln!("{status}");
+
+            // Show symlink status if verbose
+            if verbose {
+                eprintln!("\nSymlink Status:");
+                use crate::utils::{get_home_dir, is_broken_symlink, is_symlink};
+                let home_dir = get_home_dir()?;
+                let _dotfiles_dir = config_path.parent().unwrap();
+                let mut total_files = 0;
+                let mut valid_symlinks = 0;
+                let mut broken_symlinks = 0;
+                let mut missing_files = 0;
+
+                for profile_name in config.list_profiles() {
+                    if let Some(profile_cfg) = config.get_profile(profile_name) {
+                        eprintln!("  Profile: {profile_name}");
+                        for file in &profile_cfg.files {
+                            total_files += 1;
+                            let dest = home_dir.join(file);
+
+                            if !dest.exists() {
+                                eprintln!("    {}: Missing", dest.display());
+                                missing_files += 1;
+                            } else if is_broken_symlink(&dest) {
+                                eprintln!("    {}: Broken symlink", dest.display());
+                                broken_symlinks += 1;
+                            } else if is_symlink(&dest) {
+                                eprintln!("    {}: Valid symlink", dest.display());
+                                valid_symlinks += 1;
+                            } else {
+                                eprintln!("    {}: File (not symlinked)", dest.display());
+                                missing_files += 1;
+                            }
+                        }
+                    }
+                }
+
+                eprintln!("\nSummary:");
+                eprintln!("  Total tracked files: {total_files}");
+                eprintln!("  Valid symlinks: {valid_symlinks}");
+                eprintln!("  Broken symlinks: {broken_symlinks}");
+                eprintln!("  Missing/not symlinked: {missing_files}");
+            }
+
             Ok(())
         }
         Commands::Apply {
             profile,
             skip_bootstrap,
             skip_secrets,
+            force,
         } => {
             info!("Applying profile: {}", profile);
-            eprintln!("Applying profile: {profile}");
+            if !args.quiet {
+                eprintln!("Applying profile: {profile}");
+            }
             if skip_bootstrap {
                 info!("Skipping bootstrap");
-                eprintln!("Skipping bootstrap");
+                if !args.quiet {
+                    eprintln!("Skipping bootstrap");
+                }
             }
             if skip_secrets {
                 info!("Skipping secrets");
-                eprintln!("Skipping secrets");
+                if !args.quiet {
+                    eprintln!("Skipping secrets");
+                }
             }
 
             if args.dry_run {
@@ -458,49 +539,312 @@ pub async fn run(args: Args) -> Result<()> {
                 .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found in config", profile))?;
             let create_backups = config.global.create_backups;
 
-            // For each tracked file, symlink with backup if needed
-            use crate::utils::{backup_file_to_dotfiles_backup, get_home_dir, is_symlink};
+            // Debug: print config information
+            eprintln!("[DEBUG] Config loaded from: {}", config_path.display());
+            eprintln!("[DEBUG] Requested profile: '{profile}'");
+            eprintln!(
+                "[DEBUG] Profile exists: {}",
+                config.profiles.contains_key(&profile)
+            );
+            eprintln!("[DEBUG] Available profiles: {:?}", config.list_profiles());
+            eprintln!("[DEBUG] Profile files count: {}", profile_cfg.files.len());
+            eprintln!("[DEBUG] Profile files: {:?}", profile_cfg.files);
+
+            // Debug: print config file content
+            match std::fs::read_to_string(&config_path) {
+                Ok(content) => {
+                    eprintln!("[DEBUG] Config file content:");
+                    eprintln!("{content}");
+                }
+                Err(e) => {
+                    eprintln!("[DEBUG] Failed to read config file: {e}");
+                }
+            }
+
+            // For each tracked file, symlink with enhanced conflict resolution
+            use crate::utils::{
+                create_symlink_with_conflict_resolution, get_home_dir, get_symlink_target,
+                is_symlink,
+            };
             let home_dir = get_home_dir()?;
-            let dotfiles_dir = config_path.parent().unwrap();
+            let _dotfiles_dir = config_path.parent().unwrap();
+
+            // Debug: print profile file list
+            eprintln!(
+                "[DEBUG] Profile '{}' has {} files:",
+                profile,
+                profile_cfg.files.len()
+            );
+            for file in &profile_cfg.files {
+                eprintln!("[DEBUG]   - {file}");
+            }
+
             for file in &profile_cfg.files {
                 // Source: dotfiles repo (files/<file>), Dest: home dir/<file>
-                let source = dotfiles_dir.join("files").join(file);
                 let dest = home_dir.join(file);
-                if dest.exists() {
-                    // If already correct symlink, skip
-                    if is_symlink(&dest) {
-                        if let Ok(target) = std::fs::read_link(&dest) {
-                            if target == source {
-                                eprintln!(
-                                    "Already symlinked: {} -> {}",
-                                    dest.display(),
-                                    source.display()
-                                );
-                                continue;
-                            }
+
+                eprintln!("[DEBUG] Checking file: {file}");
+                eprintln!("[DEBUG] Dest: {}", dest.display());
+
+                if !dest.exists() {
+                    // Create new symlink
+                    eprintln!(
+                        "[DEBUG] Creating new symlink: {} -> {}",
+                        dest.display(),
+                        _dotfiles_dir.join("files").join(file).display()
+                    );
+                    if args.dry_run {
+                        eprintln!(
+                            "DRY-RUN: Would create symlink {} -> {}",
+                            dest.display(),
+                            _dotfiles_dir.join("files").join(file).display()
+                        );
+                    } else {
+                        create_symlink_with_conflict_resolution(
+                            &_dotfiles_dir.join("files").join(file),
+                            &dest,
+                            force,
+                            create_backups,
+                            &config_path,
+                        )?;
+                        if !args.quiet {
+                            eprintln!(
+                                "Symlinked: {} -> {}",
+                                dest.display(),
+                                _dotfiles_dir.join("files").join(file).display()
+                            );
                         }
                     }
-                    // Backup if enabled
-                    if create_backups {
-                        let backup_path = backup_file_to_dotfiles_backup(&dest, &config_path)?;
-                        eprintln!("Backed up {} to {}", dest.display(), backup_path.display());
+                    continue;
+                }
+
+                if !is_symlink(&dest) {
+                    // Handle non-symlink conflict
+                    eprintln!("[DEBUG] Non-symlink conflict: {}", dest.display());
+                    if !force {
+                        eprintln!(
+                            "  {}: Already exists and is not a symlink. Use --force to overwrite.",
+                            dest.display()
+                        );
+                        return Err(anyhow::anyhow!(
+                            "Target {} already exists and is not a symlink. Use --force to overwrite.",
+                            dest.display()
+                        ));
                     }
-                    // Remove the old file
-                    std::fs::remove_file(&dest)?;
+                    // Force overwrite - create symlink
+                    eprintln!(
+                        "[DEBUG] Force creating symlink: {} -> {}",
+                        dest.display(),
+                        _dotfiles_dir.join("files").join(file).display()
+                    );
+                    if args.dry_run {
+                        eprintln!(
+                            "DRY-RUN: Would force create symlink {} -> {}",
+                            dest.display(),
+                            _dotfiles_dir.join("files").join(file).display()
+                        );
+                    } else {
+                        create_symlink_with_conflict_resolution(
+                            &_dotfiles_dir.join("files").join(file),
+                            &dest,
+                            force,
+                            create_backups,
+                            &config_path,
+                        )?;
+                        if !args.quiet {
+                            eprintln!(
+                                "Symlinked: {} -> {}",
+                                dest.display(),
+                                _dotfiles_dir.join("files").join(file).display()
+                            );
+                        }
+                    }
+                    continue;
                 }
-                // Create parent dirs if needed
-                if let Some(parent) = dest.parent() {
-                    std::fs::create_dir_all(parent)?;
+
+                // Check if existing symlink is broken or points to wrong target
+                let needs_repair = match get_symlink_target(&dest) {
+                    Ok(actual_target) => {
+                        eprintln!("[DEBUG] actual_target: {}", actual_target.display());
+                        eprintln!(
+                            "[DEBUG] expected source: {}",
+                            _dotfiles_dir.join("files").join(file).display()
+                        );
+                        eprintln!("[DEBUG] actual_target.exists(): {}", actual_target.exists());
+                        let needs = actual_target != _dotfiles_dir.join("files").join(file)
+                            || !actual_target.exists();
+                        eprintln!("[DEBUG] needs_repair: {needs}");
+                        needs
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "[DEBUG] Could not read symlink target for {}: {}",
+                            dest.display(),
+                            e
+                        );
+                        true // Can't read symlink target, assume broken
+                    }
+                };
+
+                eprintln!(
+                    "[DEBUG] After needs_repair check: {} => {}",
+                    dest.display(),
+                    needs_repair
+                );
+
+                if needs_repair {
+                    eprintln!("[DEBUG] Entering repair branch for {}", dest.display());
+                    if args.dry_run {
+                        eprintln!("DRY-RUN: Would repair {}", dest.display());
+                    } else {
+                        use crate::utils::repair_symlink;
+                        repair_symlink(&dest, &_dotfiles_dir.join("files").join(file))?;
+                        if !args.quiet {
+                            eprintln!(
+                                "Repaired: {} -> {}",
+                                dest.display(),
+                                _dotfiles_dir.join("files").join(file).display()
+                            );
+                        }
+                    }
+                } else if args.verbose {
+                    eprintln!("  {}: Valid symlink", dest.display());
                 }
-                // Symlink
-                #[cfg(unix)]
-                std::os::unix::fs::symlink(&source, &dest)?;
-                #[cfg(windows)]
-                std::os::windows::fs::symlink_file(&source, &dest)?;
-                eprintln!("Symlinked {} -> {}", dest.display(), source.display());
             }
             info!("Apply completed");
-            eprintln!("Apply completed");
+            if !args.quiet {
+                eprintln!("Apply completed");
+            }
+            Ok(())
+        }
+        Commands::Repair { profile, verbose } => {
+            info!("Repairing broken symlinks");
+            if !args.quiet {
+                eprintln!("Repairing broken symlinks");
+            }
+
+            if args.dry_run {
+                info!("[DRY RUN] Would repair broken symlinks");
+                eprintln!("DRY-RUN: Would repair broken symlinks");
+                return Ok(());
+            }
+
+            // Load config
+            let (config, config_path) = Config::load()?;
+            use crate::utils::{get_home_dir, get_symlink_target, is_symlink};
+            let home_dir = get_home_dir()?;
+            let _dotfiles_dir = config_path.parent().unwrap();
+
+            let profiles_to_repair = if let Some(profile_name) = profile {
+                vec![profile_name]
+            } else {
+                config
+                    .list_profiles()
+                    .into_iter()
+                    .map(|s| s.to_string())
+                    .collect()
+            };
+
+            let mut total_checked = 0;
+            let mut total_repaired = 0;
+
+            for profile_name in &profiles_to_repair {
+                if let Some(profile_cfg) = config.get_profile(profile_name) {
+                    if verbose {
+                        eprintln!("Checking profile: {profile_name}");
+                    }
+
+                    for file in &profile_cfg.files {
+                        total_checked += 1;
+                        let dest = home_dir.join(file);
+
+                        eprintln!("[DEBUG] Checking file: {file}");
+                        eprintln!("[DEBUG] Dest: {}", dest.display());
+                        eprintln!("[DEBUG] home_dir: {}", home_dir.display());
+                        eprintln!("[DEBUG] dotfiles_dir: {}", _dotfiles_dir.display());
+
+                        // Check if destination exists or is a symlink (even if broken)
+                        if !dest.exists() && !is_symlink(&dest) {
+                            eprintln!(
+                                "[DEBUG] Destination does not exist and is not a symlink: {}",
+                                dest.display()
+                            );
+                            continue; // File doesn't exist and is not a symlink, nothing to repair
+                        }
+
+                        if !is_symlink(&dest) {
+                            eprintln!("[DEBUG] Not a symlink: {}", dest.display());
+                            if verbose {
+                                eprintln!("  {}: Not a symlink (skipping)", dest.display());
+                            }
+                            continue;
+                        }
+                        eprintln!("[DEBUG] Is a symlink, proceeding to check target");
+
+                        // Check if symlink is broken or points to wrong target
+                        eprintln!(
+                            "[DEBUG] About to check symlink target for: {}",
+                            dest.display()
+                        );
+                        let needs_repair = match get_symlink_target(&dest) {
+                            Ok(actual_target) => {
+                                eprintln!("[DEBUG] actual_target: {}", actual_target.display());
+                                eprintln!(
+                                    "[DEBUG] expected source: {}",
+                                    _dotfiles_dir.join("files").join(file).display()
+                                );
+                                eprintln!(
+                                    "[DEBUG] actual_target.exists(): {}",
+                                    actual_target.exists()
+                                );
+                                let needs = actual_target != _dotfiles_dir.join("files").join(file)
+                                    || !actual_target.exists();
+                                eprintln!("[DEBUG] needs_repair: {needs}");
+                                needs
+                            }
+                            Err(e) => {
+                                eprintln!(
+                                    "[DEBUG] Could not read symlink target for {}: {}",
+                                    dest.display(),
+                                    e
+                                );
+                                true // Can't read symlink target, assume broken
+                            }
+                        };
+
+                        eprintln!(
+                            "[DEBUG] After needs_repair check: {} => {}",
+                            dest.display(),
+                            needs_repair
+                        );
+
+                        if needs_repair {
+                            eprintln!("[DEBUG] Entering repair branch for {}", dest.display());
+                            if args.dry_run {
+                                eprintln!("DRY-RUN: Would repair {}", dest.display());
+                            } else {
+                                use crate::utils::repair_symlink;
+                                repair_symlink(&dest, &_dotfiles_dir.join("files").join(file))?;
+                                if !args.quiet {
+                                    eprintln!(
+                                        "Repaired: {} -> {}",
+                                        dest.display(),
+                                        _dotfiles_dir.join("files").join(file).display()
+                                    );
+                                }
+                                total_repaired += 1;
+                            }
+                        } else if verbose {
+                            eprintln!("  {}: Valid symlink", dest.display());
+                        }
+                    }
+                }
+            }
+
+            if !args.quiet {
+                eprintln!("Repair completed: {total_checked} checked, {total_repaired} repaired");
+            }
+            info!("Repair completed: {total_checked} checked, {total_repaired} repaired");
             Ok(())
         }
         Commands::Profiles { verbose } => {

@@ -100,15 +100,15 @@ ordinator list-files --profile work    # Shows tracked files
 
 **Tasks**:
 - [x] Implement symlink creation with backup
-- [ ] Handle nested directories (`.config`, `Library/Preferences`)
-- [ ] Symlink validation and repair
-- [ ] Conflict resolution (existing files/symlinks)
+- [x] Handle nested directories (`.config`, `Library/Preferences`)
+- [x] Symlink validation and repair
+- [x] Conflict resolution (existing files/symlinks)
 
 **Tests**:
-- [ ] Symlinks are created correctly
-- [ ] Nested directories are handled
-- [ ] Conflicts are resolved properly
-- [ ] Existing files are backed up
+- [x] Symlinks are created correctly
+- [x] Nested directories are handled
+- [x] Conflicts are resolved properly
+- [x] Existing files are backed up
 
 **Acceptance Criteria**:
 ```bash
@@ -116,6 +116,14 @@ ordinator apply --profile work         # Creates symlinks
 ordinator status                       # Shows symlink status
 ordinator repair                       # Fixes broken symlinks
 ```
+
+**Major Improvements Completed**:
+- ✅ Fixed Apply command to create new symlinks (was only repairing existing ones)
+- ✅ Added proper conflict resolution with `--force` flag
+- ✅ Enhanced repair command to detect and fix broken symlinks
+- ✅ Improved error messages and debug output
+- ✅ Added comprehensive test coverage for symlink scenarios
+- ✅ Fixed test isolation issues with `ORDINATOR_HOME` environment variable
 
 ---
 
@@ -280,14 +288,16 @@ ordinator generate-script --profile work
 
 **Tasks**:
 - [ ] JSON output format
-- [ ] Verbose logging levels
+- [x] Verbose logging levels
 - [ ] Progress indicators
-- [ ] Error reporting improvements
+- [x] Error reporting improvements
+- [x] Command documentation
 
 **Tests**:
 - [ ] JSON output is valid
-- [ ] Logging levels work correctly
+- [x] Logging levels work correctly
 - [ ] Progress indicators function
+- [x] Documentation is comprehensive and accurate
 
 ---
 

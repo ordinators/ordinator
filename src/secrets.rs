@@ -61,3 +61,204 @@ impl SecretsManager {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_secrets_manager_new_with_both_configs() {
+        let age_key = std::path::PathBuf::from("/path/to/age.key");
+        let sops_config = std::path::PathBuf::from("/path/to/.sops.yaml");
+
+        let manager = SecretsManager::new(Some(age_key.clone()), Some(sops_config.clone()));
+
+        assert_eq!(manager.age_key_file, Some(age_key));
+        assert_eq!(manager.sops_config, Some(sops_config));
+    }
+
+    #[test]
+    fn test_secrets_manager_new_with_age_key_only() {
+        let age_key = std::path::PathBuf::from("/path/to/age.key");
+
+        let manager = SecretsManager::new(Some(age_key.clone()), None);
+
+        assert_eq!(manager.age_key_file, Some(age_key));
+        assert_eq!(manager.sops_config, None);
+    }
+
+    #[test]
+    fn test_secrets_manager_new_with_sops_config_only() {
+        let sops_config = std::path::PathBuf::from("/path/to/.sops.yaml");
+
+        let manager = SecretsManager::new(None, Some(sops_config.clone()));
+
+        assert_eq!(manager.age_key_file, None);
+        assert_eq!(manager.sops_config, Some(sops_config));
+    }
+
+    #[test]
+    fn test_secrets_manager_new_with_no_configs() {
+        let manager = SecretsManager::new(None, None);
+
+        assert_eq!(manager.age_key_file, None);
+        assert_eq!(manager.sops_config, None);
+    }
+
+    #[test]
+    fn test_encrypt_file() {
+        let manager = SecretsManager::new(None, None);
+        let file_path = std::path::Path::new("/tmp/test.txt");
+
+        let result = manager.encrypt_file(file_path);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_encrypt_file_with_configs() {
+        let age_key = std::path::PathBuf::from("/path/to/age.key");
+        let sops_config = std::path::PathBuf::from("/path/to/.sops.yaml");
+        let manager = SecretsManager::new(Some(age_key), Some(sops_config));
+
+        let file_path = std::path::Path::new("/tmp/test.txt");
+        let result = manager.encrypt_file(file_path);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_decrypt_file() {
+        let manager = SecretsManager::new(None, None);
+        let file_path = std::path::Path::new("/tmp/test.enc.yaml");
+
+        let result = manager.decrypt_file(file_path);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_decrypt_file_with_configs() {
+        let age_key = std::path::PathBuf::from("/path/to/age.key");
+        let sops_config = std::path::PathBuf::from("/path/to/.sops.yaml");
+        let manager = SecretsManager::new(Some(age_key), Some(sops_config));
+
+        let file_path = std::path::Path::new("/tmp/test.enc.yaml");
+        let result = manager.decrypt_file(file_path);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_list_encrypted_files() {
+        let manager = SecretsManager::new(None, None);
+        let repo_path = std::path::Path::new("/tmp/repo");
+
+        let result = manager.list_encrypted_files(repo_path);
+        assert!(result.is_ok());
+
+        let files = result.unwrap();
+        assert!(files.is_empty()); // Currently returns empty vector
+    }
+
+    #[test]
+    fn test_list_encrypted_files_with_configs() {
+        let age_key = std::path::PathBuf::from("/path/to/age.key");
+        let sops_config = std::path::PathBuf::from("/path/to/.sops.yaml");
+        let manager = SecretsManager::new(Some(age_key), Some(sops_config));
+
+        let repo_path = std::path::Path::new("/tmp/repo");
+        let result = manager.list_encrypted_files(repo_path);
+        assert!(result.is_ok());
+
+        let files = result.unwrap();
+        assert!(files.is_empty()); // Currently returns empty vector
+    }
+
+    #[test]
+    fn test_check_for_plaintext_secrets() {
+        let manager = SecretsManager::new(None, None);
+        let file_path = std::path::Path::new("/tmp/test.txt");
+
+        let result = manager.check_for_plaintext_secrets(file_path);
+        assert!(result.is_ok());
+
+        let has_secrets = result.unwrap();
+        assert!(!has_secrets); // Currently returns false
+    }
+
+    #[test]
+    fn test_check_for_plaintext_secrets_with_configs() {
+        let age_key = std::path::PathBuf::from("/path/to/age.key");
+        let sops_config = std::path::PathBuf::from("/path/to/.sops.yaml");
+        let manager = SecretsManager::new(Some(age_key), Some(sops_config));
+
+        let file_path = std::path::Path::new("/tmp/test.txt");
+        let result = manager.check_for_plaintext_secrets(file_path);
+        assert!(result.is_ok());
+
+        let has_secrets = result.unwrap();
+        assert!(!has_secrets); // Currently returns false
+    }
+
+    #[test]
+    fn test_validate_installation() {
+        let manager = SecretsManager::new(None, None);
+
+        let result = manager.validate_installation();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_installation_with_configs() {
+        let age_key = std::path::PathBuf::from("/path/to/age.key");
+        let sops_config = std::path::PathBuf::from("/path/to/.sops.yaml");
+        let manager = SecretsManager::new(Some(age_key), Some(sops_config));
+
+        let result = manager.validate_installation();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_secrets_manager_integration() {
+        let age_key = std::path::PathBuf::from("/path/to/age.key");
+        let sops_config = std::path::PathBuf::from("/path/to/.sops.yaml");
+        let manager = SecretsManager::new(Some(age_key), Some(sops_config));
+
+        // Test all methods in sequence
+        let file_path = std::path::Path::new("/tmp/test.txt");
+        assert!(manager.encrypt_file(file_path).is_ok());
+
+        let enc_file_path = std::path::Path::new("/tmp/test.enc.yaml");
+        assert!(manager.decrypt_file(enc_file_path).is_ok());
+
+        let repo_path = std::path::Path::new("/tmp/repo");
+        let files = manager.list_encrypted_files(repo_path).unwrap();
+        assert!(files.is_empty());
+
+        assert!(manager.check_for_plaintext_secrets(file_path).is_ok());
+        assert!(manager.validate_installation().is_ok());
+    }
+
+    #[test]
+    fn test_secrets_manager_edge_cases() {
+        let manager = SecretsManager::new(None, None);
+
+        // Test with non-existent paths
+        let non_existent_path = std::path::Path::new("/non/existent/path");
+        assert!(manager.encrypt_file(non_existent_path).is_ok());
+        assert!(manager.decrypt_file(non_existent_path).is_ok());
+        assert!(manager.list_encrypted_files(non_existent_path).is_ok());
+        assert!(manager
+            .check_for_plaintext_secrets(non_existent_path)
+            .is_ok());
+    }
+
+    #[test]
+    fn test_secrets_manager_with_empty_paths() {
+        let manager = SecretsManager::new(None, None);
+
+        // Test with empty path
+        let empty_path = std::path::Path::new("");
+        assert!(manager.encrypt_file(empty_path).is_ok());
+        assert!(manager.decrypt_file(empty_path).is_ok());
+        assert!(manager.list_encrypted_files(empty_path).is_ok());
+        assert!(manager.check_for_plaintext_secrets(empty_path).is_ok());
+    }
+}
