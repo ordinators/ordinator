@@ -40,7 +40,7 @@ fn test_init_dry_run() {
 #[test]
 fn test_add_dry_run() {
     let temp = assert_fs::TempDir::new().unwrap();
-    
+
     let mut cmd = Command::cargo_bin("ordinator").unwrap();
     cmd.current_dir(&temp);
     cmd.env("ORDINATOR_CONFIG", "/nonexistent/config.toml");
