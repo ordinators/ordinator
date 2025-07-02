@@ -464,7 +464,7 @@ pub async fn run(args: Args) -> Result<()> {
 
                 for profile_name in config.list_profiles() {
                     if let Some(profile_cfg) = config.get_profile(profile_name) {
-                        eprintln!("  Profile: {}", profile_name);
+                        eprintln!("  Profile: {profile_name}");
                         for file in &profile_cfg.files {
                             total_files += 1;
                             let dest = home_dir.join(file);
@@ -487,10 +487,10 @@ pub async fn run(args: Args) -> Result<()> {
                 }
 
                 eprintln!("\nSummary:");
-                eprintln!("  Total tracked files: {}", total_files);
-                eprintln!("  Valid symlinks: {}", valid_symlinks);
-                eprintln!("  Broken symlinks: {}", broken_symlinks);
-                eprintln!("  Missing/not symlinked: {}", missing_files);
+                eprintln!("  Total tracked files: {total_files}");
+                eprintln!("  Valid symlinks: {valid_symlinks}");
+                eprintln!("  Broken symlinks: {broken_symlinks}");
+                eprintln!("  Missing/not symlinked: {missing_files}");
             }
 
             Ok(())
@@ -541,7 +541,7 @@ pub async fn run(args: Args) -> Result<()> {
 
             // Debug: print config information
             eprintln!("[DEBUG] Config loaded from: {}", config_path.display());
-            eprintln!("[DEBUG] Requested profile: '{}'", profile);
+            eprintln!("[DEBUG] Requested profile: '{profile}'");
             eprintln!(
                 "[DEBUG] Profile exists: {}",
                 config.profiles.contains_key(&profile)
@@ -554,10 +554,10 @@ pub async fn run(args: Args) -> Result<()> {
             match std::fs::read_to_string(&config_path) {
                 Ok(content) => {
                     eprintln!("[DEBUG] Config file content:");
-                    eprintln!("{}", content);
+                    eprintln!("{content}");
                 }
                 Err(e) => {
-                    eprintln!("[DEBUG] Failed to read config file: {}", e);
+                    eprintln!("[DEBUG] Failed to read config file: {e}");
                 }
             }
 
@@ -576,14 +576,14 @@ pub async fn run(args: Args) -> Result<()> {
                 profile_cfg.files.len()
             );
             for file in &profile_cfg.files {
-                eprintln!("[DEBUG]   - {}", file);
+                eprintln!("[DEBUG]   - {file}");
             }
 
             for file in &profile_cfg.files {
                 // Source: dotfiles repo (files/<file>), Dest: home dir/<file>
                 let dest = home_dir.join(file);
 
-                eprintln!("[DEBUG] Checking file: {}", file);
+                eprintln!("[DEBUG] Checking file: {file}");
                 eprintln!("[DEBUG] Dest: {}", dest.display());
 
                 if !dest.exists() {
@@ -663,23 +663,27 @@ pub async fn run(args: Args) -> Result<()> {
                 }
 
                 // Check if existing symlink is broken or points to wrong target
-                let needs_repair = if let Ok(actual_target) = get_symlink_target(&dest) {
-                    eprintln!("[DEBUG] actual_target: {}", actual_target.display());
-                    eprintln!(
-                        "[DEBUG] expected source: {}",
-                        _dotfiles_dir.join("files").join(file).display()
-                    );
-                    eprintln!("[DEBUG] actual_target.exists(): {}", actual_target.exists());
-                    let needs = actual_target != _dotfiles_dir.join("files").join(file)
-                        || !actual_target.exists();
-                    eprintln!("[DEBUG] needs_repair: {}", needs);
-                    needs
-                } else {
-                    eprintln!(
-                        "[DEBUG] Could not read symlink target for {}",
-                        dest.display()
-                    );
-                    true // Can't read symlink target, assume broken
+                let needs_repair = match get_symlink_target(&dest) {
+                    Ok(actual_target) => {
+                        eprintln!("[DEBUG] actual_target: {}", actual_target.display());
+                        eprintln!(
+                            "[DEBUG] expected source: {}",
+                            _dotfiles_dir.join("files").join(file).display()
+                        );
+                        eprintln!("[DEBUG] actual_target.exists(): {}", actual_target.exists());
+                        let needs = actual_target != _dotfiles_dir.join("files").join(file)
+                            || !actual_target.exists();
+                        eprintln!("[DEBUG] needs_repair: {needs}");
+                        needs
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "[DEBUG] Could not read symlink target for {}: {}",
+                            dest.display(),
+                            e
+                        );
+                        true // Can't read symlink target, assume broken
+                    }
                 };
 
                 eprintln!(
@@ -747,14 +751,14 @@ pub async fn run(args: Args) -> Result<()> {
             for profile_name in &profiles_to_repair {
                 if let Some(profile_cfg) = config.get_profile(profile_name) {
                     if verbose {
-                        eprintln!("Checking profile: {}", profile_name);
+                        eprintln!("Checking profile: {profile_name}");
                     }
 
                     for file in &profile_cfg.files {
                         total_checked += 1;
                         let dest = home_dir.join(file);
 
-                        eprintln!("[DEBUG] Checking file: {}", file);
+                        eprintln!("[DEBUG] Checking file: {file}");
                         eprintln!("[DEBUG] Dest: {}", dest.display());
                         eprintln!("[DEBUG] home_dir: {}", home_dir.display());
                         eprintln!("[DEBUG] dotfiles_dir: {}", _dotfiles_dir.display());
@@ -795,7 +799,7 @@ pub async fn run(args: Args) -> Result<()> {
                                 );
                                 let needs = actual_target != _dotfiles_dir.join("files").join(file)
                                     || !actual_target.exists();
-                                eprintln!("[DEBUG] needs_repair: {}", needs);
+                                eprintln!("[DEBUG] needs_repair: {needs}");
                                 needs
                             }
                             Err(e) => {
@@ -838,15 +842,9 @@ pub async fn run(args: Args) -> Result<()> {
             }
 
             if !args.quiet {
-                eprintln!(
-                    "Repair completed: {} checked, {} repaired",
-                    total_checked, total_repaired
-                );
+                eprintln!("Repair completed: {total_checked} checked, {total_repaired} repaired");
             }
-            info!(
-                "Repair completed: {} checked, {} repaired",
-                total_checked, total_repaired
-            );
+            info!("Repair completed: {total_checked} checked, {total_repaired} repaired");
             Ok(())
         }
         Commands::Profiles { verbose } => {

@@ -144,7 +144,7 @@ pub fn backup_file_hybrid(original: &Path, config_path: &Path) -> Result<PathBuf
     let filename = original.file_name().unwrap_or_default().to_string_lossy();
     let backup_number = get_next_backup_number(&backup_dir, &filename)?;
     let timestamp = Local::now().format("%Y%m%d-%H%M%S");
-    let backup_name = format!("{}.backup.{}.{}", filename, backup_number, timestamp);
+    let backup_name = format!("{filename}.backup.{backup_number}.{timestamp}");
     let backup_path = backup_dir.join(backup_name);
     std::fs::copy(original, &backup_path)?;
     Ok(backup_path)

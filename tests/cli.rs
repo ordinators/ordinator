@@ -286,8 +286,7 @@ exclude = []
         .collect();
     assert!(
         backups.iter().any(|f| f.starts_with("dotfile.txt.backup.")),
-        "No backup file found: {:?}",
-        backups
+        "No backup file found: {backups:?}"
     );
     // Check that the destination is now a symlink
     #[cfg(unix)]
@@ -558,44 +557,43 @@ exclude = []
             .unwrap();
         writeln!(
             debug_file,
-            "[AFTER CREATE] managed parent: {}",
-            managed_parent.display()
+            "[AFTER CREATE] managed parent: {managed_parent}",
+            managed_parent = managed_parent.display()
         )
         .unwrap();
         writeln!(
             debug_file,
-            "[AFTER CREATE] managed parent exists: {}",
-            managed_parent.exists()
+            "[AFTER CREATE] managed parent exists: {exists}",
+            exists = managed_parent.exists()
         )
         .unwrap();
         match std::fs::metadata(managed_parent) {
             Ok(meta) => {
                 writeln!(
                     debug_file,
-                    "[AFTER CREATE] managed parent permissions: {:?}",
-                    meta.permissions()
+                    "[AFTER CREATE] managed parent permissions: {permissions:?}",
+                    permissions = meta.permissions()
                 )
                 .unwrap();
             }
             Err(e) => {
                 writeln!(
                     debug_file,
-                    "[AFTER CREATE] managed parent metadata error: {}",
-                    e
+                    "[AFTER CREATE] managed parent metadata error: {e}"
                 )
                 .unwrap();
             }
         }
         writeln!(
             debug_file,
-            "[AFTER CREATE] managed file path: {}",
-            managed.path().display()
+            "[AFTER CREATE] managed file path: {managed_path}",
+            managed_path = managed.display()
         )
         .unwrap();
     }
     if debug_path.path().exists() {
         if let Ok(debug_contents) = std::fs::read_to_string(debug_path.path()) {
-            eprintln!("[TEST DEBUG FILE AFTER CREATE]\n{}", debug_contents);
+            eprintln!("[TEST DEBUG FILE AFTER CREATE]\n{debug_contents}");
         }
     }
 
@@ -616,9 +614,8 @@ exclude = []
     let output = cmd.output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    eprintln!("[DEBUG] Apply command status: {:?}", output.status);
-    eprintln!("[DEBUG] Apply stdout: {}", stdout);
-    eprintln!("[DEBUG] Apply stderr: {}", stderr);
+    eprintln!("[DEBUG] Apply stdout: {stdout}");
+    eprintln!("[DEBUG] Apply stderr: {stderr}");
     assert!(output.status.success(), "Initial apply failed");
 
     // After apply, recursively list all files and symlinks in the temp directory
@@ -628,10 +625,10 @@ exclude = []
             for entry in entries.flatten() {
                 let path = entry.path();
                 let file_type = entry.file_type().ok();
-                eprintln!("[DEBUG] {}{} ({:?})", prefix, path.display(), file_type);
+                eprintln!("[DEBUG] {} ({:?})", path.display(), file_type);
                 if let Some(ft) = file_type {
                     if ft.is_dir() {
-                        list_files_recursively(&path, &format!("{}  ", prefix));
+                        list_files_recursively(&path, &format!("{prefix}  "));
                     }
                 }
             }
@@ -706,9 +703,8 @@ exclude = []
     let output = cmd.output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    eprintln!("[DEBUG] Apply command status: {:?}", output.status);
-    eprintln!("[DEBUG] Apply stdout: {}", stdout);
-    eprintln!("[DEBUG] Apply stderr: {}", stderr);
+    eprintln!("[DEBUG] Apply stdout: {stdout}");
+    eprintln!("[DEBUG] Apply stderr: {stderr}");
     assert!(output.status.success(), "Initial apply failed");
 
     // After apply, recursively list all files and symlinks in the temp directory
@@ -718,10 +714,10 @@ exclude = []
             for entry in entries.flatten() {
                 let path = entry.path();
                 let file_type = entry.file_type().ok();
-                eprintln!("[DEBUG] {}{} ({:?})", prefix, path.display(), file_type);
+                eprintln!("[DEBUG] {} ({:?})", path.display(), file_type);
                 if let Some(ft) = file_type {
                     if ft.is_dir() {
-                        list_files_recursively(&path, &format!("{}  ", prefix));
+                        list_files_recursively(&path, &format!("{prefix}  "));
                     }
                 }
             }
@@ -746,21 +742,18 @@ exclude = []
 
         // Debug: check if managed file exists before assertion
         eprintln!(
-            "[DEBUG] Managed file exists before assertion: {}",
-            managed_path.exists()
+            "[DEBUG] Managed file exists before assertion: {exists}",
+            exists = managed_path.exists()
         );
         match std::fs::symlink_metadata(&managed_path) {
             Ok(meta) => {
                 eprintln!(
-                    "[DEBUG] Managed file type before assertion: {:?}",
-                    meta.file_type()
+                    "[DEBUG] Managed file type before assertion: {ft:?}",
+                    ft = meta.file_type()
                 );
             }
             Err(e) => {
-                eprintln!(
-                    "[DEBUG] Managed file metadata error before assertion: {}",
-                    e
-                );
+                eprintln!("[DEBUG] Managed file metadata error before assertion: {e}");
             }
         }
     } else {
@@ -770,14 +763,20 @@ exclude = []
     // Verify symlink is now broken (if it exists)
     #[cfg(unix)]
     {
-        eprintln!("[DEBUG] home_file path: {}", home_file.path().display());
-        eprintln!("[DEBUG] home_file exists: {}", home_file.path().exists());
+        eprintln!(
+            "[DEBUG] home_file path: {path}",
+            path = home_file.path().display()
+        );
+        eprintln!(
+            "[DEBUG] home_file exists: {exists}",
+            exists = home_file.path().exists()
+        );
         match std::fs::symlink_metadata(home_file.path()) {
             Ok(meta) => {
-                eprintln!("[DEBUG] home_file metadata: {:?}", meta.file_type());
+                eprintln!("[DEBUG] home_file metadata: {ft:?}", ft = meta.file_type());
             }
             Err(e) => {
-                eprintln!("[DEBUG] home_file metadata error: {}", e);
+                eprintln!("[DEBUG] home_file metadata error: {e}");
             }
         }
         eprintln!(
@@ -834,12 +833,12 @@ exclude = []
 "#;
     std::fs::write(&config_path, config_toml).unwrap();
     // Debug: print the config file content that was written
-    println!(
+    print!(
         "[TEST DEBUG] Config file written to: {}",
         config_path.display()
     );
-    println!("[TEST DEBUG] Config file content:");
-    println!("{}", std::fs::read_to_string(&config_path).unwrap());
+    print!("[TEST DEBUG] Config file content:");
+    print!("{}", std::fs::read_to_string(&config_path).unwrap());
 
     // Place the managed dotfile in files/
     let files_dir = ordinator_home.join("files");
@@ -859,14 +858,14 @@ exclude = []
             .unwrap();
         writeln!(
             debug_file,
-            "[AFTER CREATE] managed parent: {}",
-            managed_parent.display()
+            "[AFTER CREATE] managed parent: {managed_parent}",
+            managed_parent = managed_parent.display()
         )
         .unwrap();
         writeln!(
             debug_file,
-            "[AFTER CREATE] managed parent exists: {}",
-            managed_parent.exists()
+            "[AFTER CREATE] managed parent exists: {exists}",
+            exists = managed_parent.exists()
         )
         .unwrap();
         match std::fs::metadata(managed_parent) {
@@ -881,8 +880,7 @@ exclude = []
             Err(e) => {
                 writeln!(
                     debug_file,
-                    "[AFTER CREATE] managed parent metadata error: {}",
-                    e
+                    "[AFTER CREATE] managed parent metadata error: {e}"
                 )
                 .unwrap();
             }
@@ -896,7 +894,7 @@ exclude = []
     }
     if debug_path.path().exists() {
         if let Ok(debug_contents) = std::fs::read_to_string(debug_path.path()) {
-            eprintln!("[TEST DEBUG FILE AFTER CREATE]\n{}", debug_contents);
+            eprintln!("[TEST DEBUG FILE AFTER CREATE]\n{debug_contents}");
         }
     }
 

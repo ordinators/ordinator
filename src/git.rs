@@ -89,7 +89,7 @@ impl GitManager {
         })?;
 
         repo.remote(name, url)
-            .with_context(|| format!("Failed to add remote '{}' with URL '{}'", name, url))?;
+            .with_context(|| format!("Failed to add remote '{name}' with URL '{url}'"))?;
 
         info!("Remote '{}' added successfully", name);
         Ok(())
@@ -316,17 +316,17 @@ impl GitManager {
                 let status = entry.status();
 
                 if status.is_wt_new() {
-                    output.push_str(&format!("  Untracked: {}\n", path));
+                    output.push_str(&format!("  Untracked: {path}\n"));
                 } else if status.is_wt_modified() {
-                    output.push_str(&format!("  Modified: {}\n", path));
+                    output.push_str(&format!("  Modified: {path}\n"));
                 } else if status.is_wt_deleted() {
-                    output.push_str(&format!("  Deleted: {}\n", path));
+                    output.push_str(&format!("  Deleted: {path}\n"));
                 } else if status.is_index_new() {
-                    output.push_str(&format!("  Staged: {}\n", path));
+                    output.push_str(&format!("  Staged: {path}\n"));
                 } else if status.is_index_modified() {
-                    output.push_str(&format!("  Staged (modified): {}\n", path));
+                    output.push_str(&format!("  Staged (modified): {path}\n"));
                 } else if status.is_index_deleted() {
-                    output.push_str(&format!("  Staged (deleted): {}\n", path));
+                    output.push_str(&format!("  Staged (deleted): {path}\n"));
                 }
             }
         }
@@ -334,14 +334,14 @@ impl GitManager {
         // Show branch information
         if let Ok(head) = repo.head() {
             if let Some(branch_name) = head.shorthand() {
-                output.push_str(&format!("  On branch: {}\n", branch_name));
+                output.push_str(&format!("  On branch: {branch_name}\n"));
             }
         }
 
         // Show remote information
         if let Ok(remote) = repo.find_remote("origin") {
             if let Some(url) = remote.url() {
-                output.push_str(&format!("  Remote: {}\n", url));
+                output.push_str(&format!("  Remote: {url}\n"));
             }
         }
 

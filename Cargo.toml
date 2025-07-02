@@ -63,3 +63,6 @@ cargo-fuzz = "0.13"
 
 # Note: cargo-tarpaulin removed due to git2 dependency conflicts
 # Can be added back later when needed for code coverage
+
+[lints.clippy]
+uninlined-format-args = "deny"
