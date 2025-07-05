@@ -170,6 +170,9 @@ pub enum SecretCommands {
         #[arg(long)]
         paths_only: bool,
     },
+
+    /// Check for SOPS and age installation
+    Check,
 }
 
 pub async fn run(args: Args) -> Result<()> {
@@ -946,6 +949,19 @@ pub async fn run(args: Args) -> Result<()> {
                     // TODO: Implement actual list logic
                     info!("Encrypted files listing not yet implemented");
                     eprintln!("Encrypted files listing not yet implemented");
+                    Ok(())
+                }
+                SecretCommands::Check => {
+                    use crate::secrets::check_sops_and_age;
+                    match check_sops_and_age() {
+                        Ok(()) => {
+                            println!("SOPS and age are both installed and available in PATH.");
+                        }
+                        Err(e) => {
+                            eprintln!("{e}");
+                            std::process::exit(1);
+                        }
+                    }
                     Ok(())
                 }
             }

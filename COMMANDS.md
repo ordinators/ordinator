@@ -398,6 +398,27 @@ ordinator secrets list --paths-only
 - Shows encryption status and metadata
 - Respects secrets configuration patterns
 
+### `ordinator secrets check`
+
+Check for SOPS and age installation.
+
+```bash
+ordinator secrets check
+```
+
+**What it does:**
+- Checks if both `sops` and `age` binaries are installed and available in PATH
+- Prints the path to each binary if found
+- Prints a clear error and install instructions if either is missing
+
+**Examples:**
+```bash
+ordinator secrets check
+# Found sops at: /usr/local/bin/sops
+# Found age at: /usr/local/bin/age
+# SOPS and age are both installed and available in PATH.
+```
+
 ## System Integration
 
 ### `ordinator generate-script`

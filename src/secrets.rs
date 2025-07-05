@@ -62,6 +62,18 @@ impl SecretsManager {
     }
 }
 
+pub fn check_sops_and_age() -> anyhow::Result<()> {
+    let sops = which::which("sops").map_err(|_| anyhow::anyhow!(
+        "SOPS is not installed or not found in PATH.\nInstall it: https://github.com/mozilla/sops#downloads"
+    ))?;
+    let age = which::which("age").map_err(|_| anyhow::anyhow!(
+        "age is not installed or not found in PATH.\nInstall it: https://github.com/FiloSottile/age#installation"
+    ))?;
+    println!("Found sops at: {}", sops.display());
+    println!("Found age at: {}", age.display());
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -260,5 +272,37 @@ mod tests {
         assert!(manager.decrypt_file(empty_path).is_ok());
         assert!(manager.list_encrypted_files(empty_path).is_ok());
         assert!(manager.check_for_plaintext_secrets(empty_path).is_ok());
+    }
+
+    #[test]
+    fn test_check_sops_and_age_not_found() {
+        use std::env;
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+        let orig_path = env::var("PATH").unwrap();
+        env::set_var("PATH", temp_dir.path());
+        let result = crate::secrets::check_sops_and_age();
+        assert!(result.is_err(), "Should error if sops/age are not found");
+        env::set_var("PATH", orig_path);
+    }
+
+    #[test]
+    fn test_check_sops_and_age_found() {
+        use std::env;
+        use tempfile::TempDir;
+        use std::fs;
+        let temp_dir = TempDir::new().unwrap();
+        let sops_path = temp_dir.path().join("sops");
+        let age_path = temp_dir.path().join("age");
+        fs::write(&sops_path, "#!/bin/sh\nexit 0\n").unwrap();
+        fs::write(&age_path, "#!/bin/sh\nexit 0\n").unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&sops_path, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::set_permissions(&age_path, fs::Permissions::from_mode(0o755)).unwrap();
+        let orig_path = env::var("PATH").unwrap();
+        env::set_var("PATH", temp_dir.path());
+        let result = crate::secrets::check_sops_and_age();
+        assert!(result.is_ok(), "Should succeed if sops/age are found");
+        env::set_var("PATH", orig_path);
     }
 }
