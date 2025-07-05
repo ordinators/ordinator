@@ -203,11 +203,12 @@ ordinator push [OPTIONS]
 ```
 
 **Options:**
-- `--force` - Force push (use with caution)
+- `--force` - Force push changes
+- `--no-rebase` - Skip rebase before push
 
 **Examples:**
 ```bash
-# Normal push
+# Push changes
 ordinator push
 
 # Force push
@@ -215,9 +216,11 @@ ordinator push --force
 ```
 
 **What it does:**
-- Pushes committed changes to remote repository
-- Uses `origin` as default remote
-- Supports force push for overwriting remote changes
+- Pushes local changes to remote repository
+- Uses git push command
+- Supports force push option
+- Supports rebase strategy for clean history
+- Updates local dotfiles with remote changes
 
 ### `ordinator pull`
 
@@ -228,46 +231,207 @@ ordinator pull [OPTIONS]
 ```
 
 **Options:**
-- `--rebase` - Rebase on pull
+- `--rebase` - Use rebase strategy instead of merge
+- `--no-rebase` - Skip rebase and use merge
 
 **Examples:**
 ```bash
-# Normal pull
+# Pull changes
 ordinator pull
 
 # Pull with rebase
 ordinator pull --rebase
+
+# Pull without rebase
+ordinator pull --no-rebase
 ```
 
 **What it does:**
-- Fetches and merges changes from remote repository
-- Supports rebase strategy for clean history
+- Fetches changes from remote repository
+- Updates local repository
+- Uses rebase strategy by default
+- Supports merge strategy with --no-rebase
 - Updates local dotfiles with remote changes
 
 ### `ordinator sync`
 
-Sync with remote repository (pull then push).
+Synchronize dotfiles with remote repository.
 
 ```bash
 ordinator sync [OPTIONS]
 ```
 
 **Options:**
-- `--force` - Force push after sync
+- `--force` - Force push/pull
+- `--no-rebase` - Skip rebase during pull
 
 **Examples:**
 ```bash
-# Normal sync
+# Basic sync
 ordinator sync
 
-# Sync with force push
+# Force sync
 ordinator sync --force
+
+# Sync without rebase
+ordinator sync --no-rebase
 ```
 
 **What it does:**
-- Pulls latest changes from remote
-- Pushes local changes to remote
-- Ensures local and remote are in sync
+- Pulls changes from remote
+- Pushes local changes
+- Uses rebase strategy by default
+- Supports force push/pull
+- Updates local dotfiles with remote changes
+
+## Secrets Management Commands
+
+### `ordinator secrets encrypt`
+
+Encrypt a file using SOPS and age.
+
+```bash
+ordinator secrets encrypt <PATH>
+```
+
+**Arguments:**
+- `PATH` - File or directory to encrypt (required)
+
+**Options:**
+- `--profile <PROFILE>` - Profile to associate with this file
+- `--dry-run` - Simulate encryption without making changes
+
+**Examples:**
+```bash
+# Encrypt a single file
+ordinator secrets encrypt ~/.ssh/config
+
+# Encrypt a directory
+ordinator secrets encrypt ~/.aws
+
+# Encrypt with specific profile
+ordinator secrets encrypt ~/.ssh/config --profile work
+```
+
+**What it does:**
+- Uses SOPS and age for encryption
+- Preserves file extensions (e.g., `config.yaml` becomes `config.enc.yaml`)
+- Adds `.enc` suffix to encrypted files
+- Uses encryption patterns from configuration
+- Respects exclusion patterns from configuration
+- Creates encrypted files in the same directory as original
+
+### `ordinator secrets decrypt`
+
+Decrypt a file using SOPS.
+
+```bash
+ordinator secrets decrypt <PATH>
+```
+
+**Arguments:**
+- `PATH` - File or directory to decrypt (required)
+
+**Options:**
+- `--profile <PROFILE>` - Profile to associate with this file
+- `--dry-run` - Simulate decryption without making changes
+
+**Examples:**
+```bash
+# Decrypt a single file
+ordinator secrets decrypt ~/.ssh/config.enc
+
+# Decrypt a directory
+ordinator secrets decrypt ~/.aws
+
+# Decrypt with specific profile
+ordinator secrets decrypt ~/.ssh/config.enc --profile work
+```
+
+**What it does:**
+- Uses SOPS for decryption
+- Restores original file extensions
+- Removes `.enc` suffix from decrypted files
+- Uses decryption patterns from configuration
+- Respects exclusion patterns from configuration
+- Creates decrypted files in the same directory as original
+
+### `ordinator secrets list`
+
+List encrypted files in the repository.
+
+```bash
+ordinator secrets list [OPTIONS]
+```
+
+**Options:**
+- `--profile <PROFILE>` - Profile to list files for
+- `--verbose` - Show detailed information about encrypted files
+
+**Examples:**
+```bash
+# List all encrypted files
+ordinator secrets list
+
+# List encrypted files for specific profile
+ordinator secrets list --profile work
+
+# List with detailed information
+ordinator secrets list --verbose
+```
+
+**What it does:**
+- Lists all encrypted files in the repository
+- Shows file paths and encryption status
+- Can filter by profile
+- Shows detailed information with --verbose
+
+### `ordinator secrets validate`
+
+Validate SOPS and age installation.
+
+```bash
+ordinator secrets validate
+```
+
+**What it does:**
+- Checks if SOPS is installed and in PATH
+- Checks if age is installed and in PATH
+- Shows installation paths if found
+- Provides installation instructions if missing
+
+### `ordinator secrets check`
+
+Check for plaintext secrets in files.
+
+```bash
+ordinator secrets check <PATH>
+```
+
+**Arguments:**
+- `PATH` - File or directory to check (required)
+
+**Options:**
+- `--profile <PROFILE>` - Profile to check files for
+- `--verbose` - Show detailed information about detected secrets
+
+**Examples:**
+```bash
+# Check a single file
+ordinator secrets check ~/.ssh/config
+
+# Check a directory
+ordinator secrets check ~/.aws
+
+# Check with specific profile
+ordinator secrets check ~/.ssh/config --profile work
+```
+
+**What it does:**
+- Scans files for potential plaintext secrets
+- Uses configuration patterns to identify sensitive data
+- Shows detailed information about detected secrets
+- Helps identify files that need encryption
 
 ## Management Commands
 
@@ -320,118 +484,6 @@ ordinator profiles --verbose
 - Lists all configured profiles
 - Shows profile descriptions and settings
 - Reports enabled/disabled status
-
-## Secrets Management
-
-### `ordinator secrets encrypt`
-
-Encrypt a file with SOPS.
-
-```bash
-ordinator secrets encrypt <FILE>
-```
-
-**Arguments:**
-- `FILE` - File to encrypt (required)
-
-**Examples:**
-```bash
-# Encrypt secrets file
-ordinator secrets encrypt ~/.ssh/id_rsa
-
-# Encrypt configuration with secrets
-ordinator secrets encrypt ~/.config/api_keys.json
-```
-
-**What it does:**
-- Encrypts file using Mozilla SOPS with age encryption
-- Preserves file structure and metadata
-- Uses configured age key for encryption
-
-### `ordinator secrets decrypt`
-
-Decrypt a file with SOPS.
-
-```bash
-ordinator secrets decrypt <FILE>
-```
-
-**Arguments:**
-- `FILE` - File to decrypt (required)
-
-**Examples:**
-```bash
-# Decrypt secrets file
-ordinator secrets decrypt ~/.ssh/id_rsa.enc
-
-# Decrypt configuration
-ordinator secrets decrypt ~/.config/api_keys.json.enc
-```
-
-**What it does:**
-- Decrypts file using Mozilla SOPS
-- Requires valid age key for decryption
-- Logs decryption events for audit trail
-
-### `ordinator secrets list`
-
-List encrypted files.
-
-```bash
-ordinator secrets list [OPTIONS]
-```
-
-**Options:**
-- `--paths-only` - Show file paths only
-
-**Examples:**
-```bash
-# List all encrypted files
-ordinator secrets list
-
-# Show only paths
-ordinator secrets list --paths-only
-```
-
-**What it does:**
-- Lists all encrypted files in the repository
-- Shows encryption status and metadata
-- Respects secrets configuration patterns
-
-### `ordinator secrets check`
-
-Check for SOPS and age installation.
-
-```bash
-ordinator secrets check
-```
-
-**What it does:**
-- Checks if both `sops` and `age` binaries are installed and available in PATH
-- Prints the path to each binary if found
-- Prints a clear error and install instructions if either is missing
-
-**Examples:**
-```bash
-ordinator secrets check
-# Found sops at: /usr/local/bin/sops
-# Found age at: /usr/local/bin/age
-# SOPS and age are both installed and available in PATH.
-```
-
-## System Integration
-
-### `ordinator generate-script`
-
-Generate system script for manual execution.
-
-```bash
-ordinator generate-script [OPTIONS]
-```
-
-**Options:**
-- `-o, --output <FILE>` - Output file path (default: "ordinator-system.sh")
-- `--profile <PROFILE>` - Profile to use (default: "default")
 
 **Examples:**
 ```bash

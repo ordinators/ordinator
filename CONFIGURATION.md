@@ -72,9 +72,45 @@ exclude_patterns = ["*.bak"]
 
 ### `[secrets]`
 - `age_key_file` (string, optional): Path to the age key file for decryption.
+  - Must contain a valid age key in the format `age1...`
+  - Used for both encryption and decryption operations
+  - If not specified, SOPS will use default key locations
+
 - `sops_config` (string, optional): Path to the SOPS configuration file.
+  - Used to configure SOPS encryption settings
+  - Supports multiple encryption methods (age, GPG, KMS)
+  - If not specified, SOPS will use default configuration
+
 - `encrypt_patterns` (array of strings): Glob patterns for files to encrypt.
+  - Supports standard glob patterns (e.g., `*.yaml`, `secrets/**/*`)
+  - Files matching these patterns will be automatically encrypted
+  - Can be overridden by `exclude_patterns`
+  - Example patterns:
+    - `secrets/*.yaml` - Encrypt all YAML files in secrets directory
+    - `*.key` - Encrypt all key files
+    - `secrets/**/*` - Encrypt all files in secrets directory recursively
+
 - `exclude_patterns` (array of strings): Glob patterns for files to exclude from encryption.
+  - Supports standard glob patterns
+  - Files matching these patterns will never be encrypted, even if they match `encrypt_patterns`
+  - Useful for excluding backup files or already encrypted files
+  - Example patterns:
+    - `*.bak` - Exclude backup files
+    - `*.enc.yaml` - Exclude already encrypted YAML files
+    - `secrets/excluded/**/*` - Exclude specific directory from encryption
+
+- `encryption_format` (string, optional): Format for encrypted files.
+  - Default: `"{stem}.enc.{ext}"` for YAML files, `"{stem}.enc"` for others
+  - Supports template variables:
+    - `{stem}` - File stem (name without extension)
+    - `{ext}` - File extension
+    - `{file}` - Full file name
+  - Example: `"{stem}.sops.{ext}"` to use .sops extension
+
+- `encryption_method` (string, optional): Preferred encryption method.
+  - Default: "age"
+  - Supported values: "age", "gpg", "kms"
+  - Must match available encryption keys in SOPS configuration
 
 ---
 
@@ -85,6 +121,49 @@ exclude_patterns = ["*.bak"]
 - Use the `[secrets]` section to specify which files should be encrypted and how secrets are managed.
 - Use the `[global]` section to set defaults and enable/disable features.
 - Use the `exclude` field in `[global]` or `[profiles.<name>]` to prevent certain files or directories from being tracked or symlinked. Profile-level `exclude` patterns take precedence over global ones.
+- Configure encryption patterns and exclusions to control which files are automatically encrypted.
+- Customize encryption format and method to match your security requirements.
+
+## Encryption Best Practices
+
+1. **Key Management**
+   - Store age keys securely
+   - Use separate keys for different environments (work/personal)
+   - Backup encryption keys in a secure location
+
+2. **Pattern Configuration**
+   - Encrypt sensitive files by default
+   - Use exclude patterns for backup files
+   - Keep encryption patterns consistent across profiles
+
+3. **File Organization**
+   - Store encrypted files in dedicated directories
+   - Use consistent naming conventions
+   - Document encryption requirements in README files
+
+4. **Security**
+   - Never commit encryption keys to version control
+   - Use strong encryption methods
+   - Regularly rotate encryption keys
+
+5. **Configuration Example**
+   ```toml
+   [secrets]
+   age_key_file = "~/.config/age/work.key"
+   sops_config = "~/.config/sops/work-config.yaml"
+   encrypt_patterns = [
+     "secrets/**/*.yaml",
+     "secrets/**/*.json",
+     "*.key"
+   ]
+   exclude_patterns = [
+     "*.bak",
+     "*.enc.yaml",
+     "secrets/excluded/**/*"
+   ]
+   encryption_format = "{stem}.sops.{ext}"
+   encryption_method = "age"
+   ```
 
 ---
 

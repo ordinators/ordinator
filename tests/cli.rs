@@ -1059,3 +1059,47 @@ symlinks = [
     println!("[TEST DEBUG] Config file content:");
     println!("{}", std::fs::read_to_string(&config_file).unwrap());
 }
+
+#[test]
+fn test_secrets_encrypt_cli_success() {
+    use assert_fs::prelude::*;
+    use std::env;
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+    let temp = assert_fs::TempDir::new().unwrap();
+    // Create a dummy sops in a temp bin dir
+    let bin_dir = temp.child("bin");
+    bin_dir.create_dir_all().unwrap();
+    // Create mock sops binary that copies input to output
+    let sops_path = bin_dir.child("sops");
+    sops_path
+        .write_str("#!/bin/sh\n/bin/cp \"$2\" \"$4\"\n")
+        .unwrap();
+    fs::set_permissions(sops_path.path(), fs::Permissions::from_mode(0o755)).unwrap();
+    // Create mock age binary that does nothing but succeeds
+    let age_path = bin_dir.child("age");
+    age_path.write_str("#!/bin/sh\nexit 0\n").unwrap();
+    fs::set_permissions(age_path.path(), fs::Permissions::from_mode(0o755)).unwrap();
+    // Create a file to encrypt
+    let file = temp.child("secret.txt");
+    file.write_str("supersecret").unwrap();
+    // Set PATH to only include our dummy sops
+    let orig_path = env::var("PATH").unwrap();
+    env::set_var("PATH", bin_dir.path());
+    // Run the CLI
+    let mut cmd = Command::cargo_bin("ordinator").unwrap();
+    cmd.current_dir(&temp);
+    cmd.args(["secrets", "encrypt", file.path().to_str().unwrap()]);
+    cmd.assert()
+        .success()
+        .stdout(contains("File encrypted successfully"));
+    // Check output file exists and contents match
+    let output_path = format!("{}.enc", file.path().to_str().unwrap());
+    assert!(
+        fs::metadata(&output_path).is_ok(),
+        "Encrypted file not created"
+    );
+    let contents = fs::read_to_string(&output_path).unwrap();
+    assert_eq!(contents, "supersecret");
+    env::set_var("PATH", orig_path);
+}

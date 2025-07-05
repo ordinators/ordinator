@@ -895,18 +895,16 @@ pub async fn run(args: Args) -> Result<()> {
         Commands::Secrets { subcommand } => {
             match subcommand {
                 SecretCommands::Encrypt { file } => {
-                    info!("Encrypting file: {}", file);
-                    eprintln!("Encrypting file: {file}");
-
-                    if args.dry_run {
-                        info!("[DRY RUN] Would encrypt file: {}", file);
-                        eprintln!("DRY-RUN: Would encrypt file: {file}");
-                        return Ok(());
+                    use crate::secrets::encrypt_file_with_sops;
+                    match encrypt_file_with_sops(&file) {
+                        Ok(output_path) => {
+                            println!("File encrypted successfully: {output_path}");
+                        }
+                        Err(e) => {
+                            eprintln!("Encryption failed: {e}");
+                            std::process::exit(1);
+                        }
                     }
-
-                    // TODO: Implement actual encrypt logic
-                    info!("Encryption not yet implemented");
-                    eprintln!("Encryption not yet implemented");
                     Ok(())
                 }
                 SecretCommands::Decrypt { file } => {
