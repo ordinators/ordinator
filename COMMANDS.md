@@ -356,6 +356,39 @@ ordinator secrets decrypt ~/.ssh/config.enc --profile work
 - Respects exclusion patterns from configuration
 - Creates decrypted files in the same directory as original
 
+### `ordinator secrets setup`
+
+Set up SOPS and age for secrets management.
+
+```bash
+ordinator secrets setup [OPTIONS]
+```
+
+**Options:**
+- `--profile <PROFILE>` - Profile to set up (default: "default")
+- `--force` - Force overwrite existing configuration
+- `--dry-run` - Simulate setup without making changes
+
+**Examples:**
+```bash
+# Set up SOPS and age for default profile
+ordinator secrets setup
+
+# Set up for specific profile
+ordinator secrets setup --profile work
+
+# Force overwrite existing configuration
+ordinator secrets setup --force
+```
+
+**What it does:**
+- Checks if SOPS and age are installed (installs via Homebrew if missing)
+- Generates age encryption key for the profile
+- Creates SOPS configuration file (`.sops.yaml`)
+- Updates `ordinator.toml` with secrets configuration
+- Sets up encryption patterns and exclusions
+- Configures age key file location and SOPS config path
+
 ### `ordinator secrets list`
 
 List encrypted files in the repository.
@@ -365,6 +398,7 @@ ordinator secrets list [OPTIONS]
 ```
 
 **Options:**
+- `--paths-only` - Show file paths only (no status table)
 - `--profile <PROFILE>` - Profile to list files for
 - `--verbose` - Show detailed information about encrypted files
 
@@ -372,6 +406,9 @@ ordinator secrets list [OPTIONS]
 ```bash
 # List all encrypted files
 ordinator secrets list
+
+# List with file paths only
+ordinator secrets list --paths-only
 
 # List encrypted files for specific profile
 ordinator secrets list --profile work
@@ -381,10 +418,11 @@ ordinator secrets list --verbose
 ```
 
 **What it does:**
-- Lists all encrypted files in the repository
-- Shows file paths and encryption status
+- Lists all files matching encryption patterns
+- Shows encryption status (Encrypted/Plaintext)
 - Can filter by profile
 - Shows detailed information with --verbose
+- Outputs simple paths with --paths-only
 
 ### `ordinator secrets validate`
 
@@ -402,36 +440,17 @@ ordinator secrets validate
 
 ### `ordinator secrets check`
 
-Check for plaintext secrets in files.
+Check SOPS and age installation.
 
 ```bash
-ordinator secrets check <PATH>
-```
-
-**Arguments:**
-- `PATH` - File or directory to check (required)
-
-**Options:**
-- `--profile <PROFILE>` - Profile to check files for
-- `--verbose` - Show detailed information about detected secrets
-
-**Examples:**
-```bash
-# Check a single file
-ordinator secrets check ~/.ssh/config
-
-# Check a directory
-ordinator secrets check ~/.aws
-
-# Check with specific profile
-ordinator secrets check ~/.ssh/config --profile work
+ordinator secrets check
 ```
 
 **What it does:**
-- Scans files for potential plaintext secrets
-- Uses configuration patterns to identify sensitive data
-- Shows detailed information about detected secrets
-- Helps identify files that need encryption
+- Checks if SOPS is installed and in PATH
+- Checks if age is installed and in PATH
+- Shows installation paths if found
+- Provides installation instructions if missing
 
 ## Management Commands
 
@@ -584,9 +603,22 @@ ordinator apply --profile work
 ### Secrets Management
 
 ```bash
+# Set up SOPS and age for secrets management
+ordinator secrets setup --profile work
+
+# Check SOPS and age installation
+ordinator secrets check
+
 # Encrypt sensitive files
-ordinator secrets encrypt ~/.ssh/id_rsa
+ordinator secrets encrypt ~/.ssh/config
 ordinator secrets encrypt ~/.config/api_keys.json
+
+# List encrypted files
+ordinator secrets list
+ordinator secrets list --paths-only
+
+# Decrypt files when needed
+ordinator secrets decrypt ~/.ssh/config.enc
 
 # Apply with secrets decryption
 ordinator apply
@@ -622,6 +654,31 @@ sudo ./ordinator-system.sh
 **"Source file not found"**
 - Check that managed files exist in `files/` directory
 - Verify file paths in configuration
+
+### Secrets Troubleshooting
+
+**"SOPS is not installed or not found in PATH"**
+- Run `ordinator secrets setup` to install SOPS and age
+- Ensure Homebrew is installed: `brew install sops age`
+
+**"No age key file configured. Run 'ordinator secrets setup' first"**
+- Run `ordinator secrets setup --profile <profile>` to generate keys
+- Check that the age key file exists and is readable
+
+**"Encryption failed"**
+- Verify SOPS and age are properly installed
+- Check that the age key file is valid
+- Ensure the file you're encrypting exists and is readable
+
+**"Decryption failed"**
+- Verify the encrypted file exists and has `.enc` extension
+- Check that the age key file matches the one used for encryption
+- Ensure SOPS configuration is correct
+
+**"No files match the encryption patterns"**
+- Check your `encrypt_patterns` configuration in `ordinator.toml`
+- Verify files are in the expected locations
+- Use `ordinator secrets list --verbose` for detailed information
 
 ### Debug Mode
 

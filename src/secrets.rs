@@ -1,8 +1,15 @@
 use crate::config::Config;
 use anyhow::Result;
 use globset::{Glob, GlobSet, GlobSetBuilder};
+use std::fs;
+#[cfg(test)]
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+use std::process::Command;
 use tracing::info;
+use walkdir::WalkDir;
 
 /// Secrets manager using SOPS and age
 #[allow(dead_code)]
@@ -141,11 +148,225 @@ pub fn check_sops_and_age() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Set up SOPS and age for secrets management
+pub fn setup_sops_and_age(profile: &str, force: bool) -> anyhow::Result<()> {
+    info!("Setting up SOPS and age for profile: {}", profile);
+
+    // Step 1: Check if SOPS and age are installed
+    match check_sops_and_age() {
+        Ok(()) => {
+            println!("✅ SOPS and age are already installed");
+        }
+        Err(_) => {
+            println!("❌ SOPS and/or age not found. Installing via Homebrew...");
+            install_sops_and_age()?;
+        }
+    }
+
+    // Step 2: Generate age key if it doesn't exist
+    let age_key_path = generate_age_key(profile, force)?;
+
+    // Step 3: Create SOPS configuration
+    let sops_config_path = create_sops_config(profile, &age_key_path, force)?;
+
+    // Step 4: Update ordinator.toml with secrets configuration
+    update_ordinator_config(profile, &age_key_path, &sops_config_path)?;
+
+    println!("✅ SOPS and age setup complete for profile: {profile}");
+    println!("   Age key: {}", age_key_path.display());
+    println!("   SOPS config: {}", sops_config_path.display());
+
+    Ok(())
+}
+
+/// Install SOPS and age via Homebrew
+fn install_sops_and_age() -> anyhow::Result<()> {
+    println!("Installing SOPS and age via Homebrew...");
+
+    // Check if Homebrew is installed
+    if which::which("brew").is_err() {
+        return Err(anyhow::anyhow!(
+            "Homebrew is not installed. Please install Homebrew first: https://brew.sh"
+        ));
+    }
+
+    // Install SOPS and age
+    let status = Command::new("brew")
+        .args(["install", "sops", "age"])
+        .status()?;
+
+    if !status.success() {
+        return Err(anyhow::anyhow!(
+            "Failed to install SOPS and age via Homebrew"
+        ));
+    }
+
+    println!("✅ SOPS and age installed successfully");
+    Ok(())
+}
+
+/// Generate an age key for the specified profile
+fn generate_age_key(profile: &str, force: bool) -> anyhow::Result<std::path::PathBuf> {
+    let config_dir = dirs::config_dir()
+        .ok_or_else(|| anyhow::anyhow!("Could not determine config directory"))?
+        .join("ordinator")
+        .join("age");
+
+    fs::create_dir_all(&config_dir)?;
+
+    let key_filename = if profile == "default" {
+        "key.txt".to_string()
+    } else {
+        format!("{profile}.txt")
+    };
+
+    let key_path = config_dir.join(key_filename);
+
+    if key_path.exists() && force {
+        fs::remove_file(&key_path)?;
+    }
+    if key_path.exists() && !force {
+        println!("✅ Age key already exists: {}", key_path.display());
+        return Ok(key_path);
+    }
+
+    println!("Generating age key for profile: {profile}");
+
+    // Generate age key
+    let output = Command::new("age-keygen")
+        .arg("-o")
+        .arg(&key_path)
+        .output()?;
+
+    if !output.status.success() {
+        return Err(anyhow::anyhow!(
+            "Failed to generate age key: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    // Set secure permissions
+    fs::set_permissions(&key_path, fs::Permissions::from_mode(0o600))?;
+
+    println!("✅ Age key generated: {}", key_path.display());
+    Ok(key_path)
+}
+
+/// Create SOPS configuration file
+fn create_sops_config(
+    profile: &str,
+    age_key_path: &Path,
+    force: bool,
+) -> anyhow::Result<std::path::PathBuf> {
+    let config_filename = if profile == "default" {
+        ".sops.yaml".to_string()
+    } else {
+        format!(".sops.{profile}.yaml")
+    };
+
+    let sops_config_path = std::env::current_dir()?.join(&config_filename);
+
+    if sops_config_path.exists() && !force {
+        println!(
+            "✅ SOPS config already exists: {}",
+            sops_config_path.display()
+        );
+        return Ok(sops_config_path);
+    }
+
+    println!("Creating SOPS configuration for profile: {profile}");
+
+    // Read the age public key
+    let age_key_content = fs::read_to_string(age_key_path)?;
+
+    // Debug: Write all lines to a temporary file for inspection
+    let debug_file = std::env::temp_dir().join("age_key_debug.txt");
+    fs::write(&debug_file, &age_key_content)
+        .map_err(|e| anyhow::anyhow!("Failed to write debug file: {}", e))?;
+    println!(
+        "Debug: Age key file contents written to {}",
+        debug_file.display()
+    );
+
+    let public_key = age_key_content
+        .lines()
+        .find_map(|line| {
+            if line.starts_with("# public key: ") {
+                Some(line.trim_start_matches("# public key: ").trim())
+            } else if line.starts_with("age1") {
+                Some(line.trim())
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Could not find age public key in key file. Debug file: {:?}",
+                debug_file
+            )
+        })?;
+
+    // Create SOPS configuration
+    let sops_config = format!(r#"creation_rules:\n  - age: >-\n      {public_key}\n"#);
+
+    fs::write(&sops_config_path, sops_config)?;
+
+    println!("✅ SOPS config created: {}", sops_config_path.display());
+    Ok(sops_config_path)
+}
+
+/// Update ordinator.toml with secrets configuration
+fn update_ordinator_config(
+    _profile: &str,
+    age_key_path: &Path,
+    sops_config_path: &Path,
+) -> anyhow::Result<()> {
+    let config_path = crate::config::Config::find_config_file()?
+        .ok_or_else(|| anyhow::anyhow!("Could not find ordinator.toml configuration file"))?;
+    let mut config = if config_path.exists() {
+        Config::from_file(&config_path)?
+    } else {
+        Config::default()
+    };
+
+    // Update secrets configuration
+    config.secrets.age_key_file = Some(age_key_path.to_path_buf());
+    config.secrets.sops_config = Some(sops_config_path.to_path_buf());
+
+    // Add default encryption patterns if none exist
+    if config.secrets.encrypt_patterns.is_empty() {
+        config.secrets.encrypt_patterns = vec![
+            "secrets/**/*.yaml".to_string(),
+            "secrets/**/*.yml".to_string(),
+            "*.key".to_string(),
+        ];
+    }
+
+    // Add default exclude patterns if none exist
+    if config.secrets.exclude_patterns.is_empty() {
+        config.secrets.exclude_patterns = vec!["*.bak".to_string(), "**/*.enc.yaml".to_string()];
+    }
+
+    // Save updated config
+    config.save_to_file(&config_path)?;
+
+    println!("✅ Updated ordinator.toml with secrets configuration");
+    Ok(())
+}
+
 pub fn encrypt_file_with_sops(file: &str) -> anyhow::Result<String> {
     use std::path::Path;
     use std::process::Command;
+
     // Check if sops is available
     check_sops_and_age()?;
+
+    // Load configuration to get age key file
+    let config = crate::config::Config::from_file_or_default()?;
+    let age_key_file = config.secrets.age_key_file.ok_or_else(|| {
+        anyhow::anyhow!("No age key file configured. Run 'ordinator secrets setup' first.")
+    })?;
+
     let input_path = Path::new(file);
     if !input_path.exists() {
         return Err(anyhow::anyhow!("File not found: {}", file));
@@ -156,7 +377,7 @@ pub fn encrypt_file_with_sops(file: &str) -> anyhow::Result<String> {
         .and_then(|f| f.to_str())
         .unwrap_or("file");
 
-    // Determine output path
+    // Determine output path - always relative to input file's directory
     let output_path = if let Some(ext) = input_path.extension().and_then(|e| e.to_str()) {
         if ext == "yaml" || ext == "yml" {
             let stem = input_path
@@ -169,19 +390,30 @@ pub fn encrypt_file_with_sops(file: &str) -> anyhow::Result<String> {
                 .to_string_lossy()
                 .to_string()
         } else {
-            format!("{file_name}.enc")
+            let parent = input_path.parent().unwrap_or_else(|| Path::new(""));
+            parent
+                .join(format!("{file_name}.enc"))
+                .to_string_lossy()
+                .to_string()
         }
     } else {
-        format!("{file_name}.enc")
+        let parent = input_path.parent().unwrap_or_else(|| Path::new(""));
+        parent
+            .join(format!("{file_name}.enc"))
+            .to_string_lossy()
+            .to_string()
     };
 
-    // Call sops to encrypt
-    let status = Command::new("sops")
+    // Call sops to encrypt with age key file set
+    let mut command = Command::new("sops");
+    command
         .arg("--encrypt")
         .arg(&file)
         .arg("--output")
         .arg(&output_path)
-        .status()?;
+        .env("SOPS_AGE_KEY_FILE", age_key_file);
+
+    let status = command.status()?;
     if !status.success() {
         return Err(anyhow::anyhow!("sops failed to encrypt file: {}", file));
     }
@@ -192,14 +424,29 @@ pub fn encrypt_file_with_sops(file: &str) -> anyhow::Result<String> {
 pub fn decrypt_file_with_sops(file: &str) -> anyhow::Result<()> {
     use std::path::Path;
     use std::process::Command;
+
     // Check if sops is available
     check_sops_and_age()?;
+
+    // Load configuration to get age key file
+    let config = crate::config::Config::from_file_or_default()?;
+    let age_key_file = config.secrets.age_key_file.ok_or_else(|| {
+        anyhow::anyhow!("No age key file configured. Run 'ordinator secrets setup' first.")
+    })?;
+
     let input_path = Path::new(file);
     if !input_path.exists() {
         return Err(anyhow::anyhow!("File not found: {}", file));
     }
-    // Call sops to decrypt
-    let status = Command::new("sops").arg("--decrypt").arg(file).status()?;
+
+    // Call sops to decrypt with age key file set
+    let mut command = Command::new("sops");
+    command
+        .arg("--decrypt")
+        .arg(file)
+        .env("SOPS_AGE_KEY_FILE", age_key_file);
+
+    let status = command.status()?;
     if !status.success() {
         return Err(anyhow::anyhow!("sops failed to decrypt file: {}", file));
     }
@@ -207,11 +454,123 @@ pub fn decrypt_file_with_sops(file: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Returns true if the file appears to be SOPS-encrypted (by header)
+pub fn is_file_encrypted(path: &std::path::Path) -> bool {
+    if let Ok(file) = fs::File::open(path) {
+        let reader = BufReader::new(file);
+        for (i, line) in reader.lines().enumerate() {
+            if let Ok(l) = line {
+                if l.trim().starts_with("sops:") {
+                    return true;
+                }
+            }
+            if i > 10 {
+                break;
+            }
+        }
+    }
+    false
+}
+
+/// List all files matching encrypt_patterns (and not exclude_patterns), and whether they are encrypted
+pub fn list_encrypted_files() -> anyhow::Result<Vec<(std::path::PathBuf, bool)>> {
+    let config = crate::config::Config::from_file_or_default()?;
+    let encrypt_patterns = &config.secrets.encrypt_patterns;
+    let exclude_patterns = &config.secrets.exclude_patterns;
+    if encrypt_patterns.is_empty() {
+        return Ok(vec![]);
+    }
+    let mut encrypt_builder = GlobSetBuilder::new();
+    for pat in encrypt_patterns {
+        encrypt_builder.add(Glob::new(pat)?);
+    }
+    let encrypt_set = encrypt_builder.build()?;
+    let mut exclude_set = None;
+    if !exclude_patterns.is_empty() {
+        let mut builder = GlobSetBuilder::new();
+        for pat in exclude_patterns {
+            builder.add(Glob::new(pat)?);
+        }
+        exclude_set = Some(builder.build()?);
+    }
+    let mut results = vec![];
+
+    // Get the config file path to determine the base directory for walking
+    let config_path = std::env::var("ORDINATOR_CONFIG")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| std::path::PathBuf::from("ordinator.toml"));
+    let base_dir = config_path
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."));
+
+    for entry in WalkDir::new(base_dir).into_iter().filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.is_file() {
+            // Get relative path from the base directory
+            let rel = path.strip_prefix(base_dir).unwrap_or(path);
+            let rel_str = rel.to_string_lossy();
+            let encrypt_match = encrypt_set.is_match(&*rel_str);
+            let exclude_match = exclude_set
+                .as_ref()
+                .map(|ex| ex.is_match(&*rel_str))
+                .unwrap_or(false);
+            if encrypt_match && !exclude_match {
+                let encrypted = is_file_encrypted(path);
+                results.push((rel.to_path_buf(), encrypted));
+            }
+        }
+    }
+    Ok(results)
+}
+
 #[cfg(test)]
 #[allow(unused_imports)]
 mod tests {
     use super::*;
+    use std::env;
+    use std::io::Write;
     use std::os::unix::fs::PermissionsExt;
+    use tempfile::tempdir;
+
+    /// Helper function to set up proper test isolation for secrets tests
+    fn setup_secrets_test_environment() -> (
+        tempfile::TempDir,
+        Option<String>,
+        Option<String>,
+        std::path::PathBuf,
+    ) {
+        let temp_dir = tempdir().unwrap();
+        let orig_config = env::var("ORDINATOR_CONFIG").ok();
+        let orig_home = env::var("ORDINATOR_HOME").ok();
+        let orig_cwd = std::env::current_dir().unwrap();
+
+        // Set up proper test isolation
+        env::set_var("ORDINATOR_HOME", temp_dir.path());
+        env::set_current_dir(temp_dir.path()).unwrap();
+
+        (temp_dir, orig_config, orig_home, orig_cwd)
+    }
+
+    /// Helper function to clean up test environment
+    fn cleanup_secrets_test_environment(
+        orig_config: Option<String>,
+        orig_home: Option<String>,
+        orig_cwd: std::path::PathBuf,
+    ) {
+        // Clean up environment variables
+        if let Some(config_val) = orig_config {
+            env::set_var("ORDINATOR_CONFIG", config_val);
+        } else {
+            env::remove_var("ORDINATOR_CONFIG");
+        }
+        if let Some(home_val) = orig_home {
+            env::set_var("ORDINATOR_HOME", home_val);
+        } else {
+            env::remove_var("ORDINATOR_HOME");
+        }
+        // Try to restore original directory, but don't fail if it doesn't exist
+        let _ = env::set_current_dir(orig_cwd);
+    }
 
     #[test]
     fn test_encrypt_file() {
@@ -392,7 +751,7 @@ mod tests {
 
     #[test]
     fn test_check_sops_and_age_found() {
-        let temp_dir = tempfile::TempDir::new().unwrap();
+        let temp_dir = tempdir().unwrap();
         // Create dummy binaries
         let sops_path = temp_dir.path().join("sops");
         let age_path = temp_dir.path().join("age");
@@ -414,7 +773,10 @@ mod tests {
         assert!(check_sops_and_age().is_ok());
 
         // Restore original PATH
-        std::env::set_var("PATH", orig_path);
+        let orig_path = orig_path.as_str();
+        if std::path::Path::new(&orig_path).exists() {
+            env::set_current_dir(orig_path).unwrap();
+        }
     }
 
     #[test]
@@ -425,7 +787,7 @@ mod tests {
 
     #[test]
     fn test_encrypt_file_with_sops_sops_not_found() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempdir().unwrap();
         let file_path = temp_dir.path().join("test.txt");
         std::fs::write(&file_path, "test").unwrap();
 
@@ -439,8 +801,10 @@ mod tests {
         use std::env;
         use std::fs;
         use std::os::unix::fs::PermissionsExt;
-        let temp_dir = tempfile::TempDir::new().unwrap();
+        let temp_dir = tempdir().unwrap();
         let orig_path = env::var("PATH").unwrap_or_default();
+        let orig_config = env::var("ORDINATOR_CONFIG").ok();
+
         // Create a dummy sops that always fails
         let sops_path = temp_dir.path().join("sops");
         fs::write(&sops_path, "#!/bin/sh\nexit 1\n").unwrap();
@@ -466,16 +830,18 @@ mod tests {
         if let Err(e) = &result {
             println!("[TEST DEBUG] sops_failure error: {e}");
         }
-        assert!(result.is_err());
+        // The function should fail because sops exits with code 1
+        assert!(
+            result.is_err(),
+            "Expected encryption to fail when sops exits with code 1"
+        );
 
         // Clean up
-        if let Ok(output_path) = result {
-            let output_path = std::path::Path::new(&output_path);
-            if output_path.exists() {
-                fs::remove_file(output_path).unwrap();
-            }
+        if let Some(config_val) = orig_config {
+            env::set_var("ORDINATOR_CONFIG", config_val);
+        } else {
+            env::remove_var("ORDINATOR_CONFIG");
         }
-
         // Restore original PATH
         std::env::set_var("PATH", orig_path);
     }
@@ -486,11 +852,17 @@ mod tests {
         use std::fs;
         use std::os::unix::fs::PermissionsExt;
         use std::process::Command as ProcessCommand;
-        let temp_dir = tempfile::TempDir::new().unwrap();
+        let temp_dir = tempdir().unwrap();
         let orig_path = env::var("PATH").unwrap_or_default();
+        let orig_config = env::var("ORDINATOR_CONFIG").ok();
+
         // Create a shell script as dummy sops that copies input to output
         let sops_path = temp_dir.path().join("sops");
-        fs::write(&sops_path, "#!/bin/sh\n/bin/cp \"$2\" \"$4\"\n").unwrap();
+        fs::write(
+            &sops_path,
+            "#!/bin/sh\nmkdir -p $(dirname \"$4\")\n/bin/cp \"$2\" \"$4\"\n",
+        )
+        .unwrap();
         fs::set_permissions(&sops_path, fs::Permissions::from_mode(0o755)).unwrap();
         // Create a dummy age binary
         let age_path = temp_dir.path().join("age");
@@ -500,6 +872,32 @@ mod tests {
         // Add temp dir to PATH
         let new_path = format!("{}:{}", temp_dir.path().display(), orig_path);
         std::env::set_var("PATH", &new_path);
+
+        // Create a dummy age key file
+        let age_key_file = temp_dir.path().join("age.key");
+        fs::write(
+            &age_key_file,
+            "# public key: age1testkey\nAGE-SECRET-KEY-1TEST\n",
+        )
+        .unwrap();
+
+        // Create a config file with the age key file path
+        let config = crate::config::Config {
+            secrets: crate::config::SecretsConfig {
+                age_key_file: Some(age_key_file.clone()),
+                sops_config: None,
+                encrypt_patterns: vec!["*.txt".to_string()],
+                exclude_patterns: vec![],
+            },
+            ..Default::default()
+        };
+        let config_path = temp_dir.path().join("ordinator.toml");
+        config.save_to_file(&config_path).unwrap();
+        env::set_var("ORDINATOR_CONFIG", &config_path);
+
+        // Set current working directory to temp dir to ensure relative paths work
+        let orig_cwd = std::env::current_dir().unwrap();
+        std::env::set_current_dir(temp_dir.path()).unwrap();
 
         // Create a temp file to encrypt
         let file_path = temp_dir.path().join("test.txt");
@@ -520,12 +918,136 @@ mod tests {
         assert_eq!(contents, "hello");
 
         // Clean up
-        let output_path = std::path::Path::new(&output_path);
-        if output_path.exists() {
-            fs::remove_file(output_path).unwrap();
+        if let Some(config_val) = orig_config {
+            env::set_var("ORDINATOR_CONFIG", config_val);
+        } else {
+            env::remove_var("ORDINATOR_CONFIG");
+        }
+        // Restore original PATH and working directory
+        std::env::set_var("PATH", orig_path);
+        let _ = std::env::set_current_dir(orig_cwd);
+    }
+
+    #[test]
+    fn test_is_file_encrypted_plaintext() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("plain.yaml");
+        let mut file = File::create(&file_path).unwrap();
+        writeln!(file, "api_key: secret123").unwrap();
+        assert!(!is_file_encrypted(&file_path));
+    }
+
+    #[test]
+    fn test_is_file_encrypted_sops() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("secret.enc.yaml");
+        let mut file = File::create(&file_path).unwrap();
+        writeln!(file, "sops:").unwrap();
+        writeln!(file, "  kms: []").unwrap();
+        assert!(is_file_encrypted(&file_path));
+    }
+
+    #[test]
+    fn test_list_encrypted_files_patterns() {
+        let (temp_dir, orig_config, orig_home, orig_cwd) = setup_secrets_test_environment();
+
+        // Create test files with different patterns
+        let test_files = vec![
+            "secret.yaml",
+            "config.enc.yaml",
+            "ignore.txt",
+            "backup.bak",
+            "data.yml",
+        ];
+
+        for file_name in &test_files {
+            let file_path = temp_dir.path().join(file_name);
+            std::fs::write(&file_path, "test content").unwrap();
         }
 
-        // Restore original PATH
-        std::env::set_var("PATH", orig_path);
+        // Create config with specific patterns
+        let config = crate::config::Config {
+            secrets: crate::config::SecretsConfig {
+                encrypt_patterns: vec!["**/*.yaml".to_string(), "**/*.yml".to_string()],
+                exclude_patterns: vec!["*.bak".to_string()],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let config_path = temp_dir.path().join("ordinator.toml");
+        config.save_to_file(&config_path).unwrap();
+        env::set_var("ORDINATOR_CONFIG", &config_path);
+
+        // Set current working directory to temp dir to ensure relative paths work
+        std::env::set_current_dir(temp_dir.path()).unwrap();
+
+        // Test the list_encrypted_files function
+        let files = list_encrypted_files().unwrap();
+
+        // Should find secret.yaml, config.enc.yaml, and data.yml (3 files)
+        // Should exclude ignore.txt (not yaml/yml) and backup.bak (excluded pattern)
+        assert_eq!(
+            files.len(),
+            3,
+            "Expected 3 files matching patterns, found {}",
+            files.len()
+        );
+
+        let file_names: Vec<String> = files
+            .iter()
+            .map(|(path, _)| path.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+
+        assert!(file_names.contains(&"secret.yaml".to_string()));
+        assert!(file_names.contains(&"config.enc.yaml".to_string()));
+        assert!(file_names.contains(&"data.yml".to_string()));
+        assert!(!file_names.contains(&"ignore.txt".to_string()));
+        assert!(!file_names.contains(&"backup.bak".to_string()));
+
+        // Clean up test environment
+        cleanup_secrets_test_environment(orig_config, orig_home, orig_cwd);
+    }
+
+    #[test]
+    fn test_list_encrypted_files_encrypted() {
+        let (temp_dir, orig_config, orig_home, orig_cwd) = setup_secrets_test_environment();
+
+        // Create file using absolute path
+        let file_path = temp_dir.path().join("secret.enc.yaml");
+        let mut enc = File::create(&file_path).unwrap();
+        writeln!(&mut enc, "sops:").unwrap();
+        writeln!(&mut enc, "  kms: []").unwrap();
+
+        // Write config
+        let config = crate::config::Config {
+            secrets: crate::config::SecretsConfig {
+                encrypt_patterns: vec!["*.enc.yaml".to_string()],
+                exclude_patterns: vec![],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let config_path = temp_dir.path().join("ordinator.toml");
+        config.save_to_file(&config_path).unwrap();
+        env::set_var("ORDINATOR_CONFIG", &config_path);
+
+        // Set current working directory to temp dir to ensure relative paths work
+        std::env::set_current_dir(temp_dir.path()).unwrap();
+
+        let files = list_encrypted_files().unwrap();
+        assert_eq!(
+            files.len(),
+            1,
+            "Files found: {:?}",
+            files
+                .iter()
+                .map(|f| f.0.display().to_string())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(files[0].0.file_name().unwrap(), "secret.enc.yaml");
+        assert!(files[0].1);
+
+        // Clean up test environment
+        cleanup_secrets_test_environment(orig_config, orig_home, orig_cwd);
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "ordinator"
-version = "0.2.2"
+version = "0.3.1"
 edition = "2021"
 authors = ["Anthony Norfleet <anthony.norfleet@gmail.com>"]
 description = "Dotfiles and Environment Manager for macOS"
@@ -47,6 +47,10 @@ which = "6.0"
 
 # Directory utilities
 dirs = "5.0"
+tempfile = "3.8"
+
+# Test isolation
+scopeguard = "1.2"
 
 [dev-dependencies]
 # Testing frameworks
@@ -58,11 +62,9 @@ predicates = "3.0"
 # Property-based testing
 proptest = "1.4"
 
-# Fuzz testing
-cargo-fuzz = "0.13"
-
 # Note: cargo-tarpaulin removed due to git2 dependency conflicts
 # Can be added back later when needed for code coverage
+# Note: cargo-fuzz removed until fuzz testing is implemented
 
 [lints.clippy]
 uninlined-format-args = "deny"

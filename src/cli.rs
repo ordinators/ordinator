@@ -173,6 +173,17 @@ pub enum SecretCommands {
 
     /// Check for SOPS and age installation
     Check,
+
+    /// Set up SOPS and age for secrets management
+    Setup {
+        /// Profile to set up (defaults to 'default')
+        #[arg(long, default_value = "default")]
+        profile: String,
+
+        /// Force overwrite existing configuration
+        #[arg(long)]
+        force: bool,
+    },
 }
 
 pub async fn run(args: Args) -> Result<()> {
@@ -908,21 +919,20 @@ pub async fn run(args: Args) -> Result<()> {
                     Ok(())
                 }
                 SecretCommands::Decrypt { file } => {
-                    info!("Decrypting file: {}", file);
-                    eprintln!("Decrypting file: {file}");
-
-                    if args.dry_run {
-                        info!("[DRY RUN] Would decrypt file: {}", file);
-                        eprintln!("DRY-RUN: Would decrypt file: {file}");
-                        return Ok(());
+                    use crate::secrets::decrypt_file_with_sops;
+                    match decrypt_file_with_sops(&file) {
+                        Ok(()) => {
+                            println!("File decrypted successfully: {file}");
+                        }
+                        Err(e) => {
+                            eprintln!("Decryption failed: {e}");
+                            std::process::exit(1);
+                        }
                     }
-
-                    // TODO: Implement actual decrypt logic
-                    info!("Decryption not yet implemented");
-                    eprintln!("Decryption not yet implemented");
                     Ok(())
                 }
                 SecretCommands::List { paths_only } => {
+                    use crate::secrets::list_encrypted_files;
                     info!(
                         "Listing encrypted files{}",
                         if paths_only { " (paths only)" } else { "" }
@@ -944,9 +954,28 @@ pub async fn run(args: Args) -> Result<()> {
                         return Ok(());
                     }
 
-                    // TODO: Implement actual list logic
-                    info!("Encrypted files listing not yet implemented");
-                    eprintln!("Encrypted files listing not yet implemented");
+                    match list_encrypted_files() {
+                        Ok(files) => {
+                            if files.is_empty() {
+                                println!("No files match the encryption patterns.");
+                            } else if paths_only {
+                                for (path, _) in files {
+                                    println!("{}", path.display());
+                                }
+                            } else {
+                                println!("{:<50} | Status", "File");
+                                println!("{}", "-".repeat(50));
+                                for (path, encrypted) in files {
+                                    let status = if encrypted { "Encrypted" } else { "Plaintext" };
+                                    println!("{:<50} | {}", path.display(), status);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to list encrypted files: {e}");
+                            std::process::exit(1);
+                        }
+                    }
                     Ok(())
                 }
                 SecretCommands::Check => {
@@ -957,6 +986,19 @@ pub async fn run(args: Args) -> Result<()> {
                         }
                         Err(e) => {
                             eprintln!("{e}");
+                            std::process::exit(1);
+                        }
+                    }
+                    Ok(())
+                }
+                SecretCommands::Setup { profile, force } => {
+                    use crate::secrets::setup_sops_and_age;
+                    match setup_sops_and_age(&profile, force) {
+                        Ok(()) => {
+                            println!("✅ SOPS and age setup completed successfully for profile: {profile}");
+                        }
+                        Err(e) => {
+                            eprintln!("Setup failed: {e}");
                             std::process::exit(1);
                         }
                     }

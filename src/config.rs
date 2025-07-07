@@ -159,6 +159,15 @@ impl Config {
         }
     }
 
+    /// Load configuration from file or return default if not found
+    pub fn from_file_or_default() -> Result<Self> {
+        if let Some(config_path) = Self::find_config_file()? {
+            Self::from_file(&config_path)
+        } else {
+            Ok(Self::create_default())
+        }
+    }
+
     /// Create a default configuration
     pub fn create_default() -> Self {
         let mut profiles = HashMap::new();
