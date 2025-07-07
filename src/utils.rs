@@ -223,10 +223,13 @@ pub fn repair_symlink(symlink_path: &Path, expected_target: &Path) -> Result<()>
     }
 
     if !expected_target.exists() {
-        return Err(anyhow::anyhow!(
-            "Source file not found: {}",
-            expected_target.display()
-        ));
+        // Handle missing source file gracefully
+        fs::remove_file(symlink_path)?;
+        eprintln!(
+            "Removed broken symlink: {} (source file missing)",
+            symlink_path.display()
+        );
+        return Ok(()); // Success, not error
     }
 
     // Remove the broken symlink
@@ -458,10 +461,13 @@ mod tests {
         File::create(&file).unwrap();
         assert!(repair_symlink(&file, &nonexistent).is_err());
 
-        // Test repairing with non-existent target
+        // Test repairing with non-existent target (broken symlink)
         let symlink = dir.path().join("link.txt");
         unix_fs::symlink(&nonexistent, &symlink).unwrap();
-        assert!(repair_symlink(&symlink, &nonexistent).is_err());
+        // Should now succeed (removes the broken symlink)
+        assert!(repair_symlink(&symlink, &nonexistent).is_ok());
+        // The symlink should be removed
+        assert!(!symlink.exists());
     }
 
     #[test]

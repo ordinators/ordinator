@@ -170,6 +170,20 @@ pub enum SecretCommands {
         #[arg(long)]
         paths_only: bool,
     },
+
+    /// Check for SOPS and age installation
+    Check,
+
+    /// Set up SOPS and age for secrets management
+    Setup {
+        /// Profile to set up (defaults to 'default')
+        #[arg(long, default_value = "default")]
+        profile: String,
+
+        /// Force overwrite existing configuration
+        #[arg(long)]
+        force: bool,
+    },
 }
 
 pub async fn run(args: Args) -> Result<()> {
@@ -889,67 +903,87 @@ pub async fn run(args: Args) -> Result<()> {
             }
             Ok(())
         }
-        Commands::Secrets { subcommand } => {
-            match subcommand {
-                SecretCommands::Encrypt { file } => {
-                    info!("Encrypting file: {}", file);
-                    eprintln!("Encrypting file: {file}");
-
-                    if args.dry_run {
-                        info!("[DRY RUN] Would encrypt file: {}", file);
-                        eprintln!("DRY-RUN: Would encrypt file: {file}");
-                        return Ok(());
+        Commands::Secrets { subcommand } => match subcommand {
+            SecretCommands::Encrypt { file } => {
+                let (config, config_path) = Config::load()?;
+                let base_dir = config_path.parent().unwrap().to_path_buf();
+                let mut manager = crate::secrets::SecretsManager::new(None, None, config, base_dir);
+                match manager.encrypt_file(std::path::Path::new(&file)) {
+                    Ok(()) => {
+                        println!("File encrypted successfully: {file}");
                     }
-
-                    // TODO: Implement actual encrypt logic
-                    info!("Encryption not yet implemented");
-                    eprintln!("Encryption not yet implemented");
-                    Ok(())
-                }
-                SecretCommands::Decrypt { file } => {
-                    info!("Decrypting file: {}", file);
-                    eprintln!("Decrypting file: {file}");
-
-                    if args.dry_run {
-                        info!("[DRY RUN] Would decrypt file: {}", file);
-                        eprintln!("DRY-RUN: Would decrypt file: {file}");
-                        return Ok(());
+                    Err(e) => {
+                        eprintln!("Encryption failed: {e}");
+                        std::process::exit(1);
                     }
-
-                    // TODO: Implement actual decrypt logic
-                    info!("Decryption not yet implemented");
-                    eprintln!("Decryption not yet implemented");
-                    Ok(())
                 }
-                SecretCommands::List { paths_only } => {
-                    info!(
-                        "Listing encrypted files{}",
-                        if paths_only { " (paths only)" } else { "" }
-                    );
-                    eprintln!(
-                        "Listing encrypted files{}",
-                        if paths_only { " (paths only)" } else { "" }
-                    );
-
-                    if args.dry_run {
-                        info!(
-                            "[DRY RUN] Would list encrypted files{}",
-                            if paths_only { " (paths only)" } else { "" }
-                        );
-                        eprintln!(
-                            "DRY-RUN: Would list encrypted files{}",
-                            if paths_only { " (paths only)" } else { "" }
-                        );
-                        return Ok(());
-                    }
-
-                    // TODO: Implement actual list logic
-                    info!("Encrypted files listing not yet implemented");
-                    eprintln!("Encrypted files listing not yet implemented");
-                    Ok(())
-                }
+                Ok(())
             }
-        }
+            SecretCommands::Decrypt { file } => {
+                let (config, config_path) = Config::load()?;
+                let base_dir = config_path.parent().unwrap().to_path_buf();
+                let mut manager = crate::secrets::SecretsManager::new(None, None, config, base_dir);
+                match manager.decrypt_file(std::path::Path::new(&file)) {
+                    Ok(()) => {
+                        println!("File decrypted successfully: {file}");
+                    }
+                    Err(e) => {
+                        eprintln!("Decryption failed: {e}");
+                        std::process::exit(1);
+                    }
+                }
+                Ok(())
+            }
+            SecretCommands::List { paths_only } => {
+                let (config, config_path) = Config::load()?;
+                let base_dir = config_path.parent().unwrap().to_path_buf();
+                let manager = crate::secrets::SecretsManager::new(None, None, config, base_dir);
+                let files = manager.list_encrypted_files()?;
+                if files.is_empty() {
+                    println!("No files match the encryption patterns.");
+                } else if paths_only {
+                    for (path, _) in files {
+                        println!("{}", path.display());
+                    }
+                } else {
+                    println!("{:<50} | Status", "File");
+                    println!("{}", "-".repeat(50));
+                    for (path, encrypted) in files {
+                        let status = if encrypted { "Encrypted" } else { "Plaintext" };
+                        println!("{:<50} | {}", path.display(), status);
+                    }
+                }
+                Ok(())
+            }
+            SecretCommands::Check => {
+                use crate::secrets::check_sops_and_age;
+                match check_sops_and_age() {
+                    Ok(()) => {
+                        println!("SOPS and age are both installed and available in PATH.");
+                    }
+                    Err(e) => {
+                        eprintln!("{e}");
+                        std::process::exit(1);
+                    }
+                }
+                Ok(())
+            }
+            SecretCommands::Setup { profile, force } => {
+                use crate::secrets::setup_sops_and_age;
+                match setup_sops_and_age(&profile, force) {
+                    Ok(()) => {
+                        println!(
+                            "✅ SOPS and age setup completed successfully for profile: {profile}"
+                        );
+                    }
+                    Err(e) => {
+                        eprintln!("Setup failed: {e}");
+                        std::process::exit(1);
+                    }
+                }
+                Ok(())
+            }
+        },
         Commands::GenerateScript { output, profile } => {
             info!(
                 "Generating system script: {} for profile: {}",

@@ -108,3 +108,135 @@ All PRs must follow this structure:
 - **Testing:** List test types, counts, and any special test isolation or edge cases.
 - **Coverage:** List per-module and overall coverage, and note improvements.
 - **Completion Statement:** End with "This completes the [phase/feature] and prepares for [next phase/feature]."
+
+# Ordinator Cursor Rules
+
+## Code Style and Linting
+
+### Format String Inlining
+When using `println!` and `eprintln!` macros, always inline variables directly into the format string instead of using separate arguments. This prevents Clippy `uninlined-format-args` warnings.
+
+**Good:**
+```rust
+println!("Debug: {variable:?}");
+println!("Value: {value}");
+eprintln!("Error: {error}");
+```
+
+**Bad:**
+```rust
+println!("Debug: {:?}", variable);
+println!("Value: {}", value);
+eprintln!("Error: {}", error);
+```
+
+### Examples of Required Changes
+- `println!("Config: {:?}", config_path);` → `println!("Config: {config_path:?}");`
+- `println!("Value: {}", value);` → `println!("Value: {value}");`
+- `eprintln!("Error: {}", error);` → `eprintln!("Error: {error}");`
+- `format!("level_{}", i)` → `format!("level_{i}")`
+
+### Scope
+This rule applies to:
+- All `println!` and `eprintln!` statements
+- `format!` macros when used for simple variable interpolation
+- Debug output and logging statements
+- Test assertions with format strings
+
+### Exceptions
+Complex formatting that requires multiple arguments or conditional logic may still use separate arguments when the inline approach would make the code less readable.
+
+## Test Isolation Rules
+
+### CLI Test Isolation
+All CLI integration tests must use the proper helper methods to ensure test isolation and prevent environment variable leakage.
+
+**Required Helper Methods:**
+- Use `setup_test_environment()` for CLI tests that need a complete isolated environment
+- Use `create_ordinator_command()` for creating commands with proper environment setup
+- Always set `ORDINATOR_CONFIG` environment variable in tests
+- Use temporary directories for all test files and configs
+
+**Good:**
+```rust
+#[test]
+fn test_example() {
+    let (_temp, config_file) = setup_test_environment();
+    let mut cmd = create_ordinator_command();
+    cmd.arg("some-command");
+    let output = cmd.unwrap();
+    assert!(output.status.success());
+}
+```
+
+**Bad:**
+```rust
+#[test]
+fn test_example() {
+    // Don't create commands directly without proper isolation
+    let mut cmd = Command::cargo_bin("ordinator").unwrap();
+    cmd.arg("some-command");
+    let output = cmd.unwrap();
+    assert!(output.status.success());
+}
+```
+
+### Secrets Test Isolation
+All secrets-related tests must use fully mocked environments:
+- Create dummy SOPS and age binaries in temp directories
+- Write minimal `ordinator.toml` with `[secrets]` section
+- Set `ORDINATOR_CONFIG` and `SOPS_AGE_KEY_FILE` environment variables
+- Restore environment variables at test end
+
+**Good:**
+```rust
+#[test]
+fn test_secrets_function() {
+    let temp_dir = tempdir().unwrap();
+    // Create dummy binaries
+    let sops_path = temp_dir.path().join("sops");
+    fs::write(&sops_path, "#!/bin/sh\nexit 0\n").unwrap();
+    // Set up config and environment
+    let config = Config { secrets: SecretsConfig { ... } };
+    config.save_to_file(&config_path).unwrap();
+    env::set_var("ORDINATOR_CONFIG", &config_path);
+    // Test logic here
+    // Clean up environment variables
+}
+```
+
+### Test Environment Variables
+- **Always** set `ORDINATOR_HOME` to a temporary directory for test isolation
+- **Always** set `ORDINATOR_CONFIG` to point to a test config file
+- **Always** restore original environment variables after tests
+- **Never** modify global environment without cleanup
+
+### Test File Management
+- Use `tempfile::tempdir()` for all test directories
+- Create unique file names per test to avoid conflicts
+- Clean up all test artifacts in test teardown
+- Use absolute paths when creating test files
+
+## Rust Best Practices
+
+### Error Handling
+- Use `anyhow::Result` for error propagation
+- Provide meaningful error messages
+- Use `?` operator for error propagation
+
+### Testing
+- Use temporary directories for test isolation
+- Set `ORDINATOR_HOME` environment variable in tests
+- Clean up test artifacts
+- Use descriptive test names
+
+### Documentation
+- Document public APIs with doc comments
+- Include examples in documentation
+- Keep documentation up to date with code changes
+
+### Security
+- Never expose plaintext secrets
+- Use secure random generation for keys
+- Validate user input
+- Handle file permissions securely

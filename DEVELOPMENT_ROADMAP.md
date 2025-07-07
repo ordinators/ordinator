@@ -136,17 +136,17 @@ ordinator repair                       # Fixes broken symlinks
 **Testable**: ✅
 
 **Tasks**:
-- [ ] Detect SOPS and age installation
-- [ ] Implement `ordinator secrets encrypt <file>`
-- [ ] Implement `ordinator secrets decrypt <file>`
-- [ ] Add encrypted file patterns to config
-- [ ] Log decryption events
+- [x] Detect SOPS and age installation
+- [x] Implement `ordinator secrets encrypt <file>`
+- [x] Implement `ordinator secrets decrypt <file>`
+- [x] Add encrypted file patterns to config
+- [x] Log decryption events
 
 **Tests**:
-- [ ] SOPS/age detection works
-- [ ] File encryption/decryption works
-- [ ] Logging captures events correctly
-- [ ] Pattern matching works
+- [x] SOPS/age detection works
+- [x] File encryption/decryption works
+- [x] Logging captures events correctly
+- [x] Pattern matching works
 
 **Acceptance Criteria**:
 ```bash
