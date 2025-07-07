@@ -185,8 +185,6 @@ pub fn check_sops_and_age() -> anyhow::Result<()> {
 /// Set up SOPS and age for secrets management
 pub fn setup_sops_and_age(profile: &str, force: bool) -> anyhow::Result<()> {
     info!("Setting up SOPS and age for profile: {}", profile);
-
-    // Step 1: Check if SOPS and age are installed
     match check_sops_and_age() {
         Ok(()) => {
             println!("✅ SOPS and age are already installed");
@@ -196,20 +194,15 @@ pub fn setup_sops_and_age(profile: &str, force: bool) -> anyhow::Result<()> {
             install_sops_and_age()?;
         }
     }
-
-    // Step 2: Generate age key if it doesn't exist
-    let age_key_path = generate_age_key(profile, force)?;
-
-    // Step 3: Create SOPS configuration
+    let config_base = dirs::config_dir()
+        .ok_or_else(|| anyhow::anyhow!("Could not determine config directory"))?
+        .join("ordinator");
+    let age_key_path = generate_age_key(&config_base, profile, force)?;
     let sops_config_path = create_sops_config(profile, &age_key_path, force)?;
-
-    // Step 4: Update ordinator.toml with secrets configuration
     update_ordinator_config(profile, &age_key_path, &sops_config_path)?;
-
     println!("✅ SOPS and age setup complete for profile: {profile}");
     println!("   Age key: {}", age_key_path.display());
     println!("   SOPS config: {}", sops_config_path.display());
-
     Ok(())
 }
 
@@ -240,27 +233,22 @@ fn install_sops_and_age() -> anyhow::Result<()> {
 }
 
 /// Generate an age key for the specified profile
-fn generate_age_key(profile: &str, force: bool) -> anyhow::Result<std::path::PathBuf> {
-    let config_dir = dirs::config_dir()
-        .ok_or_else(|| anyhow::anyhow!("Could not determine config directory"))?
-        .join("ordinator")
-        .join("age");
-
+fn generate_age_key(
+    base_dir: &Path,
+    profile: &str,
+    force: bool,
+) -> anyhow::Result<std::path::PathBuf> {
+    let config_dir = base_dir.join("age");
     fs::create_dir_all(&config_dir)?;
-
     let key_filename = if profile == "default" {
         "key.txt".to_string()
     } else {
         format!("{profile}.txt")
     };
-
     let key_path = config_dir.join(key_filename);
-
-    // Ensure parent directory exists before writing the key file
     if let Some(parent) = key_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-
     if key_path.exists() && force {
         fs::remove_file(&key_path)?;
     }
@@ -268,25 +256,18 @@ fn generate_age_key(profile: &str, force: bool) -> anyhow::Result<std::path::Pat
         println!("✅ Age key already exists: {}", key_path.display());
         return Ok(key_path);
     }
-
     println!("Generating age key for profile: {profile}");
-
-    // Generate age key
     let output = Command::new("age-keygen")
         .arg("-o")
         .arg(&key_path)
         .output()?;
-
     if !output.status.success() {
         return Err(anyhow::anyhow!(
             "Failed to generate age key: {}",
             String::from_utf8_lossy(&output.stderr)
         ));
     }
-
-    // Set secure permissions
     fs::set_permissions(&key_path, fs::Permissions::from_mode(0o600))?;
-
     println!("✅ Age key generated: {}", key_path.display());
     Ok(key_path)
 }
