@@ -1278,6 +1278,13 @@ exclude_patterns = []
             key_file.path().display()
         ))
         .unwrap();
+    // Debug output: print config and env vars
+    let config_contents = std::fs::read_to_string(config_file.path()).unwrap();
+    println!("[DEBUG] ordinator.toml contents:\n{config_contents}");
+    println!("[DEBUG] ORDINATOR_CONFIG={}", config_file.path().display());
+    println!("[DEBUG] SOPS_AGE_KEY_FILE={}", key_file.path().display());
+    println!("[DEBUG] PATH={}", bin_dir.path().display());
+    println!("[DEBUG] ORDINATOR_HOME={}", temp.path().display());
     // Set env vars with RAII guards
     let _config_guard = EnvVarGuard::set("ORDINATOR_CONFIG", config_file.path());
     let _key_guard = EnvVarGuard::set("SOPS_AGE_KEY_FILE", key_file.path());
@@ -1365,7 +1372,7 @@ exclude_patterns = ["*.bak"]
 
     // Create test files
     temp.child("secret.yaml")
-        .write_str("api_key: secret123")
+        .write_str("sops:\n  kms: []\n")
         .unwrap();
     temp.child("config.txt")
         .write_str("password: test")
@@ -1393,6 +1400,10 @@ exclude_patterns = ["*.bak"]
     assert!(
         stdout.contains("Plaintext"),
         "Expected Plaintext in output: {stdout}"
+    );
+    assert!(
+        stdout.contains("Encrypted"),
+        "Expected Encrypted in output: {stdout}"
     );
 
     // Test with --paths-only flag
