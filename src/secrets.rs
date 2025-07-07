@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 use tracing::info;
 use walkdir::WalkDir;
@@ -194,9 +195,13 @@ pub fn setup_sops_and_age(profile: &str, force: bool) -> anyhow::Result<()> {
             install_sops_and_age()?;
         }
     }
-    let config_base = dirs::config_dir()
-        .ok_or_else(|| anyhow::anyhow!("Could not determine config directory"))?
-        .join("ordinator");
+    let config_base = if let Ok(home) = std::env::var("ORDINATOR_HOME") {
+        PathBuf::from(home)
+    } else {
+        dirs::config_dir()
+            .ok_or_else(|| anyhow::anyhow!("Could not determine config directory"))?
+            .join("ordinator")
+    };
     let age_key_path = generate_age_key(&config_base, profile, force)?;
     let sops_config_path = create_sops_config(profile, &age_key_path, force)?;
     update_ordinator_config(profile, &age_key_path, &sops_config_path)?;

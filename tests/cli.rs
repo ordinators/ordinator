@@ -56,6 +56,20 @@ fn setup_test_environment(temp: &assert_fs::TempDir) -> (EnvVarGuard, EnvVarGuar
     );
     println!("[DEBUG] setup_test_environment: running ordinator init in temp dir");
 
+    // Print ORDINATOR_HOME for debugging
+    let ordinator_home =
+        std::env::var("ORDINATOR_HOME").unwrap_or_else(|_| "<not set>".to_string());
+    println!("[DEBUG] ORDINATOR_HOME: {ordinator_home}");
+    // Assert it's not the user's home or default config dir
+    let home_dir = dirs::home_dir().unwrap_or_default();
+    let config_dir = dirs::config_dir().unwrap_or_default();
+    assert!(
+        ordinator_home == "<not set>"
+            || (!ordinator_home.starts_with(&*home_dir.to_string_lossy())
+                && !ordinator_home.starts_with(&*config_dir.to_string_lossy())),
+        "ORDINATOR_HOME should not be the user's home or default config dir in tests"
+    );
+
     // Run ordinator init to create the configuration
     let mut cmd = Command::cargo_bin("ordinator").unwrap();
     cmd.current_dir(temp);
@@ -1248,6 +1262,8 @@ exclude_patterns = []
 #[test]
 fn test_secrets_decrypt_cli_success() {
     let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment(&temp);
+
     // Create a dummy sops in a temp bin dir
     let bin_dir = temp.child("bin");
     bin_dir.create_dir_all().unwrap();
@@ -1266,42 +1282,62 @@ fn test_secrets_decrypt_cli_success() {
     key_file
         .write_str("# public key: age1testkey\nAGE-SECRET-KEY-1TEST\n")
         .unwrap();
+
+    // Update the config file to include secrets configuration
     let config_file = temp.child("ordinator.toml");
-    config_file
-        .write_str(&format!(
-            r#"
+    let config_content = format!(
+        r#"
+[global]
+default_profile = "default"
+auto_push = false
+create_backups = true
+exclude = []
+
+[profiles.default]
+files = []
+directories = []
+enabled = true
+description = "Default profile for basic dotfiles"
+exclude = []
+
+[profiles.work]
+files = []
+directories = []
+enabled = true
+description = "Work environment profile"
+exclude = []
+
+[profiles.personal]
+files = []
+directories = []
+enabled = true
+description = "Personal environment profile"
+exclude = []
+
 [secrets]
 age_key_file = "{}"
 encrypt_patterns = ["*.enc.yaml"]
 exclude_patterns = []
 "#,
-            key_file.path().display()
-        ))
-        .unwrap();
-    // Debug output: print config and env vars
-    let config_contents = std::fs::read_to_string(config_file.path()).unwrap();
-    println!("[DEBUG] ordinator.toml contents:\n{config_contents}");
-    println!("[DEBUG] ORDINATOR_CONFIG={}", config_file.path().display());
-    println!("[DEBUG] SOPS_AGE_KEY_FILE={}", key_file.path().display());
-    println!("[DEBUG] PATH={}", bin_dir.path().display());
-    println!("[DEBUG] ORDINATOR_HOME={}", temp.path().display());
-    // Set env vars with RAII guards
-    let _config_guard = EnvVarGuard::set("ORDINATOR_CONFIG", config_file.path());
+        key_file.path().display()
+    );
+    std::fs::write(config_file.path(), config_content).unwrap();
+
+    // Set additional env vars with RAII guards
     let _key_guard = EnvVarGuard::set("SOPS_AGE_KEY_FILE", key_file.path());
     let _path_guard = EnvVarGuard::set("PATH", bin_dir.path());
-    let _home_guard = EnvVarGuard::set("ORDINATOR_HOME", temp.path());
+
     // Create an "encrypted" file to decrypt
     let file = temp.child("secret.enc.yaml");
     file.write_str("supersecret").unwrap();
-    // Run the CLI
-    let mut cmd = Command::cargo_bin("ordinator").unwrap();
-    cmd.current_dir(&temp);
+
+    // Run the CLI using the helper function
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.env("PATH", bin_dir.path());
     cmd.args(["secrets", "decrypt", file.path().to_str().unwrap()]);
     cmd.assert()
         .success()
         .stdout(contains("File decrypted successfully"));
-    // Clean up the temp ordinator.toml file
-    std::fs::remove_file(config_file.path()).ok();
 }
 
 #[test]
@@ -1434,14 +1470,22 @@ fn test_secrets_setup_cli_success() {
     // Create a dummy sops in a temp bin dir
     let bin_dir = temp.child("bin");
     bin_dir.create_dir_all().unwrap();
+    println!("[DEBUG] Created bin_dir: {}", bin_dir.path().display());
+
     // Create mock sops binary that does nothing but succeeds
     let sops_path = bin_dir.child("sops");
     sops_path.write_str("#!/bin/sh\nexit 0\n").unwrap();
     fs::set_permissions(sops_path.path(), fs::Permissions::from_mode(0o755)).unwrap();
+    println!(
+        "[DEBUG] Created sops binary: {}",
+        sops_path.path().display()
+    );
+
     // Create mock age binary that generates a key
     let age_path = bin_dir.child("age-keygen");
-    age_path.write_str("#!/bin/sh\necho '# created: 2025-01-01'\necho '# public key: age1testkey'\necho 'AGE-SECRET-KEY-1TEST'\n").unwrap();
+    age_path.write_str("#!/bin/sh\n# Write to the output file specified by -o\necho '# created: 2025-01-01' > \"$2\"\necho '# public key: age1testkey' >> \"$2\"\necho 'AGE-SECRET-KEY-1TEST' >> \"$2\"\n").unwrap();
     fs::set_permissions(age_path.path(), fs::Permissions::from_mode(0o755)).unwrap();
+
     // Create mock age binary that does nothing but succeeds
     let age_bin = bin_dir.child("age");
     age_bin.write_str("#!/bin/sh\nexit 0\n").unwrap();
@@ -1476,6 +1520,8 @@ fn test_secrets_setup_cli_success() {
 #[test]
 fn test_secrets_check_cli_success() {
     let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment(&temp);
+
     // Create a dummy sops in a temp bin dir
     let bin_dir = temp.child("bin");
     bin_dir.create_dir_all().unwrap();
@@ -1489,9 +1535,10 @@ fn test_secrets_check_cli_success() {
     fs::set_permissions(age_path.path(), fs::Permissions::from_mode(0o755)).unwrap();
     // Set PATH with RAII guard
     let _path_guard = EnvVarGuard::set("PATH", bin_dir.path());
-    // Run the CLI
-    let mut cmd = Command::cargo_bin("ordinator").unwrap();
-    cmd.current_dir(&temp);
+
+    // Run the CLI using the helper function
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.env("PATH", bin_dir.path());
     cmd.args(["secrets", "check"]);
     cmd.assert()
         .success()
