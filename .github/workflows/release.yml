@@ -105,7 +105,7 @@ jobs:
     - name: Get SHA256 hash
       id: get_sha256
       run: |
-        SHA256=$(curl -sL "https://github.com/ordinators/ordinator/archive/${{ steps.get_version.outputs.VERSION }}.tar.gz" | shasum -a 256 | cut -d' ' -f1)
+        SHA256=$(curl -sL "https://github.com/ordinators/ordinator/archive/refs/tags/${{ steps.get_version.outputs.VERSION }}.tar.gz" | shasum -a 256 | cut -d' ' -f1)
         echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
 
     - name: Checkout homebrew tap
@@ -119,7 +119,8 @@ jobs:
     - name: Update formula
       run: |
         cd homebrew-tap
-        sed -i "s|url \"https://github.com/ordinators/ordinator/archive/v[0-9.]*\.tar\.gz\"|url \"https://github.com/ordinators/ordinator/archive/${{ steps.get_version.outputs.VERSION }}.tar.gz\"|" Formula/ordinator.rb
+        # Update URL to use the correct format with refs/tags/
+        sed -i "s|url \"https://github.com/ordinators/ordinator/archive/refs/tags/v[0-9.]*\.tar\.gz\"|url \"https://github.com/ordinators/ordinator/archive/refs/tags/${{ steps.get_version.outputs.VERSION }}.tar.gz\"|" Formula/ordinator.rb
         sed -i "s|sha256 \"[a-f0-9]*\"|sha256 \"${{ steps.get_sha256.outputs.SHA256 }}\"|" Formula/ordinator.rb
 
     - name: Create pull request
