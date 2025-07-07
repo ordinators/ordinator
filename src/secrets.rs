@@ -256,6 +256,11 @@ fn generate_age_key(profile: &str, force: bool) -> anyhow::Result<std::path::Pat
 
     let key_path = config_dir.join(key_filename);
 
+    // Ensure parent directory exists before writing the key file
+    if let Some(parent) = key_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
     if key_path.exists() && force {
         fs::remove_file(&key_path)?;
     }
