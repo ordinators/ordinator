@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::env;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct Config {
     /// Global configuration
     #[serde(default)]
@@ -20,7 +20,7 @@ pub struct Config {
     pub secrets: SecretsConfig,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GlobalConfig {
     /// Default profile to use
     #[serde(default = "default_profile")]
@@ -50,7 +50,7 @@ impl Default for GlobalConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct ProfileConfig {
     /// Files to track for this profile
     #[serde(default)]
@@ -75,7 +75,7 @@ pub struct ProfileConfig {
     pub exclude: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct SecretsConfig {
     /// Age key file path
     pub age_key_file: Option<PathBuf>,

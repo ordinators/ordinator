@@ -1,6 +1,6 @@
 [package]
 name = "ordinator"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 authors = ["Anthony Norfleet <anthony.norfleet@gmail.com>"]
 description = "Dotfiles and Environment Manager for macOS"
@@ -44,6 +44,9 @@ tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "macros"] }
 
 # SOPS integration (we'll need to shell out to sops)
 which = "6.0"
+
+# Regex for secrets detection
+regex = "1.0"
 
 # Directory utilities
 dirs = "5.0"

@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use git2::{Repository, RepositoryInitOptions};
+use std::fs;
 use std::path::PathBuf;
 use tracing::{info, warn};
 
@@ -31,6 +32,11 @@ impl GitManager {
                 "[TEST MODE] Skipping git init at {}",
                 self.repo_path.display()
             );
+            // Create .git directory for test mode so exists() can find it
+            let git_dir = self.repo_path.join(".git");
+            if !git_dir.exists() {
+                fs::create_dir_all(&git_dir)?;
+            }
             return Ok(());
         }
         info!(
@@ -350,7 +356,13 @@ impl GitManager {
 
     /// Check if repository exists
     pub fn exists(&self) -> bool {
-        Repository::open(&self.repo_path).is_ok()
+        if Self::is_test_mode() {
+            // In test mode, just check if .git directory exists
+            // since init() skips actual Git repository creation
+            self.repo_path.join(".git").exists()
+        } else {
+            Repository::open(&self.repo_path).is_ok()
+        }
     }
 }
 
