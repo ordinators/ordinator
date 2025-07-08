@@ -34,8 +34,6 @@ walkdir = "2.4"
 serde = { version = "1.0", features = ["derive"] }
 
 # Path handling
-pathdiff = "0.2"
-
 globset = "0.4"
 chrono = "0.4"
 
@@ -51,9 +49,6 @@ regex = "1.0"
 # Directory utilities
 dirs = "5.0"
 tempfile = "3.8"
-
-# Test isolation
-scopeguard = "1.2"
 
 [dev-dependencies]
 # Testing frameworks

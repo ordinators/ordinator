@@ -214,20 +214,157 @@ ordinator apply --skip-bootstrap       # Skips bootstrap
 ```
 
 ### 4.2 Package Management Integration
-**Priority**: Medium  
-**Dependencies**: 4.1  
-**Estimated Time**: 2-3 days  
-**Testable**: ✅
+**Priority:** Medium  
+**Dependencies:** 4.1  
+**Estimated Time:** 2-3 days  
+**Testable:** ✅
 
-**Tasks**:
-- [ ] Homebrew package installation
-- [ ] VS Code extension installation
-- [ ] Package list management in config
+**Tasks:**
+- [ ] Provide a method to pull/export the list of currently installed Homebrew formulae/casks and their versions
+- [ ] Add/export this list to the repo/config for reproducibility
+- [ ] On `apply`, install all listed formulae/casks at the prescribed versions
+- [ ] Ensure reproducible Homebrew environment setup from config
 
-**Tests**:
-- [ ] Homebrew packages install correctly
-- [ ] VS Code extensions install correctly
-- [ ] Package lists are managed properly
+**Tests:**
+- [ ] Exported Homebrew package list matches actual installed packages
+- [ ] `apply` installs all listed formulae/casks at correct versions
+- [ ] Handles missing or outdated packages gracefully
+- [ ] Package lists are managed properly in config
+
+**Acceptance Criteria:**
+```bash
+# User can export Homebrew package list to config
+ordinator export-brew
+# On apply, all listed formulae/casks are installed at specified versions
+ordinator apply --profile work
+```
+
+### 4.3 Remote Repository Bootstrap (`ordinator init <repo-url> [target-dir]`)
+**Priority:** Medium  
+**Dependencies:** 1.1, 2.1, 4.1  
+**Estimated Time:** 1-2 days  
+**Testable:** ✅
+
+**Tasks:**
+- [ ] Support `ordinator init --repo <repo-url> [target-dir]`, with `[target-dir]` as a positional argument (defaulting to the current directory if omitted, matching `git clone` behavior). The repository URL is only provided via the `--repo` flag, not as a positional argument.
+- [ ] Add `--repo` flag to `ordinator init` for remote cloning (deprecated in favor of positional argument, but may be supported for backward compatibility)
+- [ ] Prompt for or accept target directory
+- [ ] Clone the specified repository safely (with overwrite checks)
+- [ ] Set up configuration and profiles from the cloned repo
+- [ ] Optionally support branch/tag selection
+- [ ] Integrate with existing bootstrap and apply flows
+
+**Tests:**
+- [ ] Clones repo and initializes config correctly
+- [ ] Handles existing directory conflicts safely
+- [ ] Works with all supported profiles
+- [ ] UX is clear and error messages are helpful
+
+**Acceptance Criteria:**
+```bash
+ordinator init https://github.com/yourname/dotfiles.git ~/.dotfiles
+# Clones the repo to ~/.dotfiles, sets up config, ready for apply
+ordinator init https://github.com/yourname/dotfiles.git
+# Clones the repo to the current directory by default
+```
+
+### 4.4 Auto-Generated README with Quick-Install & Secrets Instructions
+**Priority:** Medium  
+**Dependencies:** 1.1, 4.3  
+**Estimated Time:** 1 day  
+**Testable:** ✅
+
+**Tasks:**
+- [ ] Generate a `README.md` file on `ordinator init` if one does not exist
+- [ ] Include ideal install path and quick-start shell snippet
+- [ ] Add a section about the AGE key, its required location, and security warning
+- [ ] Document recommended profiles and bootstrap usage
+- [ ] Add links to the Ordinator project and documentation
+- [ ] Allow user to customize the README template (optional)
+- [ ] Add a shell one-liner for installation to the generated README
+- [ ] Include profile table, bootstrap explanation, troubleshooting, and security notes in README
+
+**Tests:**
+- [ ] README is created with correct content on new repo init
+- [ ] Existing README is not overwritten
+- [ ] Quick-install, AGE key, and documentation links are accurate and copy-pasteable
+
+**Acceptance Criteria:**
+```bash
+# After ordinator init, repo contains README.md with:
+# - Install path
+# - Quick-start shell snippet
+# - Profile/usage info
+# - AGE key warning and path
+# - Links to Ordinator project and docs
+```
+
+### 4.5 Profile-Specific File Storage and Add Command Enhancement
+**Priority:** Medium  
+**Dependencies:** 2.1, 4.1  
+**Estimated Time:** 2 days  
+**Testable:** ✅
+
+**Tasks:**
+- [ ] Enhance `ordinator add` to support profile-specific file storage
+- [ ] When adding a file with `--profile`, store it in `files/<profile>/` subdirectory
+- [ ] Update config to track the correct source file for each profile
+- [ ] Ensure symlinking logic uses the correct profile-specific file
+- [ ] Update documentation and usage examples
+
+**Tests:**
+- [ ] Adding the same file to multiple profiles stores separate copies
+- [ ] Applying a profile symlinks the correct version for that profile
+- [ ] No accidental overwrites between profiles
+- [ ] Backward compatibility for existing flat file structure
+
+**Acceptance Criteria:**
+```bash
+ordinator add ~/.zshrc --profile work
+# stores as files/work/.zshrc
+
+ordinator add ~/.zshrc --profile laptop
+# stores as files/laptop/.zshrc
+
+ordinator apply --profile work
+# symlinks files/work/.zshrc to ~/.zshrc
+```
+
+### 4.6 Uninstall and Restore Original Configuration
+**Priority:** Medium  
+**Dependencies:** 2.2, 4.1  
+**Estimated Time:** 2 days  
+**Testable:** ✅
+
+**Tasks:**
+- [ ] Implement `ordinator uninstall` command
+- [ ] Remove all symlinks created by Ordinator for selected profile(s)
+- [ ] Optionally restore original files from backups
+- [ ] Support dry-run and force options
+- [ ] Prompt for config and repo cleanup (optional)
+- [ ] Update documentation and usage examples
+
+**Backups Details:**
+- Backups are created during `ordinator apply` if a file already exists at the target location and backups are enabled (`create_backups = true`).
+- The original file is moved to a backup location (e.g., `~/.zshrc.ordinator.bak`) before the symlink is created.
+- Backups are typically stored in the same directory as the original file, with a `.ordinator.bak` or similar suffix.
+- During uninstall/restore, Ordinator will remove the symlink and, if a backup exists, move it back to the original location.
+- If multiple backups exist, the most recent is restored (or the user is prompted).
+- If backups are disabled, uninstall will only remove symlinks and not restore originals.
+- If no backup exists, the symlink is removed and the user is warned that the original file cannot be restored.
+- Best practice: Always enable backups to ensure safe restoration of original files.
+
+**Tests:**
+- [ ] Uninstall removes all symlinks for a profile
+- [ ] Backups are restored if requested
+- [ ] No data loss if backups are missing
+- [ ] Dry-run shows correct actions
+
+**Acceptance Criteria:**
+```bash
+ordinator uninstall --profile work --restore-backups
+# Removes all symlinks for 'work' profile and restores backups if available
+```
 
 ---
 
@@ -306,32 +443,36 @@ ordinator generate-script --profile work
 - [ ] Progress indicators
 - [x] Error reporting improvements
 - [x] Command documentation
+- [ ] Generate and install MAN page for CLI usage
 
 **Tests**:
 - [ ] JSON output is valid
 - [x] Logging levels work correctly
 - [ ] Progress indicators function
 - [x] Documentation is comprehensive and accurate
+- [ ] MAN page is generated, installed, and accessible via `man ordinator`
 
 ---
 
 ## Phase 7: Installation & Distribution 📦
 
-### 7.1 Homebrew Integration
+### 7.1 Installation Methods (Homebrew & Cargo)
 **Priority**: Medium  
 **Dependencies**: All previous phases  
 **Estimated Time**: 1-2 days  
 **Testable**: ✅
 
 **Tasks**:
-- [ ] Create Homebrew formula
-- [ ] Package for distribution
-- [ ] Installation script
+- [x] Create Homebrew formula
+- [x] Package for distribution
+- [x] Installation script (Homebrew formula and documented Homebrew install command)
+- [ ] Document and support installation via Cargo (`cargo install ordinator`)
 
 **Tests**:
-- [ ] Homebrew installation works
-- [ ] Package installs correctly
-- [ ] All features function after installation
+- [x] Homebrew installation works
+- [ ] Cargo installation works
+- [x] Package installs correctly
+- [x] All features function after installation
 
 ### 7.2 Curl Install Script
 **Priority**: Medium  
