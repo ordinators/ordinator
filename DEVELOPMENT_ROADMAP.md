@@ -170,6 +170,8 @@ ordinator secrets list                 # Shows encrypted files
 - [x] Show secret types found (never actual values)
 - [x] Auto-scan files when adding to tracking
 - [x] Add --force flag to skip secrets scanning
+- [x] Block commits when secrets detected (unless --force)
+- [x] Scan all tracked files on commit
 
 **Tests**:
 - [x] Secrets are detected correctly
@@ -178,6 +180,10 @@ ordinator secrets list                 # Shows encrypted files
 - [x] CLI command works with verbose output
 - [x] Auto-scan works when adding files
 - [x] Force flag skips secrets scanning
+- [x] Commit blocks when secrets found
+- [x] Enhanced test coverage with 182 tests
+- [x] Fixed all clippy warnings
+- [x] Achieved 59.09% overall coverage
 
 ---
 
