@@ -315,12 +315,17 @@ pub async fn run(args: Args) -> Result<()> {
             }
             config.add_file_to_profile(&profile_name, path.clone())?;
             config.save_to_file(&config_path)?;
-            
+
             // Automatically scan the added file for secrets
             if path_obj.is_file() {
                 let base_dir = config_path.parent().unwrap().to_path_buf();
-                let manager = crate::secrets::SecretsManager::new(None, None, config.clone(), base_dir.clone());
-                
+                let manager = crate::secrets::SecretsManager::new(
+                    None,
+                    None,
+                    config.clone(),
+                    base_dir.clone(),
+                );
+
                 match manager.check_for_plaintext_secrets(path_obj) {
                     Ok(has_secrets) => {
                         if has_secrets {
@@ -333,18 +338,20 @@ pub async fn run(args: Args) -> Result<()> {
                                     eprintln!("   Found: potential secrets");
                                 }
                             }
-                            eprintln!("   Consider encrypting with: ordinator secrets encrypt {path}");
+                            eprintln!(
+                                "   Consider encrypting with: ordinator secrets encrypt {path}"
+                            );
                             eprintln!("   Use 'ordinator commit --force' to commit anyway");
                         }
                     }
                     Err(e) => {
                         if args.verbose {
-                            eprintln!("Warning: Could not scan '{path}' for secrets: {}", e);
+                            eprintln!("Warning: Could not scan '{path}' for secrets: {e}");
                         }
                     }
                 }
             }
-            
+
             println!("Added '{path}' to profile '{profile_name}'");
             Ok(())
         }
@@ -392,24 +399,33 @@ pub async fn run(args: Args) -> Result<()> {
             if !force {
                 eprintln!("[DEBUG] Scanning for secrets before commit...");
                 let base_dir = config_path.parent().unwrap().to_path_buf();
-                let manager = crate::secrets::SecretsManager::new(None, None, config.clone(), base_dir.clone());
-                
+                let manager = crate::secrets::SecretsManager::new(
+                    None,
+                    None,
+                    config.clone(),
+                    base_dir.clone(),
+                );
+
                 let mut found_secrets = false;
                 let mut files_with_secrets = Vec::new();
 
                 // Scan all tracked files for secrets
-                for (_profile_name, profile) in &config.profiles {
+                for profile in config.profiles.values() {
                     for file_path in &profile.files {
                         let full_path = base_dir.join(file_path);
-                        eprintln!("[DEBUG] Scanning file: {:?}", full_path);
+                        eprintln!("[DEBUG] Scanning file: {full_path:?}");
                         if full_path.exists() && full_path.is_file() {
                             match manager.check_for_plaintext_secrets(&full_path) {
                                 Ok(has_secrets) => {
-                                    eprintln!("[DEBUG] File {:?} has secrets: {}", full_path, has_secrets);
+                                    eprintln!(
+                                        "[DEBUG] File {full_path:?} has secrets: {has_secrets}"
+                                    );
                                     if has_secrets {
                                         found_secrets = true;
                                         files_with_secrets.push(file_path.clone());
-                                        eprintln!("⚠️  Warning: '{file_path}' contains potential secrets");
+                                        eprintln!(
+                                            "⚠️  Warning: '{file_path}' contains potential secrets"
+                                        );
                                         match manager.get_secrets_info(&full_path) {
                                             Ok(secret_types) => {
                                                 eprintln!("   Found: {}", secret_types.join(", "));
@@ -421,19 +437,23 @@ pub async fn run(args: Args) -> Result<()> {
                                     }
                                 }
                                 Err(e) => {
-                                    eprintln!("[DEBUG] Error scanning file {:?}: {}", full_path, e);
+                                    eprintln!("[DEBUG] Error scanning file {full_path:?}: {e}");
                                     if args.verbose {
-                                        eprintln!("Warning: Could not scan '{file_path}' for secrets: {}", e);
+                                        eprintln!(
+                                            "Warning: Could not scan '{file_path}' for secrets: {e}"
+                                        );
                                     }
                                 }
                             }
                         } else {
-                            eprintln!("[DEBUG] File does not exist or is not a file: {:?}", full_path);
+                            eprintln!(
+                                "[DEBUG] File does not exist or is not a file: {full_path:?}"
+                            );
                         }
                     }
                 }
 
-                eprintln!("[DEBUG] Found secrets: {}", found_secrets);
+                eprintln!("[DEBUG] Found secrets: {found_secrets}");
                 if found_secrets {
                     eprintln!("⚠️  Plaintext secrets detected in tracked files");
                     eprintln!("   Consider encrypting with: ordinator secrets encrypt <file>");
@@ -667,8 +687,14 @@ pub async fn run(args: Args) -> Result<()> {
                 config.profiles.contains_key(&profile)
             );
             eprintln!("[DEBUG] Available profiles: {:?}", config.list_profiles());
-            eprintln!("[DEBUG] Profile files count: {}", config.get_profile(&profile).unwrap().files.len());
-            eprintln!("[DEBUG] Profile files: {:?}", config.get_profile(&profile).unwrap().files);
+            eprintln!(
+                "[DEBUG] Profile files count: {}",
+                config.get_profile(&profile).unwrap().files.len()
+            );
+            eprintln!(
+                "[DEBUG] Profile files: {:?}",
+                config.get_profile(&profile).unwrap().files
+            );
 
             // Debug: print config file content
             match std::fs::read_to_string(&config_path) {
@@ -1107,8 +1133,13 @@ pub async fn run(args: Args) -> Result<()> {
             SecretCommands::Scan { profile, verbose } => {
                 let (config, config_path) = Config::load()?;
                 let base_dir = config_path.parent().unwrap().to_path_buf();
-                let manager = crate::secrets::SecretsManager::new(None, None, config.clone(), base_dir.clone());
-                
+                let manager = crate::secrets::SecretsManager::new(
+                    None,
+                    None,
+                    config.clone(),
+                    base_dir.clone(),
+                );
+
                 let profiles_to_scan = if let Some(profile_name) = profile {
                     if !config.profiles.contains_key(&profile_name) {
                         eprintln!("Scan failed: Profile '{profile_name}' does not exist.");
@@ -1116,7 +1147,11 @@ pub async fn run(args: Args) -> Result<()> {
                     }
                     vec![profile_name]
                 } else {
-                    config.list_profiles().into_iter().map(|s| s.to_string()).collect()
+                    config
+                        .list_profiles()
+                        .into_iter()
+                        .map(|s| s.to_string())
+                        .collect()
                 };
 
                 let mut found_secrets = false;
@@ -1127,11 +1162,11 @@ pub async fn run(args: Args) -> Result<()> {
                         if !args.quiet {
                             eprintln!("Scanning profile: {profile_name}");
                         }
-                        
+
                         for file_path in &profile.files {
                             total_files_scanned += 1;
                             let full_path = base_dir.join(file_path);
-                            
+
                             if full_path.exists() && full_path.is_file() {
                                 match manager.check_for_plaintext_secrets(&full_path) {
                                     Ok(has_secrets) => {
@@ -1145,17 +1180,19 @@ pub async fn run(args: Args) -> Result<()> {
                                                                  file_path, secret_types.join(", "));
                                                     }
                                                     Err(_) => {
-                                                        eprintln!("⚠️  Potential secrets found in: {}", file_path);
+                                                        eprintln!(
+                                                            "⚠️  Potential secrets found in: {file_path}"
+                                                        );
                                                     }
                                                 }
                                             } else {
-                                                eprintln!("⚠️  {}", file_path);
+                                                eprintln!("⚠️  {file_path}");
                                             }
                                         }
                                     }
                                     Err(e) => {
                                         if verbose {
-                                            eprintln!("Error scanning {}: {}", file_path, e);
+                                            eprintln!("Error scanning {file_path}: {e}");
                                         }
                                     }
                                 }
@@ -1166,7 +1203,9 @@ pub async fn run(args: Args) -> Result<()> {
 
                 if !found_secrets {
                     if !args.quiet {
-                        eprintln!("✅ No plaintext secrets found in {} files", total_files_scanned);
+                        eprintln!(
+                            "✅ No plaintext secrets found in {total_files_scanned} files"
+                        );
                     }
                 } else {
                     if !args.quiet {

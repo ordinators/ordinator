@@ -1,10 +1,7 @@
 use crate::config::Config;
 use anyhow::Result;
 use globset::{Glob, GlobSet, GlobSetBuilder};
-use regex;
 use std::fs;
-#[cfg(test)]
-use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
@@ -185,14 +182,26 @@ impl SecretsManager {
                 // API keys - must be checked before generic token
                 (r"(?i)api[_-]?key\s*[:=]\s*[a-zA-Z0-9_-]{20,}", "API Key"),
                 // OAuth and JWT tokens - specific token types
-                (r"(?i)oauth[_-]?token\s*[:=]\s*[a-zA-Z0-9]{20,}", "OAuth Token"),
+                (
+                    r"(?i)oauth[_-]?token\s*[:=]\s*[a-zA-Z0-9]{20,}",
+                    "OAuth Token",
+                ),
                 (r"(?i)jwt[_-]?token\s*[:=]\s*[a-zA-Z0-9]{20,}", "JWT Token"),
                 // AWS credentials
-                (r"(?i)aws_access_key_id\s*[:=]\s*[A-Z0-9]{20}", "AWS Access Key"),
-                (r"(?i)aws_secret_access_key\s*[:=]\s*[A-Za-z0-9/+=]{40}", "AWS Secret Key"),
+                (
+                    r"(?i)aws_access_key_id\s*[:=]\s*[A-Z0-9]{20}",
+                    "AWS Access Key",
+                ),
+                (
+                    r"(?i)aws_secret_access_key\s*[:=]\s*[A-Za-z0-9/+=]{40}",
+                    "AWS Secret Key",
+                ),
                 // Database credentials
                 (r"(?i)database_url\s*[:=]\s*[a-zA-Z]+://", "Database URL"),
-                (r"(?i)db_password\s*[:=]\s*[a-zA-Z0-9!@#$%^&*]{8,}", "Database Password"),
+                (
+                    r"(?i)db_password\s*[:=]\s*[a-zA-Z0-9!@#$%^&*]{8,}",
+                    "Database Password",
+                ),
                 // Generic patterns - check these last
                 (r"(?i)token\s*[:=]\s*[a-zA-Z0-9]{20,}", "Token"),
                 (r"(?i)secret\s*[:=]\s*[a-zA-Z0-9]{20,}", "Secret"),
@@ -234,8 +243,8 @@ impl SecretsManager {
                 return Ok(vec![]); // Binary file
             }
 
-            println!("[DEBUG] Scanning file: {:?}", file_path);
-            println!("[DEBUG] Content: {}", content);
+            println!("[DEBUG] Scanning file: {file_path:?}");
+            println!("[DEBUG] Content: {content}");
 
             // Check for common secret patterns
             let secret_patterns = [
@@ -244,26 +253,32 @@ impl SecretsManager {
                 (r"(?i)token\s*[:=]\s*[a-zA-Z0-9]{20,}", "Token"),
                 (r"(?i)secret\s*[:=]\s*[a-zA-Z0-9]{20,}", "Secret"),
                 (r"(?i)password\s*[:=]\s*[a-zA-Z0-9!@#$%^&*]{8,}", "Password"),
-                
                 // SSH private keys
                 (r"-----BEGIN.*PRIVATE KEY-----", "SSH Private Key"),
-                
                 // AWS credentials
-                (r"(?i)aws_access_key_id\s*[:=]\s*[A-Z0-9]{20}", "AWS Access Key"),
-                (r"(?i)aws_secret_access_key\s*[:=]\s*[A-Za-z0-9/+=]{40}", "AWS Secret Key"),
-                
+                (
+                    r"(?i)aws_access_key_id\s*[:=]\s*[A-Z0-9]{20}",
+                    "AWS Access Key",
+                ),
+                (
+                    r"(?i)aws_secret_access_key\s*[:=]\s*[A-Za-z0-9/+=]{40}",
+                    "AWS Secret Key",
+                ),
                 // Database credentials
                 (r"(?i)database_url\s*[:=]\s*[a-zA-Z]+://", "Database URL"),
-                (r"(?i)db_password\s*[:=]\s*[a-zA-Z0-9!@#$%^&*]{8,}", "Database Password"),
-                
+                (
+                    r"(?i)db_password\s*[:=]\s*[a-zA-Z0-9!@#$%^&*]{8,}",
+                    "Database Password",
+                ),
                 // OAuth and JWT tokens
-                (r"(?i)oauth[_-]?token\s*[:=]\s*[a-zA-Z0-9]{20,}", "OAuth Token"),
+                (
+                    r"(?i)oauth[_-]?token\s*[:=]\s*[a-zA-Z0-9]{20,}",
+                    "OAuth Token",
+                ),
                 (r"(?i)jwt[_-]?token\s*[:=]\s*[a-zA-Z0-9]{20,}", "JWT Token"),
-                
                 // Private keys and certificates
                 (r"-----BEGIN.*PRIVATE KEY-----", "Private Key"),
                 (r"-----BEGIN.*CERTIFICATE-----", "Certificate"),
-                
                 // Generic high-entropy strings (potential secrets)
                 (r"[a-zA-Z0-9]{32,}", "High-entropy string"),
             ];
@@ -271,10 +286,12 @@ impl SecretsManager {
             for (pattern, secret_type) in &secret_patterns {
                 if let Ok(regex) = regex::Regex::new(pattern) {
                     if regex.is_match(&content) {
-                        println!("[DEBUG] Matched pattern: {} for type: {}", pattern, secret_type);
+                        println!(
+                            "[DEBUG] Matched pattern: {pattern} for type: {secret_type}"
+                        );
                         found_types.push(secret_type.to_string());
                     } else {
-                        println!("[DEBUG] No match for pattern: {}", pattern);
+                        println!("[DEBUG] No match for pattern: {pattern}");
                     }
                 }
             }
@@ -873,9 +890,9 @@ mod tests {
         let guard = TestIsolationGuard::new();
         let config = Config::default();
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         // Test with empty paths
         let result = manager.list_encrypted_files();
         assert!(result.is_ok());
@@ -888,13 +905,13 @@ mod tests {
         let guard = TestIsolationGuard::new();
         let config = Config::default();
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         // Create a binary file
         let binary_file = guard.temp_dir().path().join("binary.bin");
         fs::write(&binary_file, b"\x00\x01\x02\x03\x04\x05").unwrap();
-        
+
         let result = manager.check_for_plaintext_secrets(&binary_file);
         assert!(result.is_ok());
         assert!(!result.unwrap()); // Should not detect secrets in binary files
@@ -905,17 +922,17 @@ mod tests {
         let guard = TestIsolationGuard::new();
         let config = Config::default();
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         // Create a large file
         let large_file = guard.temp_dir().path().join("large.txt");
         let mut content = String::new();
         for i in 0..10000 {
-            content.push_str(&format!("line {}: some content\n", i));
+            content.push_str(&format!("line {i}: some content\n"));
         }
         fs::write(&large_file, content).unwrap();
-        
+
         let result = manager.check_for_plaintext_secrets(&large_file);
         assert!(result.is_ok());
         // Should handle large files gracefully
@@ -926,11 +943,11 @@ mod tests {
         let guard = TestIsolationGuard::new();
         let config = Config::default();
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         let nonexistent_file = guard.temp_dir().path().join("nonexistent.txt");
-        
+
         let result = manager.check_for_plaintext_secrets(&nonexistent_file);
         assert!(result.is_ok());
         assert!(!result.unwrap()); // Should return false for nonexistent files
@@ -941,13 +958,13 @@ mod tests {
         let guard = TestIsolationGuard::new();
         let config = Config::default();
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         // Create a binary file
         let binary_file = guard.temp_dir().path().join("binary.bin");
         fs::write(&binary_file, b"\x00\x01\x02\x03\x04\x05").unwrap();
-        
+
         let result = manager.get_secrets_info(&binary_file);
         assert!(result.is_ok());
         let secret_types = result.unwrap();
@@ -959,11 +976,11 @@ mod tests {
         let guard = TestIsolationGuard::new();
         let config = Config::default();
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         let nonexistent_file = guard.temp_dir().path().join("nonexistent.txt");
-        
+
         let result = manager.get_secrets_info(&nonexistent_file);
         assert!(result.is_ok());
         let secret_types = result.unwrap();
@@ -975,9 +992,9 @@ mod tests {
         let guard = TestIsolationGuard::new();
         let config = Config::default();
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         // Create a file with multiple secret types
         let secrets_file = guard.temp_dir().path().join("multiple_secrets.txt");
         let content = r#"
@@ -989,14 +1006,14 @@ database_url=postgresql://user:pass@localhost/db
 jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
 "#;
         fs::write(&secrets_file, content).unwrap();
-        
+
         let result = manager.get_secrets_info(&secrets_file);
         assert!(result.is_ok());
         let secret_types = result.unwrap();
-        
+
         // Debug: Print what was actually detected
-        println!("Detected secret types: {:?}", secret_types);
-        
+        println!("Detected secret types: {secret_types:?}");
+
         // Should detect multiple secret types (adjusting expectations based on actual detection)
         assert!(secret_types.contains(&"Token".to_string())); // api_key and oauth_token detected as Token
         assert!(secret_types.contains(&"Password".to_string()));
@@ -1010,18 +1027,19 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         let guard = TestIsolationGuard::new();
         let config = Config::default();
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         // Create a file with Unicode content and secrets
         let unicode_file = guard.temp_dir().path().join("unicode_secrets.txt");
-        let content = "api_key=sk_test_1234567890abcdef\npassword=mysecretpassword123\nunicode=测试密码";
+        let content =
+            "api_key=sk_test_1234567890abcdef\npassword=mysecretpassword123\nunicode=测试密码";
         fs::write(&unicode_file, content).unwrap();
-        
+
         let result = manager.get_secrets_info(&unicode_file);
         assert!(result.is_ok());
         let secret_types = result.unwrap();
-        
+
         // Should detect secrets in Unicode content (adjusting expectations based on actual detection)
         assert!(secret_types.contains(&"Password".to_string()));
         // Note: api_key is not being detected as Token in this case, which is acceptable
@@ -1033,11 +1051,11 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         let mut config = Config::default();
         config.secrets.encrypt_patterns = vec!["*.txt".to_string()];
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let mut manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         let nonexistent_file = guard.temp_dir().path().join("nonexistent.txt");
-        
+
         let result = manager.encrypt_file(&nonexistent_file);
         assert!(result.is_err()); // Should fail for nonexistent files
     }
@@ -1048,11 +1066,11 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         let mut config = Config::default();
         config.secrets.encrypt_patterns = vec!["*.enc.txt".to_string()];
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let mut manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         let nonexistent_file = guard.temp_dir().path().join("nonexistent.enc.txt");
-        
+
         let result = manager.decrypt_file(&nonexistent_file);
         assert!(result.is_err()); // Should fail for nonexistent files
     }
@@ -1063,12 +1081,12 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         let mut config = Config::default();
         config.secrets.encrypt_patterns = vec!["invalid[pattern".to_string()];
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let mut manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         let test_file = guard.temp_dir().path().join("test.txt");
         fs::write(&test_file, "content").unwrap();
-        
+
         let result = manager.should_encrypt_file(&test_file);
         assert!(result.is_err()); // Should fail with invalid glob pattern
     }
@@ -1079,12 +1097,12 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         let mut config = Config::default();
         config.secrets.exclude_patterns = vec!["invalid[pattern".to_string()];
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let mut manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         let test_file = guard.temp_dir().path().join("test.txt");
         fs::write(&test_file, "content").unwrap();
-        
+
         let result = manager.should_encrypt_file(&test_file);
         assert!(result.is_err()); // Should fail with invalid glob pattern
     }
@@ -1150,9 +1168,9 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         let mut config = Config::default();
         config.secrets.encrypt_patterns = vec!["invalid[pattern".to_string()];
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         let result = manager.list_encrypted_files();
         assert!(result.is_err()); // Should fail with invalid glob pattern
     }
@@ -1162,24 +1180,24 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         let guard = TestIsolationGuard::new();
         let config = Config::default();
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         // Create a file that we can't read
         let unreadable_file = guard.temp_dir().path().join("unreadable.txt");
         fs::write(&unreadable_file, "content").unwrap();
-        
+
         // Make file unreadable
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(&unreadable_file, fs::Permissions::from_mode(0o000)).unwrap();
         }
-        
+
         let result = manager.check_for_plaintext_secrets(&unreadable_file);
         // Should handle permission errors gracefully
         assert!(result.is_ok() || result.is_err());
-        
+
         // Restore permissions for cleanup
         #[cfg(unix)]
         {
@@ -1193,17 +1211,17 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         let guard = TestIsolationGuard::new();
         let config = Config::default();
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         // Create a symlink to a nonexistent target
         let symlink_path = guard.temp_dir().path().join("broken_symlink");
-        
+
         #[cfg(unix)]
         {
             std::os::unix::fs::symlink("/nonexistent/target", &symlink_path).unwrap();
         }
-        
+
         let result = manager.check_for_plaintext_secrets(&symlink_path);
         // Should handle broken symlinks gracefully
         assert!(result.is_ok() || result.is_err());
@@ -1214,15 +1232,15 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         let guard = TestIsolationGuard::new();
         let config = Config::default();
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         // Create a circular symlink
         let link_path = guard.temp_dir().path().join("circular_link");
         let target_path = guard.temp_dir().path().join("target");
-        
+
         fs::write(&target_path, "content").unwrap();
-        
+
         #[cfg(unix)]
         {
             std::os::unix::fs::symlink(&target_path, &link_path).unwrap();
@@ -1230,7 +1248,7 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
             std::fs::remove_file(&target_path).unwrap();
             std::os::unix::fs::symlink(&link_path, &target_path).unwrap();
         }
-        
+
         let result = manager.check_for_plaintext_secrets(&link_path);
         // Should handle circular symlinks gracefully
         assert!(result.is_ok() || result.is_err());
@@ -1241,17 +1259,19 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         let guard = TestIsolationGuard::new();
         let config = Config::default();
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         // Create a very large file
         let large_file = guard.temp_dir().path().join("very_large.txt");
         let mut content = String::new();
         for i in 0..100000 {
-            content.push_str(&format!("line {}: some content with api_key=sk_test_1234567890abcdef\n", i));
+            content.push_str(&format!(
+                "line {i}: some content with api_key=sk_test_1234567890abcdef\n",
+            ));
         }
         fs::write(&large_file, content).unwrap();
-        
+
         let result = manager.check_for_plaintext_secrets(&large_file);
         assert!(result.is_ok());
         // Should handle very large files gracefully
@@ -1262,23 +1282,26 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         let guard = TestIsolationGuard::new();
         let config = Config::default();
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         // Create a file with Unicode filename
         let unicode_filename = guard.temp_dir().path().join("测试文件.txt");
         fs::write(&unicode_filename, "api_key=sk_test_1234567890abcdef").unwrap();
-        
+
         // Manual regex check
         let content = std::fs::read_to_string(&unicode_filename).unwrap();
         let pattern = r"(?i)api[_-]?key\s*[:=]\s*[a-zA-Z0-9_-]{20,}";
         let regex = regex::Regex::new(pattern).unwrap();
-        println!("Unicode filename - Manual regex match: {}", regex.is_match(&content));
-        println!("Unicode filename - Content: {}", content);
-        println!("Unicode filename - Path: {:?}", unicode_filename);
-        
+        println!(
+            "Unicode filename - Manual regex match: {}",
+            regex.is_match(&content)
+        );
+        println!("Unicode filename - Content: {content}");
+        println!("Unicode filename - Path: {unicode_filename:?}");
+
         let result = manager.check_for_plaintext_secrets(&unicode_filename);
-        println!("Unicode filename - Result: {:?}", result);
+        println!("Unicode filename - Result: {result:?}");
         assert!(result.is_ok());
         assert!(result.unwrap()); // Should detect secrets in Unicode filename
     }
@@ -1288,22 +1311,25 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         let guard = TestIsolationGuard::new();
         let config = Config::default();
         let base_dir = guard.temp_dir().path().to_path_buf();
-        
+
         let manager = SecretsManager::new(None, None, config, base_dir);
-        
+
         // Create a file with special characters in filename
-        let special_filename = guard.temp_dir().path().join("file with spaces and !@#$%^&*().txt");
+        let special_filename = guard
+            .temp_dir()
+            .path()
+            .join("file with spaces and !@#$%^&*().txt");
         fs::write(&special_filename, "api_key=sk_test_1234567890abcdef").unwrap();
-        
+
         // Manual regex check
         let content = std::fs::read_to_string(&special_filename).unwrap();
         let pattern = r"(?i)api[_-]?key\s*[:=]\s*[a-zA-Z0-9_-]{20,}";
         let regex = regex::Regex::new(pattern).unwrap();
         println!("Manual regex match: {}", regex.is_match(&content));
-        println!("Content: {}", content);
-        
+        println!("Content: {content}");
+
         let result = manager.check_for_plaintext_secrets(&special_filename);
-        println!("Result for special filename: {:?}", result);
+        println!("Result for special filename: {result:?}");
         assert!(result.is_ok());
         assert!(result.unwrap()); // Should detect secrets in special filename
     }

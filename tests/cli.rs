@@ -34,8 +34,6 @@ impl Drop for EnvVarGuard {
     }
 }
 
-
-
 fn setup_test_environment_with_config(
     temp: &assert_fs::TempDir,
     custom_config: Option<&str>,
@@ -1135,7 +1133,8 @@ exclude_patterns = []
 "#,
         key_file.path().display()
     );
-    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, Some(&config_content));
+    let (_config_guard, _test_mode_guard) =
+        setup_test_environment_with_config(&temp, Some(&config_content));
 
     // Set PATH with RAII guard
     let _path_guard = EnvVarGuard::set("PATH", bin_dir.path());
@@ -1213,7 +1212,8 @@ exclude_patterns = []
 "#,
         key_file.path().display()
     );
-    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, Some(&config_content));
+    let (_config_guard, _test_mode_guard) =
+        setup_test_environment_with_config(&temp, Some(&config_content));
 
     // Set PATH with RAII guard
     let _path_guard = EnvVarGuard::set("PATH", bin_dir.path());
@@ -1909,34 +1909,33 @@ directories = ["directory-émojis-🚀"]
 fn test_add_file_with_permission_denied() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     // Create a file that we can't read
     let test_file = temp.path().join("unreadable.txt");
     fs::write(&test_file, "test content").unwrap();
-    
+
     // Make file unreadable
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        if let Err(_) = fs::set_permissions(&test_file, fs::Permissions::from_mode(0o000)) {
+        if fs::set_permissions(&test_file, fs::Permissions::from_mode(0o000)).is_err() {
             // If we can't set permissions to 000, skip this test
             return;
         }
     }
-    
+
     let mut cmd = create_ordinator_command(&temp);
-    cmd.arg("add")
-        .arg(test_file.to_str().unwrap());
-    
+    cmd.arg("add").arg(test_file.to_str().unwrap());
+
     let output = cmd.unwrap();
     // The add command only checks if the file exists, not if it's readable
     // So it should succeed even with permission issues
     assert!(output.status.success());
-    
+
     // Restore permissions for cleanup
     #[cfg(unix)]
     {
-        if let Err(_) = fs::set_permissions(&test_file, fs::Permissions::from_mode(0o644)) {
+        if fs::set_permissions(&test_file, fs::Permissions::from_mode(0o644)).is_err() {
             // Ignore cleanup errors
         }
     }
@@ -1946,11 +1945,10 @@ fn test_add_file_with_permission_denied() {
 fn test_add_file_with_invalid_unicode_path() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     let mut cmd = create_ordinator_command(&temp);
-    cmd.arg("add")
-        .arg("invalid\u{FFFE}path");
-    
+    cmd.arg("add").arg("invalid\u{FFFE}path");
+
     cmd.assert()
         .failure()
         .stderr(predicates::str::contains("does not exist on disk"));
@@ -1960,17 +1958,15 @@ fn test_add_file_with_invalid_unicode_path() {
 fn test_commit_with_empty_message() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     // Initialize a proper Git repository using the CLI
     let mut init_cmd = create_ordinator_command(&temp);
     init_cmd.arg("init");
     init_cmd.unwrap();
-    
+
     let mut cmd = create_ordinator_command(&temp);
-    cmd.arg("commit")
-        .arg("-m")
-        .arg("");
-    
+    cmd.arg("commit").arg("-m").arg("");
+
     cmd.assert()
         .failure()
         .stderr(predicates::str::contains("Commit message cannot be empty"));
@@ -1980,40 +1976,38 @@ fn test_commit_with_empty_message() {
 fn test_commit_with_secrets_detection_edge_cases() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     // Initialize a proper Git repository using the CLI
     let mut init_cmd = create_ordinator_command(&temp);
     init_cmd.arg("init");
     init_cmd.unwrap();
-    
+
     // Create files with various secret patterns
     let files_dir = temp.path().join("files");
     fs::create_dir_all(&files_dir).unwrap();
-    
+
     let test_files = [
         ("api_keys.txt", "api_key=sk_test_1234567890abcdef"),
         ("passwords.txt", "password=mysecretpassword123"),
         ("tokens.txt", "oauth_token=ghp_1234567890abcdef"),
         ("aws.txt", "aws_access_key_id=AKIA1234567890ABCDEF"),
     ];
-    
+
     for (filename, content) in test_files {
         let file_path = files_dir.join(filename);
         fs::write(&file_path, content).unwrap();
     }
-    
+
     // Add all files to the default profile so they get scanned
     for (filename, _) in test_files.iter() {
         let mut add_cmd = create_ordinator_command(&temp);
-        add_cmd.arg("add").arg(format!("files/{}", filename));
+        add_cmd.arg("add").arg(format!("files/{filename}"));
         add_cmd.unwrap();
     }
-    
+
     let mut cmd = create_ordinator_command(&temp);
-    cmd.arg("commit")
-        .arg("-m")
-        .arg("Test commit with secrets");
-    
+    cmd.arg("commit").arg("-m").arg("Test commit with secrets");
+
     cmd.assert()
         .failure()
         .stderr(predicates::str::contains("Plaintext secrets detected"));
@@ -2023,20 +2017,18 @@ fn test_commit_with_secrets_detection_edge_cases() {
 fn test_commit_with_very_long_message() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     // Initialize a proper Git repository using the CLI
     let mut init_cmd = create_ordinator_command(&temp);
     init_cmd.arg("init");
     init_cmd.unwrap();
-    
+
     // Create a very long commit message
     let long_message = "a".repeat(10000);
-    
+
     let mut cmd = create_ordinator_command(&temp);
-    cmd.arg("commit")
-        .arg("-m")
-        .arg(&long_message);
-    
+    cmd.arg("commit").arg("-m").arg(&long_message);
+
     let output = cmd.unwrap();
     // Should handle long messages gracefully
     assert!(output.status.success() || !output.status.success());
@@ -2046,19 +2038,17 @@ fn test_commit_with_very_long_message() {
 fn test_commit_with_special_characters_in_message() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     // Initialize a proper Git repository using the CLI
     let mut init_cmd = create_ordinator_command(&temp);
     init_cmd.arg("init");
     init_cmd.unwrap();
-    
+
     let special_message = "Commit with special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?";
-    
+
     let mut cmd = create_ordinator_command(&temp);
-    cmd.arg("commit")
-        .arg("-m")
-        .arg(special_message);
-    
+    cmd.arg("commit").arg("-m").arg(special_message);
+
     let output = cmd.unwrap();
     // Should handle special characters gracefully
     assert!(output.status.success() || !output.status.success());
@@ -2068,24 +2058,24 @@ fn test_commit_with_special_characters_in_message() {
 fn test_commit_with_force_flag_bypasses_secrets_check() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     // Initialize a proper Git repository using the CLI
     let mut init_cmd = create_ordinator_command(&temp);
     init_cmd.arg("init");
     init_cmd.unwrap();
-    
+
     // Create a file with secrets
     let files_dir = temp.path().join("files");
     fs::create_dir_all(&files_dir).unwrap();
     let secret_file = files_dir.join("secret.txt");
     fs::write(&secret_file, "api_key=sk_test_1234567890abcdef").unwrap();
-    
+
     let mut cmd = create_ordinator_command(&temp);
     cmd.arg("commit")
         .arg("-m")
         .arg("Force commit with secrets")
         .arg("--force");
-    
+
     let output = cmd.unwrap();
     // Should bypass secrets check with --force
     assert!(output.status.success());
@@ -2095,17 +2085,16 @@ fn test_commit_with_force_flag_bypasses_secrets_check() {
 fn test_secrets_scan_with_binary_file() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     // Create a binary file
     let files_dir = temp.path().join("files");
     fs::create_dir_all(&files_dir).unwrap();
     let binary_file = files_dir.join("binary.bin");
     fs::write(&binary_file, b"\x00\x01\x02\x03\x04\x05").unwrap();
-    
+
     let mut cmd = create_ordinator_command(&temp);
-    cmd.arg("secrets")
-        .arg("scan");
-    
+    cmd.arg("secrets").arg("scan");
+
     let output = cmd.unwrap();
     // Should handle binary files gracefully
     assert!(output.status.success() || !output.status.success());
@@ -2115,22 +2104,21 @@ fn test_secrets_scan_with_binary_file() {
 fn test_secrets_scan_with_large_file() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     // Create a large file (simulate by creating a file with many lines)
     let files_dir = temp.path().join("files");
     fs::create_dir_all(&files_dir).unwrap();
     let large_file = files_dir.join("large.txt");
-    
+
     let mut content = String::new();
     for i in 0..10000 {
-        content.push_str(&format!("line {}: some content\n", i));
+        content.push_str(&format!("line {i}: some content\n"));
     }
     fs::write(&large_file, content).unwrap();
-    
+
     let mut cmd = create_ordinator_command(&temp);
-    cmd.arg("secrets")
-        .arg("scan");
-    
+    cmd.arg("secrets").arg("scan");
+
     let output = cmd.unwrap();
     // Should handle large files gracefully
     assert!(output.status.success() || !output.status.success());
@@ -2140,16 +2128,16 @@ fn test_secrets_scan_with_large_file() {
 fn test_add_file_with_unicode_secrets() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     // Create a file with Unicode characters and secrets
     let test_file = temp.path().join("unicode_secrets.txt");
-    let content = "api_key=sk_test_1234567890abcdef\npassword=mysecretpassword123\nunicode=测试密码";
+    let content =
+        "api_key=sk_test_1234567890abcdef\npassword=mysecretpassword123\nunicode=测试密码";
     fs::write(&test_file, content).unwrap();
-    
+
     let mut cmd = create_ordinator_command(&temp);
-    cmd.arg("add")
-        .arg(test_file.to_str().unwrap());
-    
+    cmd.arg("add").arg(test_file.to_str().unwrap());
+
     let output = cmd.unwrap();
     // Should detect secrets in Unicode content
     assert!(output.status.success());
@@ -2161,28 +2149,26 @@ fn test_add_file_with_unicode_secrets() {
 fn test_secrets_scan_with_nonexistent_profile() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     let mut cmd = create_ordinator_command(&temp);
     cmd.arg("secrets")
         .arg("scan")
         .arg("--profile")
         .arg("nonexistent");
-    
-    cmd.assert()
-        .failure()
-        .stderr(predicates::str::contains("Profile 'nonexistent' does not exist"));
+
+    cmd.assert().failure().stderr(predicates::str::contains(
+        "Profile 'nonexistent' does not exist",
+    ));
 }
 
 #[test]
 fn test_secrets_scan_with_verbose_output() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     let mut cmd = create_ordinator_command(&temp);
-    cmd.arg("secrets")
-        .arg("scan")
-        .arg("--verbose");
-    
+    cmd.arg("secrets").arg("scan").arg("--verbose");
+
     let output = cmd.unwrap();
     // Should succeed when no secrets are found
     assert!(output.status.success());
@@ -2192,107 +2178,100 @@ fn test_secrets_scan_with_verbose_output() {
 fn test_secrets_encrypt_with_nonexistent_file() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     // Create a file that matches encryption patterns so the command will actually try to encrypt it
     let files_dir = temp.path().join("files");
     fs::create_dir_all(&files_dir).unwrap();
     let test_file = files_dir.join("secrets.yaml");
     fs::write(&test_file, "api_key: test_key").unwrap();
-    
+
     let mut cmd = create_ordinator_command(&temp);
-    cmd.arg("secrets")
-        .arg("encrypt")
-        .arg("nonexistent.txt");
-    
-    cmd.assert()
-        .failure()
-        .stderr(predicates::str::contains("Encryption failed: File 'nonexistent.txt' does not exist"));
+    cmd.arg("secrets").arg("encrypt").arg("nonexistent.txt");
+
+    cmd.assert().failure().stderr(predicates::str::contains(
+        "Encryption failed: File 'nonexistent.txt' does not exist",
+    ));
 }
 
 #[test]
 fn test_secrets_decrypt_with_nonexistent_file() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     // Create a file that matches encryption patterns so the command will actually try to decrypt it
     let files_dir = temp.path().join("files");
     fs::create_dir_all(&files_dir).unwrap();
     let test_file = files_dir.join("secrets.yaml");
     fs::write(&test_file, "api_key: test_key").unwrap();
-    
+
     let mut cmd = create_ordinator_command(&temp);
-    cmd.arg("secrets")
-        .arg("decrypt")
-        .arg("nonexistent.txt");
-    
-    cmd.assert()
-        .failure()
-        .stderr(predicates::str::contains("Decryption failed: File 'nonexistent.txt' does not exist"));
+    cmd.arg("secrets").arg("decrypt").arg("nonexistent.txt");
+
+    cmd.assert().failure().stderr(predicates::str::contains(
+        "Decryption failed: File 'nonexistent.txt' does not exist",
+    ));
 }
 
 #[test]
 fn test_secrets_setup_with_invalid_profile() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     let mut cmd = create_ordinator_command(&temp);
     cmd.arg("secrets")
         .arg("setup")
         .arg("--profile")
         .arg("invalid/profile/name");
-    
-    cmd.assert()
-        .failure()
-        .stderr(predicates::str::contains("Setup failed: Invalid profile name"));
+
+    cmd.assert().failure().stderr(predicates::str::contains(
+        "Setup failed: Invalid profile name",
+    ));
 }
 
 #[test]
 fn test_apply_with_nonexistent_profile() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     let mut cmd = create_ordinator_command(&temp);
-    cmd.arg("apply")
-        .arg("--profile")
-        .arg("nonexistent");
-    
-    cmd.assert()
-        .failure()
-        .stderr(predicates::str::contains("Profile 'nonexistent' does not exist"));
+    cmd.arg("apply").arg("--profile").arg("nonexistent");
+
+    cmd.assert().failure().stderr(predicates::str::contains(
+        "Profile 'nonexistent' does not exist",
+    ));
 }
 
 #[test]
 fn test_secrets_scan_with_multiple_secret_types() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     // Create files with various secret patterns
     let files_dir = temp.path().join("files");
     fs::create_dir_all(&files_dir).unwrap();
-    
+
     let test_files = [
         ("api_keys.txt", "api_key=sk_test_1234567890abcdef"),
         ("passwords.txt", "password=mysecretpassword123"),
         ("tokens.txt", "oauth_token=ghp_1234567890abcdef"),
         ("aws.txt", "aws_access_key_id=AKIA1234567890ABCDEF"),
     ];
-    
+
     for (filename, content) in test_files {
         let file_path = files_dir.join(filename);
         fs::write(&file_path, content).unwrap();
     }
-    
+
     // Add all files to the default profile so they get scanned
     for (filename, _) in test_files.iter() {
         let mut add_cmd = create_ordinator_command(&temp);
-        add_cmd.arg("add").arg(format!("files/{}", filename));
+        add_cmd.arg("add").arg(format!("files/{filename}"));
         add_cmd.unwrap();
     }
-    
+
     let mut cmd = create_ordinator_command(&temp);
-    cmd.arg("secrets")
-        .arg("scan");
-    
+    cmd.arg("secrets").arg("scan");
+
     cmd.assert()
         .failure()
         .stderr(predicates::str::contains("Plaintext secrets detected"));
@@ -2302,10 +2281,10 @@ fn test_secrets_scan_with_multiple_secret_types() {
 fn test_profiles_success() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     let mut cmd = create_ordinator_command(&temp);
     cmd.arg("profiles");
-    
+
     cmd.assert()
         .success()
         .stderr(contains("default"))
@@ -2317,10 +2296,10 @@ fn test_profiles_success() {
 fn test_profiles_verbose() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     let mut cmd = create_ordinator_command(&temp);
     cmd.arg("profiles").arg("--verbose");
-    
+
     cmd.assert()
         .success()
         .stderr(contains("Default profile for basic dotfiles"))
@@ -2332,18 +2311,22 @@ fn test_profiles_verbose() {
 fn test_profiles_with_config() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     // Add some files to make profiles more interesting
     let test_file = temp.child("test.txt");
     test_file.touch().unwrap();
-    
+
     let mut add_cmd = create_ordinator_command(&temp);
-    add_cmd.arg("add").arg("test.txt").arg("--profile").arg("work");
+    add_cmd
+        .arg("add")
+        .arg("test.txt")
+        .arg("--profile")
+        .arg("work");
     add_cmd.unwrap();
-    
+
     let mut cmd = create_ordinator_command(&temp);
     cmd.arg("profiles").arg("--verbose");
-    
+
     cmd.assert()
         .success()
         .stderr(contains("work"))
@@ -2353,27 +2336,31 @@ fn test_profiles_with_config() {
 #[test]
 fn test_apply_with_secrets_decryption() {
     let temp = assert_fs::TempDir::new().unwrap();
-    
+
     // Create a dummy sops in a temp bin dir
     let bin_dir = temp.child("bin");
     bin_dir.create_dir_all().unwrap();
     let sops_path = bin_dir.child("sops");
-    sops_path.write_str("#!/bin/sh\necho 'decrypted content'\n").unwrap();
+    sops_path
+        .write_str("#!/bin/sh\necho 'decrypted content'\n")
+        .unwrap();
     fs::set_permissions(sops_path.path(), fs::Permissions::from_mode(0o755)).unwrap();
     let age_path = bin_dir.child("age");
     age_path.write_str("#!/bin/sh\nexit 0\n").unwrap();
     fs::set_permissions(age_path.path(), fs::Permissions::from_mode(0o755)).unwrap();
-    
+
     // Create the files directory and encrypted file
     let files_dir = temp.child("files");
     files_dir.create_dir_all().unwrap();
     let encrypted_file = files_dir.child("secret.txt.enc");
     encrypted_file.write_str("encrypted content").unwrap();
-    
+
     // Create a dummy age key file
     let key_file = temp.child("age.key");
-    key_file.write_str("# public key: age1testkey\nAGE-SECRET-KEY-1TEST\n").unwrap();
-    
+    key_file
+        .write_str("# public key: age1testkey\nAGE-SECRET-KEY-1TEST\n")
+        .unwrap();
+
     // Create custom config with secrets and the encrypted file
     let custom_config = format!(
         r#"
@@ -2398,23 +2385,23 @@ exclude_patterns = []
 "#,
         key_file.path().display()
     );
-    
+
     // Set up environment with custom config
-    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, Some(&custom_config));
+    let (_config_guard, _test_mode_guard) =
+        setup_test_environment_with_config(&temp, Some(&custom_config));
     let _path_guard = EnvVarGuard::set("PATH", bin_dir.path());
-    
+
     let mut cmd = create_ordinator_command(&temp);
     cmd.env("PATH", bin_dir.path());
     cmd.arg("apply").arg("--force");
-    
-    cmd.assert()
-        .success();
-    
+
+    cmd.assert().success();
+
     // Check that the symlink was created correctly
     let symlink_path = temp.path().join("secret.txt.enc");
     assert!(symlink_path.exists());
     assert!(symlink_path.is_symlink());
-    
+
     // Check that the symlink points to the correct target
     let target = std::fs::read_link(&symlink_path).unwrap();
     assert_eq!(target, temp.path().join("files").join("secret.txt.enc"));
@@ -2424,11 +2411,11 @@ exclude_patterns = []
 fn test_apply_skip_secrets() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     // Create an encrypted file
     let encrypted_file = temp.child("secret.txt.enc");
     encrypted_file.write_str("encrypted content").unwrap();
-    
+
     // Update config to include the encrypted file
     let config_file = temp.child("ordinator.toml");
     let config_content = r#"
@@ -2450,10 +2437,10 @@ encrypt_patterns = ["*.enc"]
 exclude_patterns = []
 "#;
     std::fs::write(config_file.path(), config_content).unwrap();
-    
+
     let mut cmd = create_ordinator_command(&temp);
     cmd.arg("apply").arg("--skip-secrets").arg("--force");
-    
+
     cmd.assert()
         .success()
         .stderr(predicates::str::contains("Skipping secrets"));
@@ -2462,12 +2449,12 @@ exclude_patterns = []
 #[test]
 fn test_secrets_encrypt_with_permission_error() {
     let temp = assert_fs::TempDir::new().unwrap();
-    
+
     // Create a file with no write permissions
     let test_file = temp.child("readonly.txt.enc");
     test_file.write_str("test content").unwrap();
     fs::set_permissions(test_file.path(), fs::Permissions::from_mode(0o444)).unwrap();
-    
+
     // Create custom config with encrypt_patterns
     let custom_config = r#"
 [global]
@@ -2487,8 +2474,9 @@ exclude = []
 encrypt_patterns = ["*.enc"]
 exclude_patterns = []
 "#;
-    
-    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, Some(custom_config));
+
+    let (_config_guard, _test_mode_guard) =
+        setup_test_environment_with_config(&temp, Some(custom_config));
     let mut cmd = create_ordinator_command(&temp);
     cmd.arg("secrets").arg("encrypt").arg("readonly.txt.enc");
     cmd.assert()
@@ -2499,18 +2487,18 @@ exclude_patterns = []
 #[test]
 fn test_secrets_decrypt_with_corrupted_file() {
     let temp = assert_fs::TempDir::new().unwrap();
-    
+
     // Create a dummy sops that fails on decrypt
     let bin_dir = temp.child("bin");
     bin_dir.create_dir_all().unwrap();
     let sops_path = bin_dir.child("sops");
     sops_path.write_str("#!/bin/sh\nexit 1\n").unwrap();
     fs::set_permissions(sops_path.path(), fs::Permissions::from_mode(0o755)).unwrap();
-    
+
     // Create a corrupted encrypted file
     let corrupted_file = temp.child("corrupted.txt.enc");
     corrupted_file.write_str("corrupted content").unwrap();
-    
+
     // Create custom config with encrypt_patterns
     let custom_config = r#"
 [global]
@@ -2530,8 +2518,9 @@ exclude = []
 encrypt_patterns = ["*.enc"]
 exclude_patterns = []
 "#;
-    
-    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, Some(custom_config));
+
+    let (_config_guard, _test_mode_guard) =
+        setup_test_environment_with_config(&temp, Some(custom_config));
     // Set PATH with RAII guard
     let _path_guard = EnvVarGuard::set("PATH", bin_dir.path());
     let mut cmd = create_ordinator_command(&temp);
@@ -2546,7 +2535,7 @@ exclude_patterns = []
 fn test_secrets_scan_with_empty_profile() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     // Create a profile with no files
     let config_file = temp.child("ordinator.toml");
     let config_content = r#"
@@ -2568,10 +2557,10 @@ encrypt_patterns = []
 exclude_patterns = []
 "#;
     std::fs::write(config_file.path(), config_content).unwrap();
-    
+
     let mut cmd = create_ordinator_command(&temp);
     cmd.arg("secrets").arg("scan").arg("--profile").arg("empty");
-    
+
     cmd.assert()
         .success()
         .stderr(predicates::str::contains("No plaintext secrets found"));
@@ -2580,19 +2569,19 @@ exclude_patterns = []
 #[test]
 fn test_cli_with_corrupted_config() {
     let temp = assert_fs::TempDir::new().unwrap();
-    
+
     // Create a corrupted config file
     let config_file = temp.child("ordinator.toml");
     config_file.write_str("invalid toml content [").unwrap();
-    
+
     // Set environment variables
     let _config_guard = EnvVarGuard::set("ORDINATOR_CONFIG", config_file.path());
     let _home_guard = EnvVarGuard::set("ORDINATOR_HOME", temp.path());
     let _test_guard = EnvVarGuard::set("ORDINATOR_TEST_MODE", "1");
-    
+
     let mut cmd = create_ordinator_command(&temp);
     cmd.arg("status");
-    
+
     cmd.assert()
         .failure()
         .stderr(predicates::str::contains("Failed to parse config file"));
@@ -2601,22 +2590,26 @@ fn test_cli_with_corrupted_config() {
 #[test]
 fn test_cli_with_invalid_json() {
     let temp = assert_fs::TempDir::new().unwrap();
-    
+
     // Create a config file with invalid JSON-like content
     let config_file = temp.child("ordinator.toml");
-    config_file.write_str(r#"
+    config_file
+        .write_str(
+            r#"
 [global
 default_profile = "default"
-"#).unwrap();
-    
+"#,
+        )
+        .unwrap();
+
     // Set environment variables
     let _config_guard = EnvVarGuard::set("ORDINATOR_CONFIG", config_file.path());
     let _home_guard = EnvVarGuard::set("ORDINATOR_HOME", temp.path());
     let _test_guard = EnvVarGuard::set("ORDINATOR_TEST_MODE", "1");
-    
+
     let mut cmd = create_ordinator_command(&temp);
     cmd.arg("status");
-    
+
     cmd.assert()
         .failure()
         .stderr(predicates::str::contains("Failed to parse config file"));
@@ -2626,29 +2619,28 @@ default_profile = "default"
 fn test_cli_with_missing_dependencies() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     // Create a file to add
     let test_file = temp.child("test.txt");
     test_file.touch().unwrap();
-    
+
     // Set PATH to empty to simulate missing dependencies
     let _path_guard = EnvVarGuard::set("PATH", "");
-    
+
     let mut cmd = create_ordinator_command(&temp);
     cmd.arg("add").arg("test.txt");
-    
-    cmd.assert()
-        .success(); // Add should still work without external dependencies
+
+    cmd.assert().success(); // Add should still work without external dependencies
 }
 
 #[test]
 fn test_quiet_flag_suppresses_output() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     let mut cmd = create_ordinator_command(&temp);
     cmd.arg("--quiet").arg("status");
-    
+
     cmd.assert()
         .success()
         .stderr(predicates::str::contains("Showing status").not());
@@ -2658,11 +2650,9 @@ fn test_quiet_flag_suppresses_output() {
 fn test_verbose_flag_increases_output() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
-    
+
     let mut cmd = create_ordinator_command(&temp);
     cmd.arg("--verbose").arg("status");
-    
-    cmd.assert()
-        .success()
-        .stderr(contains("Showing status"));
+
+    cmd.assert().success().stderr(contains("Showing status"));
 }
