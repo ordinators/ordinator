@@ -1203,9 +1203,7 @@ pub async fn run(args: Args) -> Result<()> {
 
                 if !found_secrets {
                     if !args.quiet {
-                        eprintln!(
-                            "✅ No plaintext secrets found in {total_files_scanned} files"
-                        );
+                        eprintln!("✅ No plaintext secrets found in {total_files_scanned} files");
                     }
                 } else {
                     if !args.quiet {

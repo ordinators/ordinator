@@ -286,9 +286,7 @@ impl SecretsManager {
             for (pattern, secret_type) in &secret_patterns {
                 if let Ok(regex) = regex::Regex::new(pattern) {
                     if regex.is_match(&content) {
-                        println!(
-                            "[DEBUG] Matched pattern: {pattern} for type: {secret_type}"
-                        );
+                        println!("[DEBUG] Matched pattern: {pattern} for type: {secret_type}");
                         found_types.push(secret_type.to_string());
                     } else {
                         println!("[DEBUG] No match for pattern: {pattern}");
