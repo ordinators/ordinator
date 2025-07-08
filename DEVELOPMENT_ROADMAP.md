@@ -162,14 +162,22 @@ ordinator secrets list                 # Shows encrypted files
 **Testable**: ✅
 
 **Tasks**:
-- [ ] Implement secrets detection heuristics
-- [ ] Add warnings for plaintext secrets
-- [ ] Integration with file tracking
+- [x] Implement secrets detection heuristics
+- [x] Add warnings for plaintext secrets
+- [x] Integration with file tracking
+- [x] Add CLI command with detailed reporting
+- [x] Exit with error code when secrets found
+- [x] Show secret types found (never actual values)
+- [x] Auto-scan files when adding to tracking
+- [x] Add --force flag to skip secrets scanning
 
 **Tests**:
-- [ ] Secrets are detected correctly
-- [ ] Warnings are shown appropriately
-- [ ] False positives are minimized
+- [x] Secrets are detected correctly
+- [x] Warnings are shown appropriately
+- [x] False positives are minimized
+- [x] CLI command works with verbose output
+- [x] Auto-scan works when adding files
+- [x] Force flag skips secrets scanning
 
 ---
 

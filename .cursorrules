@@ -240,3 +240,39 @@ fn test_secrets_function() {
 - Use secure random generation for keys
 - Validate user input
 - Handle file permissions securely
+
+## Test Maintenance Rule
+
+**NEVER remove a test just because it fails. ALWAYS fix tests before doing anything else once it stops working.**
+
+### When Tests Fail:
+1. **Analyze the root cause** - Understand why the test is failing
+2. **Fix the underlying issue** - Address the actual problem, not the test
+3. **Update test expectations** - Only change test assertions if the behavior change is intentional
+4. **Maintain test coverage** - Ensure tests still validate the intended functionality
+5. **Document changes** - Explain why any test modifications were necessary
+
+### Test Fixing Priority:
+- **High Priority**: Fix failing tests before any new development
+- **Medium Priority**: Update tests when behavior changes are intentional
+- **Low Priority**: Refactor tests for better readability (only when passing)
+
+### Examples of Acceptable Test Changes:
+- ✅ Fixing test setup when dependencies change
+- ✅ Updating assertions when API behavior changes intentionally
+- ✅ Improving test isolation and cleanup
+- ✅ Adding missing test cases for edge cases
+
+### Examples of Unacceptable Test Changes:
+- ❌ Removing tests because they're "flaky"
+- ❌ Commenting out failing tests
+- ❌ Changing assertions to make tests pass without fixing the underlying issue
+- ❌ Removing tests to improve coverage numbers
+
+### Test Quality Standards:
+- Tests must be deterministic and repeatable
+- Tests should validate actual functionality, not implementation details
+- Tests should be isolated and not depend on external state
+- Tests should provide clear error messages when they fail
+
+Remember: Tests are documentation of expected behavior. Removing them breaks the contract with users and makes the codebase less reliable.

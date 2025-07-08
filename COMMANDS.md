@@ -74,6 +74,7 @@ ordinator add ~/.config/nvim
 - Updates configuration to track the file
 - Associates file with specified profile
 - Respects exclusion patterns from config
+- **Automatically scans for plaintext secrets** and warns if found (does not block the operation)
 
 ### `ordinator apply`
 
@@ -179,6 +180,7 @@ ordinator commit -m <MESSAGE>
 
 **Options:**
 - `-m, --message <MESSAGE>` - Commit message (required)
+- `--force` - Skip secrets scanning and commit anyway
 
 **Examples:**
 ```bash
@@ -187,10 +189,15 @@ ordinator commit -m "Add new dotfiles"
 
 # Commit with descriptive message
 ordinator commit -m "Update zsh configuration and add vim settings"
+
+# Force commit (skip secrets scanning)
+ordinator commit -m "Update config" --force
 ```
 
 **What it does:**
 - Stages all changes in the dotfiles repository
+- **Scans all tracked files for plaintext secrets** (unless `--force` is used)
+- **Blocks commit with error code 1 if secrets are found** (unless `--force` is used)
 - Creates Git commit with specified message
 - Uses Git repository in dotfiles directory
 
@@ -438,6 +445,41 @@ ordinator secrets validate
 - Shows installation paths if found
 - Provides installation instructions if missing
 
+### `ordinator secrets scan`
+
+Scan for plaintext secrets in tracked files.
+
+```bash
+ordinator secrets scan [OPTIONS]
+```
+
+**Options:**
+- `--profile <PROFILE>` - Profile to scan (defaults to all profiles)
+- `--verbose` - Show detailed information about found secrets
+
+**Examples:**
+```bash
+# Scan all profiles for secrets
+ordinator secrets scan
+
+# Scan specific profile
+ordinator secrets scan --profile work
+
+# Verbose scan with detailed information
+ordinator secrets scan --verbose
+```
+
+**What it does:**
+- Scans all tracked files for potential plaintext secrets
+- Uses advanced regex-based heuristics to detect passwords, API keys, tokens, etc.
+- **Detects secrets with prefixes** (e.g., `test_api_key`, `prod_password`)
+- **Handles special characters** in filenames and secret values
+- **Supports Unicode filenames** and international character sets
+- **Lists secret types found without showing actual values**
+- **Always exits with error code 1 if secrets are found**
+- Provides actionable feedback for encrypting detected secrets
+- **Robust error handling** for permission issues, binary files, and large files
+
 ### `ordinator secrets check`
 
 Check SOPS and age installation.
@@ -609,6 +651,13 @@ ordinator secrets setup --profile work
 # Check SOPS and age installation
 ordinator secrets check
 
+# Add files (automatically scans for secrets)
+ordinator add ~/.ssh/config --profile work
+ordinator add ~/.config/api_keys.json --profile work
+
+# Scan for any remaining secrets
+ordinator secrets scan --profile work
+
 # Encrypt sensitive files
 ordinator secrets encrypt ~/.ssh/config
 ordinator secrets encrypt ~/.config/api_keys.json
@@ -616,6 +665,9 @@ ordinator secrets encrypt ~/.config/api_keys.json
 # List encrypted files
 ordinator secrets list
 ordinator secrets list --paths-only
+
+# Commit changes (automatically scans for secrets)
+ordinator commit -m "Add encrypted configuration files"
 
 # Decrypt files when needed
 ordinator secrets decrypt ~/.ssh/config.enc
@@ -679,6 +731,11 @@ sudo ./ordinator-system.sh
 - Check your `encrypt_patterns` configuration in `ordinator.toml`
 - Verify files are in the expected locations
 - Use `ordinator secrets list --verbose` for detailed information
+
+**"Plaintext secrets detected in tracked files"**
+- Run `ordinator secrets scan` to see which files contain secrets
+- Use `ordinator secrets encrypt <file>` to encrypt detected secrets
+- Use `--force` flag with commit to override scanning: `ordinator commit -m "message" --force`
 
 ### Debug Mode
 

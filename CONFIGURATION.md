@@ -180,6 +180,45 @@ exclude_patterns = [
 - Configure encryption patterns and exclusions to control which files are automatically encrypted.
 - Customize encryption format and method to match your security requirements.
 
+## Secrets Scanning
+
+Ordinator automatically scans for plaintext secrets to help prevent accidental exposure of sensitive information.
+
+### Automatic Scanning
+
+**Add Command:**
+- Automatically scans files when adding them to tracking
+- Warns about detected secrets but doesn't block the operation
+- Provides suggestions for encrypting detected secrets
+
+**Commit Command:**
+- Scans all tracked files before committing
+- Blocks commit with error code 1 if secrets are found
+- Use `--force` flag to skip scanning and commit anyway
+
+### Manual Scanning
+
+Use `ordinator secrets scan` to manually check for secrets:
+- Scans all tracked files across all profiles
+- Uses advanced regex-based heuristics to detect common secret patterns
+- **Detects secrets with prefixes** (e.g., `test_api_key`, `prod_password`)
+- **Handles special characters** in filenames and secret values
+- **Supports Unicode filenames** and international character sets
+- Lists secret types found without exposing actual values
+- Always exits with error code 1 if secrets are detected
+- **Robust error handling** for permission issues, binary files, and large files
+
+### Detected Secret Types
+
+The scanner looks for:
+- Passwords and API keys (including prefixed variants)
+- Access tokens and credentials
+- Private keys and certificates
+- Database connection strings
+- Configuration secrets
+- **Special characters and Unicode content**
+- **Binary files and large files** (handled gracefully)
+
 ## Encryption Best Practices
 
 1. **Key Management**
@@ -252,21 +291,27 @@ exclude_patterns = [
 # 1. Set up secrets management for work profile
 ordinator secrets setup --profile work
 
-# 2. Add sensitive files to tracking
+# 2. Add sensitive files to tracking (automatically scans for secrets)
 ordinator add ~/.ssh/config --profile work
 ordinator add ~/.config/api_keys.json --profile work
 
-# 3. Encrypt sensitive files
+# 3. Scan for any remaining secrets
+ordinator secrets scan --profile work
+
+# 4. Encrypt sensitive files
 ordinator secrets encrypt ~/.ssh/config
 ordinator secrets encrypt ~/.config/api_keys.json
 
-# 4. Verify encryption worked
+# 5. Verify encryption worked
 ordinator secrets list
 
-# 5. Apply configuration with decryption
+# 6. Commit changes (automatically scans for secrets)
+ordinator commit -m "Add encrypted configuration files"
+
+# 7. Apply configuration with decryption
 ordinator apply --profile work
 
-# 6. Verify decryption worked
+# 8. Verify decryption worked
 ls -la ~/.ssh/config
 ```
 
@@ -279,3 +324,46 @@ ls -la ~/.ssh/config
 - Regularly review and update encryption patterns and exclusions
 - Use the `[secrets]` section to manage secrets securely
 - Configure the `[global]` section to set defaults and enable/disable features
+
+## Troubleshooting
+
+### Secrets Scanning Issues
+
+**Scanner detects false positives:**
+- The scanner uses regex patterns to detect common secret formats
+- Prefixed keys (e.g., `test_api_key`) are intentionally detected
+- Use `--verbose` to see detailed information about detected secrets
+- Consider excluding files with false positives using `exclude_patterns`
+
+**Scanner skips files:**
+- Binary files are automatically skipped to prevent corruption
+- Files with permission issues are skipped with warnings
+- Large files (>10MB) are skipped to maintain performance
+- Check file permissions and ensure files are readable
+
+**Unicode or special character issues:**
+- The scanner handles Unicode filenames and content
+- Special characters in secret values are supported
+- If issues persist, check file encoding (UTF-8 recommended)
+
+**Performance issues:**
+- Large repositories may take time to scan
+- Use `--profile` to limit scanning to specific profiles
+- Consider excluding large binary files with `exclude_patterns`
+
+### Common Error Messages
+
+**"Permission denied" errors:**
+- Check file permissions with `ls -la`
+- Ensure user has read access to tracked files
+- Use `chmod` to fix permissions if needed
+
+**"Binary file detected" warnings:**
+- Binary files are automatically skipped for safety
+- This is normal behavior to prevent corruption
+- Use `exclude_patterns` to skip binary files permanently
+
+**"Large file detected" warnings:**
+- Files >10MB are skipped for performance
+- This prevents scanning large log files or databases
+- Use `exclude_patterns` to skip large files permanently
