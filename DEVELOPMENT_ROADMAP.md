@@ -253,6 +253,7 @@ ordinator apply --profile work
 - [ ] Set up configuration and profiles from the cloned repo
 - [ ] Optionally support branch/tag selection
 - [ ] Integrate with existing bootstrap and apply flows
+- [ ] Enhance `ordinator push` to accept a `--repo` or `--remote` URL, set the remote if not already configured, and push to that remote. This reduces reliance on a pre-installed git executable and improves onboarding for new users.
 
 **Tests:**
 - [ ] Clones repo and initializes config correctly

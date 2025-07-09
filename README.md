@@ -33,6 +33,12 @@ ordinator add ~/.zshrc
 
 # Apply your configuration
 ordinator apply
+
+# Commit your changes
+ordinator commit -m "Initial commit: track dotfiles with Ordinator"
+
+# Push to GitHub (sets remote if needed)
+ordinator push --repo https://github.com/username/dotfiles.git
 ```
 
 ### 2. Replicate Your Dotfiles Repo to Another Device (Onboarding a New Machine)
@@ -111,9 +117,9 @@ Ordinator also scans tracked files for potential plaintext secrets and warns you
 ## Documentation
 
 - [Product Requirements Document](PRD.md) - Complete feature specification
-- [Configuration Guide](CONFIGURATION.md) - Configuration file format and usage
-- [Commands Reference](COMMANDS.md) - Complete CLI command documentation
 - [Development Roadmap](DEVELOPMENT_ROADMAP.md) - Implementation plan
+- [Commands Reference](COMMANDS.md) - Complete CLI command documentation
+- [Configuration Guide](CONFIGURATION.md) - Configuration file format and usage
 - [Test Plan](TEST_PLAN.md) - Testing strategy
 
 ## Contributing & Feedback
