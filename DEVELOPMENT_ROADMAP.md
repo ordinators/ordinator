@@ -231,12 +231,19 @@ ordinator bootstrap --profile work     # Shows script path, safety level, and co
 - [ ] Add/export this list to the repo/config for reproducibility
 - [ ] On `apply`, install all listed formulae/casks at the prescribed versions
 - [ ] Ensure reproducible Homebrew environment setup from config
+- [ ] Add progress indicators for package installation operations
+- [ ] Implement interactive confirmation for package installation decisions
+- [ ] Add colorized output for package status and installation progress
+- [ ] Enhance error handling for package installation failures
 
 **Tests:**
 - [ ] Exported Homebrew package list matches actual installed packages
 - [ ] `apply` installs all listed formulae/casks at correct versions
 - [ ] Handles missing or outdated packages gracefully
 - [ ] Package lists are managed properly in config
+- [ ] Progress indicators display correctly during package operations
+- [ ] Interactive prompts work for package installation confirmations
+- [ ] Colorized output renders properly in different terminal environments
 
 **Acceptance Criteria:**
 ```bash
@@ -244,6 +251,8 @@ ordinator bootstrap --profile work     # Shows script path, safety level, and co
 ordinator export-brew
 # On apply, all listed formulae/casks are installed at specified versions
 ordinator apply --profile work
+# Progress indicators show installation status
+# Interactive prompts confirm package installations
 ```
 
 ### 4.3 Remote Repository Bootstrap (`ordinator init <repo-url> [target-dir]`)
@@ -261,12 +270,19 @@ ordinator apply --profile work
 - [ ] Optionally support branch/tag selection
 - [ ] Integrate with existing bootstrap and apply flows
 - [ ] Enhance `ordinator push` to accept a `--repo` or `--remote` URL, set the remote if not already configured, and push to that remote. This reduces reliance on a pre-installed git executable and improves onboarding for new users.
+- [ ] Add interactive prompts for repository URL input and directory selection
+- [ ] Implement progress indicators for cloning and setup operations
+- [ ] Enhance error messages for network issues and authentication problems
+- [ ] Add autocompletion for repository URLs and directory paths
 
 **Tests:**
 - [ ] Clones repo and initializes config correctly
 - [ ] Handles existing directory conflicts safely
 - [ ] Works with all supported profiles
 - [ ] UX is clear and error messages are helpful
+- [ ] Interactive prompts work for repository setup
+- [ ] Progress indicators display during cloning operations
+- [ ] Autocompletion works for repository URLs and paths
 
 **Acceptance Criteria:**
 ```bash
@@ -274,6 +290,8 @@ ordinator init https://github.com/yourname/dotfiles.git ~/.dotfiles
 # Clones the repo to ~/.dotfiles, sets up config, ready for apply
 ordinator init https://github.com/yourname/dotfiles.git
 # Clones the repo to the current directory by default
+# Interactive prompts guide user through setup
+# Progress indicators show cloning status
 ```
 
 ### 4.4 Auto-Generated README with Quick-Install & Secrets Instructions
@@ -291,11 +309,17 @@ ordinator init https://github.com/yourname/dotfiles.git
 - [ ] Allow user to customize the README template (optional)
 - [ ] Add a shell one-liner for installation to the generated README
 - [ ] Include profile table, bootstrap explanation, troubleshooting, and security notes in README
+- [ ] Add interactive mode for customizing README template
+- [ ] Implement preview functionality to show generated README before saving
+- [ ] Add colorized output for highlighting important sections in generated README
 
 **Tests:**
 - [ ] README is created with correct content on new repo init
 - [ ] Existing README is not overwritten
 - [ ] Quick-install, AGE key, and documentation links are accurate and copy-pasteable
+- [ ] Interactive mode works for README customization
+- [ ] Preview functionality displays README correctly
+- [ ] Colorized output renders properly in different terminals
 
 **Acceptance Criteria:**
 ```bash
@@ -305,6 +329,8 @@ ordinator init https://github.com/yourname/dotfiles.git
 # - Profile/usage info
 # - AGE key warning and path
 # - Links to Ordinator project and docs
+# Interactive prompts allow README customization
+# Preview shows generated content before saving
 ```
 
 ### 4.5 Profile-Specific File Storage and Add Command Enhancement
@@ -319,12 +345,19 @@ ordinator init https://github.com/yourname/dotfiles.git
 - [ ] Update config to track the correct source file for each profile
 - [ ] Ensure symlinking logic uses the correct profile-specific file
 - [ ] Update documentation and usage examples
+- [ ] Add interactive prompts for profile selection when adding files
+- [ ] Implement progress indicators for file copying and organization
+- [ ] Enhance error handling for file conflicts between profiles
+- [ ] Add colorized output for file operations and profile status
 
 **Tests:**
 - [ ] Adding the same file to multiple profiles stores separate copies
 - [ ] Applying a profile symlinks the correct version for that profile
 - [ ] No accidental overwrites between profiles
 - [ ] Backward compatibility for existing flat file structure
+- [ ] Interactive prompts work for profile selection
+- [ ] Progress indicators display during file operations
+- [ ] Error handling works for file conflicts
 
 **Acceptance Criteria:**
 ```bash
@@ -336,6 +369,8 @@ ordinator add ~/.zshrc --profile laptop
 
 ordinator apply --profile work
 # symlinks files/work/.zshrc to ~/.zshrc
+# Interactive prompts guide profile selection
+# Progress indicators show file operations
 ```
 
 ### 4.6 Uninstall and Restore Original Configuration
@@ -351,6 +386,10 @@ ordinator apply --profile work
 - [ ] Support dry-run and force options
 - [ ] Prompt for config and repo cleanup (optional)
 - [ ] Update documentation and usage examples
+- [ ] Add interactive confirmation for destructive operations
+- [ ] Implement progress indicators for backup restoration
+- [ ] Add colorized output for showing what will be removed/restored
+- [ ] Enhance dry-run mode with detailed preview of uninstall actions
 
 **Backups Details:**
 - Backups are created during `ordinator apply` if a file already exists at the target location and backups are enabled (`create_backups = true`).
@@ -367,11 +406,17 @@ ordinator apply --profile work
 - [ ] Backups are restored if requested
 - [ ] No data loss if backups are missing
 - [ ] Dry-run shows correct actions
+- [ ] Interactive confirmations work for destructive operations
+- [ ] Progress indicators display during restoration
+- [ ] Colorized output shows removal/restoration preview
 
 **Acceptance Criteria:**
 ```bash
 ordinator uninstall --profile work --restore-backups
 # Removes all symlinks for 'work' profile and restores backups if available
+# Interactive prompts confirm destructive operations
+# Progress indicators show restoration status
+# Colorized output previews actions
 ```
 
 ---
@@ -389,17 +434,27 @@ ordinator uninstall --profile work --restore-backups
 - [ ] Validate command safety
 - [ ] Generate system script (`ordinator-system.sh`)
 - [ ] Never execute sudo commands directly
+- [ ] Add interactive mode for step-by-step system command execution
+- [ ] Implement progress indicators for script generation and validation
+- [ ] Add colorized output for safety level indicators (Safe/Warning/Dangerous/Blocked)
+- [ ] Enhance error messages for command validation failures
 
 **Tests**:
 - [ ] Commands are parsed correctly
 - [ ] Scripts are generated properly
 - [ ] Safety validation works
 - [ ] No sudo commands are executed
+- [ ] Interactive mode works for command execution
+- [ ] Progress indicators display during script generation
+- [ ] Colorized output renders safety levels correctly
 
 **Acceptance Criteria**:
 ```bash
 ordinator generate-script --profile work
 # Creates ordinator-system.sh for manual execution
+# Interactive mode guides through command execution
+# Progress indicators show generation status
+# Colorized output highlights safety levels
 ```
 
 ### 5.2 macOS-Specific Features
@@ -412,11 +467,26 @@ ordinator generate-script --profile work
 - [ ] `defaults write` command support
 - [ ] macOS-specific utilities
 - [ ] System preference management
+- [ ] Add interactive prompts for system preference changes
+- [ ] Implement preview mode to show what system changes will be made
+- [ ] Add confirmation dialogs for potentially destructive system changes
+- [ ] Add colorized output for system preference status
 
 **Tests**:
 - [ ] macOS commands are handled correctly
 - [ ] System preferences are managed
 - [ ] Cross-platform compatibility maintained
+- [ ] Interactive prompts work for system changes
+- [ ] Preview mode displays changes correctly
+- [ ] Confirmation dialogs prevent accidental changes
+
+**Acceptance Criteria**:
+```bash
+ordinator system --preview
+# Shows what system changes will be made
+ordinator system --interactive
+# Guides through system preference changes
+```
 
 ---
 
@@ -433,11 +503,17 @@ ordinator generate-script --profile work
 - [ ] `ordinator pull --rebase`
 - [ ] Auto-push after successful apply
 - [ ] Git conflict resolution
+- [ ] Add progress indicators for sync, pull, push operations
+- [ ] Implement interactive conflict resolution for merge conflicts
+- [ ] Add colorized output for Git status and diff information
 
 **Tests**:
 - [ ] Sync operations work correctly
 - [ ] Rebase functionality works
 - [ ] Auto-push functions properly
+- [ ] Progress indicators display during Git operations
+- [ ] Interactive conflict resolution works
+- [ ] Colorized output renders Git information correctly
 
 ### 6.2 Enhanced Logging & Output
 **Priority**: Low  
@@ -452,6 +528,10 @@ ordinator generate-script --profile work
 - [x] Error reporting improvements
 - [x] Command documentation
 - [ ] Generate and install MAN page for CLI usage
+- [ ] Add structured logging with better log organization
+- [ ] Implement log file output for persistent logging capability
+- [ ] Add performance metrics and timing information for operations
+- [ ] Add silent mode for CI/CD integration
 
 **Tests**:
 - [ ] JSON output is valid
@@ -459,6 +539,48 @@ ordinator generate-script --profile work
 - [ ] Progress indicators function
 - [x] Documentation is comprehensive and accurate
 - [ ] MAN page is generated, installed, and accessible via `man ordinator`
+- [ ] Structured logging works correctly
+- [ ] Log file output functions properly
+- [ ] Performance metrics are accurate
+- [ ] Silent mode works for automated environments
+
+### 6.3 Advanced CLI Features
+**Priority**: Low  
+**Dependencies**: 1.1, 6.2  
+**Estimated Time**: 2-3 days  
+**Testable**: ✅
+
+**Tasks**:
+- [ ] Add comprehensive shell autocompletion (bash, zsh, fish)
+- [ ] Implement full interactive mode for enhanced CLI experience
+- [ ] Add configuration validation with interactive repair capabilities
+- [ ] Implement update notifications to check for updates and notify users
+- [ ] Add plugin system for extensible command system (future consideration)
+- [ ] Implement shell integration for better integration with user's shell environment
+
+**Tests**:
+- [ ] Shell autocompletion works for bash, zsh, and fish
+- [ ] Interactive mode provides enhanced user experience
+- [ ] Configuration validation and repair functions correctly
+- [ ] Update notifications work without being intrusive
+- [ ] Shell integration improves user workflow
+- [ ] Plugin system is extensible (future)
+
+**Acceptance Criteria**:
+```bash
+# Autocompletion works in user's shell
+ordinator <TAB>  # Shows available commands
+ordinator add <TAB>  # Shows available files
+
+# Interactive mode provides guided experience
+ordinator --interactive
+
+# Configuration validation and repair
+ordinator validate-config --repair
+
+# Update notifications
+ordinator --check-updates
+```
 
 ---
 
@@ -475,12 +597,20 @@ ordinator generate-script --profile work
 - [x] Package for distribution
 - [x] Installation script (Homebrew formula and documented Homebrew install command)
 - [ ] Document and support installation via Cargo (`cargo install ordinator`)
+- [ ] Add installation verification with post-install checks and setup
+- [ ] Implement proper uninstall cleanup when removing Ordinator
+- [ ] Add self-update capability for easy updates
+- [ ] Add progress indicators for installation process
 
 **Tests**:
 - [x] Homebrew installation works
 - [ ] Cargo installation works
 - [x] Package installs correctly
 - [x] All features function after installation
+- [ ] Installation verification works correctly
+- [ ] Uninstall cleanup removes all components
+- [ ] Self-update functionality works
+- [ ] Progress indicators display during installation
 
 ### 7.2 Curl Install Script
 **Priority**: Medium  
@@ -492,11 +622,17 @@ ordinator generate-script --profile work
 - [ ] Create `curl | sh` installer
 - [ ] Silent mode support
 - [ ] Dependency checking
+- [ ] Add progress indicators for download and installation
+- [ ] Enhance dependency checking with better error messages
+- [ ] Add installation verification post-install
 
 **Tests**:
 - [ ] Installer works correctly
 - [ ] Silent mode functions
 - [ ] Dependencies are checked
+- [ ] Progress indicators display during download and installation
+- [ ] Enhanced error messages help users resolve issues
+- [ ] Installation verification validates successful installation
 
 ---
 
