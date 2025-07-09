@@ -360,6 +360,22 @@ impl Config {
         }
         Ok(builder.build()?)
     }
+
+    /// Get the bootstrap script path for a profile
+    pub fn get_bootstrap_script(&self, profile: &str) -> Option<PathBuf> {
+        self.get_profile(profile)
+            .and_then(|profile_config| profile_config.bootstrap_script.as_ref())
+            .map(|script_path| {
+                // If the script path is relative, it should be relative to the dotfiles directory
+                if script_path.starts_with('/') {
+                    PathBuf::from(script_path)
+                } else {
+                    // For relative paths, we'll need the dotfiles directory
+                    // This will be resolved when we have the config file path
+                    PathBuf::from(script_path)
+                }
+            })
+    }
 }
 
 // Helper functions for default values
