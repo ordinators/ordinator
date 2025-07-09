@@ -73,6 +73,33 @@ pub struct ProfileConfig {
     /// Patterns for files/directories to exclude in this profile
     #[serde(default)]
     pub exclude: Vec<String>,
+
+    /// Homebrew packages for this profile
+    #[serde(default)]
+    pub homebrew_packages: HomebrewPackages,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct HomebrewPackages {
+    /// Formulae (command-line tools)
+    #[serde(default)]
+    pub formulae: Vec<HomebrewPackage>,
+
+    /// Casks (GUI applications)
+    #[serde(default)]
+    pub casks: Vec<HomebrewPackage>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct HomebrewPackage {
+    /// Package name
+    pub name: String,
+
+    /// Package version (optional)
+    pub version: Option<String>,
+
+    /// Whether to pin this version
+    pub pinned: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -182,6 +209,7 @@ impl Config {
                 enabled: true,
                 description: Some("Default profile for basic dotfiles".to_string()),
                 exclude: Vec::new(),
+                homebrew_packages: HomebrewPackages::default(),
             },
         );
 
@@ -195,6 +223,7 @@ impl Config {
                 enabled: true,
                 description: Some("Work environment profile".to_string()),
                 exclude: Vec::new(),
+                homebrew_packages: HomebrewPackages::default(),
             },
         );
 
@@ -208,6 +237,7 @@ impl Config {
                 enabled: true,
                 description: Some("Personal environment profile".to_string()),
                 exclude: Vec::new(),
+                homebrew_packages: HomebrewPackages::default(),
             },
         );
 
@@ -440,6 +470,7 @@ mod tests {
             enabled: true,
             description: Some("Test profile".to_string()),
             exclude: Vec::new(),
+            homebrew_packages: HomebrewPackages::default(),
         };
 
         config.add_profile("test".to_string(), new_profile);

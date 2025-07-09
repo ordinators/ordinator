@@ -111,6 +111,10 @@ pub enum Commands {
         #[arg(long)]
         skip_secrets: bool,
 
+        /// Skip Homebrew package installation
+        #[arg(long)]
+        skip_brew: bool,
+
         /// Force overwrite existing files (use with caution)
         #[arg(long)]
         force: bool,
@@ -161,6 +165,12 @@ pub enum Commands {
         #[arg(long)]
         edit: bool,
     },
+
+    /// Manage Homebrew packages
+    Brew {
+        #[command(subcommand)]
+        subcommand: BrewCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -207,6 +217,50 @@ pub enum SecretCommands {
         profile: Option<String>,
 
         /// Show detailed information about found secrets
+        #[arg(long)]
+        verbose: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum BrewCommands {
+    /// Export current Homebrew packages to config
+    Export {
+        /// Profile to export packages for
+        #[arg(long, default_value = "default")]
+        profile: String,
+
+        /// Include version information
+        #[arg(long)]
+        with_versions: bool,
+
+        /// Force overwrite existing package list
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Install Homebrew packages for a profile
+    Install {
+        /// Profile to install packages for
+        #[arg(long, default_value = "default")]
+        profile: String,
+
+        /// Skip interactive prompts
+        #[arg(long)]
+        non_interactive: bool,
+
+        /// Force installation without confirmation
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// List Homebrew packages for a profile
+    List {
+        /// Profile to list packages for
+        #[arg(long, default_value = "default")]
+        profile: String,
+
+        /// Show detailed package information
         #[arg(long)]
         verbose: bool,
     },
@@ -653,6 +707,7 @@ pub async fn run(args: Args) -> Result<()> {
             profile,
             skip_bootstrap,
             skip_secrets,
+            skip_brew,
             force,
         } => {
             let (config, config_path) = Config::load()?;
@@ -686,6 +741,10 @@ pub async fn run(args: Args) -> Result<()> {
                 if skip_secrets {
                     info!("[DRY RUN] Would skip secrets");
                     eprintln!("DRY-RUN: Would skip secrets");
+                }
+                if skip_brew {
+                    info!("[DRY RUN] Would skip brew");
+                    eprintln!("DRY-RUN: Would skip brew");
                 }
                 return Ok(());
             }
@@ -914,6 +973,38 @@ pub async fn run(args: Args) -> Result<()> {
                 }
             } else {
                 info!("Skipped bootstrap script generation");
+            }
+
+            // Install Homebrew packages if not skipped
+            if !skip_brew {
+                use crate::brew::BrewManager;
+
+                // Check if Homebrew is installed
+                if BrewManager::check_homebrew_installed() {
+                    let brew_manager = BrewManager::new(args.dry_run);
+
+                    if !args.quiet {
+                        eprintln!("Installing Homebrew packages for profile '{profile}'");
+                    }
+
+                    if let Err(e) = brew_manager.install_packages(&profile, &config).await {
+                        if !args.quiet {
+                            eprintln!("Warning: Failed to install Homebrew packages: {e}");
+                        }
+                    } else if !args.quiet {
+                        eprintln!("✅ Homebrew packages installed successfully");
+                    }
+                } else {
+                    if !args.quiet {
+                        eprintln!("⚠️  Homebrew not installed - skipping package installation");
+                    }
+                    info!("Homebrew not installed, skipping package installation");
+                }
+            } else {
+                info!("Skipped Homebrew package installation");
+                if !args.quiet {
+                    eprintln!("Skipped Homebrew package installation");
+                }
             }
 
             info!("Apply completed");
@@ -1372,6 +1463,113 @@ pub async fn run(args: Args) -> Result<()> {
             }
 
             Ok(())
+        }
+        Commands::Brew { subcommand } => {
+            use crate::brew::BrewManager;
+
+            // Check if Homebrew is installed
+            if !BrewManager::check_homebrew_installed() {
+                eprintln!("❌ Homebrew is not installed. Please install Homebrew first:");
+                eprintln!("   /bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"");
+                std::process::exit(1);
+            }
+
+            match subcommand {
+                BrewCommands::Export {
+                    profile,
+                    with_versions: _,
+                    force,
+                } => {
+                    info!("Exporting Homebrew packages for profile: {}", profile);
+                    if !args.quiet {
+                        eprintln!("Exporting Homebrew packages for profile: {profile}");
+                    }
+
+                    let (mut config, config_path) = Config::load()?;
+
+                    if !config.profiles.contains_key(&profile) {
+                        return Err(anyhow::anyhow!("Profile '{}' does not exist.", profile));
+                    }
+
+                    // Check if packages already exist and force is not set
+                    let profile_config = config.get_profile(&profile).unwrap();
+                    if (!profile_config.homebrew_packages.formulae.is_empty()
+                        || !profile_config.homebrew_packages.casks.is_empty())
+                        && !force
+                    {
+                        eprintln!("⚠️  Profile '{profile}' already has Homebrew packages defined.");
+                        eprintln!("   Use --force to overwrite existing package list.");
+                        std::process::exit(1);
+                    }
+
+                    if args.dry_run {
+                        info!(
+                            "[DRY RUN] Would export Homebrew packages for profile: {}",
+                            profile
+                        );
+                        eprintln!("DRY-RUN: Would export Homebrew packages for profile: {profile}");
+                        return Ok(());
+                    }
+
+                    let brew_manager = BrewManager::new(args.dry_run);
+                    brew_manager.export_packages(&profile, &mut config).await?;
+
+                    config.save_to_file(&config_path)?;
+
+                    if !args.quiet {
+                        eprintln!("✅ Exported Homebrew packages to profile '{profile}'");
+                    }
+
+                    Ok(())
+                }
+                BrewCommands::Install {
+                    profile,
+                    non_interactive: _,
+                    force: _,
+                } => {
+                    info!("Installing Homebrew packages for profile: {}", profile);
+                    if !args.quiet {
+                        eprintln!("Installing Homebrew packages for profile: {profile}");
+                    }
+
+                    let (config, _) = Config::load()?;
+
+                    if !config.profiles.contains_key(&profile) {
+                        return Err(anyhow::anyhow!("Profile '{}' does not exist.", profile));
+                    }
+
+                    let brew_manager = BrewManager::new(args.dry_run);
+                    brew_manager.install_packages(&profile, &config).await?;
+
+                    if !args.quiet {
+                        eprintln!(
+                            "✅ Homebrew package installation complete for profile '{profile}'"
+                        );
+                    }
+
+                    Ok(())
+                }
+                BrewCommands::List {
+                    profile,
+                    verbose: _,
+                } => {
+                    info!("Listing Homebrew packages for profile: {}", profile);
+                    if !args.quiet {
+                        eprintln!("Listing Homebrew packages for profile: {profile}");
+                    }
+
+                    let (config, _) = Config::load()?;
+
+                    if !config.profiles.contains_key(&profile) {
+                        return Err(anyhow::anyhow!("Profile '{}' does not exist.", profile));
+                    }
+
+                    let brew_manager = BrewManager::new(args.dry_run);
+                    brew_manager.list_packages(&profile, &config)?;
+
+                    Ok(())
+                }
+            }
         }
     }
 }

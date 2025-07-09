@@ -227,33 +227,45 @@ ordinator bootstrap --profile work     # Shows script path, safety level, and co
 **Testable:** ✅
 
 **Tasks:**
-- [ ] Provide a method to pull/export the list of currently installed Homebrew formulae/casks and their versions
-- [ ] Add/export this list to the repo/config for reproducibility
-- [ ] On `apply`, install all listed formulae/casks at the prescribed versions
-- [ ] Ensure reproducible Homebrew environment setup from config
-- [ ] Add progress indicators for package installation operations
-- [ ] Implement interactive confirmation for package installation decisions
-- [ ] Add colorized output for package status and installation progress
-- [ ] Enhance error handling for package installation failures
+- [x] Provide a method to pull/export the list of currently installed Homebrew formulae/casks and their versions
+- [x] Add/export this list to the repo/config for reproducibility
+- [x] On `apply`, install all listed formulae/casks at the prescribed versions
+- [x] Ensure reproducible Homebrew environment setup from config
+- [x] Add progress indicators for package installation operations
+- [x] Implement interactive confirmation for package installation decisions
+- [x] Add colorized output for package status and installation progress
+- [x] Enhance error handling for package installation failures
 
 **Tests:**
-- [ ] Exported Homebrew package list matches actual installed packages
-- [ ] `apply` installs all listed formulae/casks at correct versions
-- [ ] Handles missing or outdated packages gracefully
-- [ ] Package lists are managed properly in config
-- [ ] Progress indicators display correctly during package operations
-- [ ] Interactive prompts work for package installation confirmations
-- [ ] Colorized output renders properly in different terminal environments
+- [x] Exported Homebrew package list matches actual installed packages
+- [x] `apply` installs all listed formulae/casks at correct versions
+- [x] Handles missing or outdated packages gracefully
+- [x] Package lists are managed properly in config
+- [x] Progress indicators display correctly during package operations
+- [x] Interactive prompts work for package installation confirmations
+- [x] Colorized output renders properly in different terminal environments
 
 **Acceptance Criteria:**
 ```bash
 # User can export Homebrew package list to config
-ordinator export-brew
+ordinator brew export --profile work
 # On apply, all listed formulae/casks are installed at specified versions
 ordinator apply --profile work
 # Progress indicators show installation status
 # Interactive prompts confirm package installations
 ```
+
+**Status:**
+- ✅ Implementation complete: Added `BrewManager` module with export, install, and list functionality
+- ✅ CLI integration complete: Added `ordinator brew` subcommand with export, install, and list commands
+- ✅ Configuration integration complete: Added `homebrew_packages` array to profile configuration
+- ✅ Apply integration complete: Added `--skip-brew` flag and Homebrew installation during apply
+- ✅ Testing complete: Comprehensive unit and integration tests with dummy brew script
+- ✅ Documentation complete: Updated COMMANDS.md, CONFIGURATION.md, and DEVELOPMENT_ROADMAP.md
+- ✅ Error handling complete: Graceful handling of missing packages and installation failures
+- ✅ Progress feedback complete: Installation status and progress indicators implemented
+
+**Completion Statement:** This completes Phase 4.2 (Package Management Integration) and prepares for Phase 4.3 (Remote Repository Bootstrap).
 
 ### 4.3 Remote Repository Bootstrap (`ordinator init <repo-url> [target-dir]`)
 **Priority:** Medium  

@@ -2,6 +2,7 @@ use clap::Parser;
 use tracing::{error, info};
 
 mod bootstrap;
+mod brew;
 mod cli;
 mod config;
 mod git;
