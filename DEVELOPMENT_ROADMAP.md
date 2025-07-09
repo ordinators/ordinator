@@ -196,38 +196,228 @@ ordinator secrets list                 # Shows encrypted files
 **Testable**: ✅
 
 **Tasks**:
-- [ ] Implement bootstrap script execution
-- [ ] Profile-based script selection
-- [ ] Non-interactive mode support
-- [ ] Script validation and safety checks
+- [x] Implement bootstrap script generation and validation
+- [x] Profile-based script selection
+- [x] Script validation and safety checks
+- [x] CLI command for presenting script info (`ordinator bootstrap`)
+- [x] Documentation and usage examples updated
 
 **Tests**:
-- [ ] Scripts execute correctly
-- [ ] Profile selection works
-- [ ] Non-interactive mode functions
-- [ ] Safety checks prevent issues
+- [x] Scripts are generated and validated correctly
+- [x] Profile selection works
+- [x] Safety checks prevent issues
+- [x] CLI and integration tests for bootstrap workflow
 
 **Acceptance Criteria**:
 ```bash
-ordinator apply --profile work         # Runs bootstrap script
-ordinator apply --skip-bootstrap       # Skips bootstrap
+ordinator apply --profile work         # Generates and validates bootstrap script
+ordinator apply --skip-bootstrap       # Skips bootstrap script generation
+ordinator bootstrap --profile work     # Shows script path, safety level, and command to run
+# Ordinator never executes the script itself; user must run it manually
+# Only --profile and --edit are supported for ordinator bootstrap
 ```
 
+**Status:**
+- Implementation, documentation, and tests complete as of [date]. Ordinator only generates and validates bootstrap scripts, never executes them.
+
 ### 4.2 Package Management Integration
-**Priority**: Medium  
-**Dependencies**: 4.1  
-**Estimated Time**: 2-3 days  
-**Testable**: ✅
+**Priority:** Medium  
+**Dependencies:** 4.1  
+**Estimated Time:** 2-3 days  
+**Testable:** ✅
 
-**Tasks**:
-- [ ] Homebrew package installation
-- [ ] VS Code extension installation
-- [ ] Package list management in config
+**Tasks:**
+- [ ] Provide a method to pull/export the list of currently installed Homebrew formulae/casks and their versions
+- [ ] Add/export this list to the repo/config for reproducibility
+- [ ] On `apply`, install all listed formulae/casks at the prescribed versions
+- [ ] Ensure reproducible Homebrew environment setup from config
+- [ ] Add progress indicators for package installation operations
+- [ ] Implement interactive confirmation for package installation decisions
+- [ ] Add colorized output for package status and installation progress
+- [ ] Enhance error handling for package installation failures
 
-**Tests**:
-- [ ] Homebrew packages install correctly
-- [ ] VS Code extensions install correctly
-- [ ] Package lists are managed properly
+**Tests:**
+- [ ] Exported Homebrew package list matches actual installed packages
+- [ ] `apply` installs all listed formulae/casks at correct versions
+- [ ] Handles missing or outdated packages gracefully
+- [ ] Package lists are managed properly in config
+- [ ] Progress indicators display correctly during package operations
+- [ ] Interactive prompts work for package installation confirmations
+- [ ] Colorized output renders properly in different terminal environments
+
+**Acceptance Criteria:**
+```bash
+# User can export Homebrew package list to config
+ordinator export-brew
+# On apply, all listed formulae/casks are installed at specified versions
+ordinator apply --profile work
+# Progress indicators show installation status
+# Interactive prompts confirm package installations
+```
+
+### 4.3 Remote Repository Bootstrap (`ordinator init <repo-url> [target-dir]`)
+**Priority:** Medium  
+**Dependencies:** 1.1, 2.1, 4.1  
+**Estimated Time:** 1-2 days  
+**Testable:** ✅
+
+**Tasks:**
+- [ ] Support `ordinator init --repo <repo-url> [target-dir]`, with `[target-dir]` as a positional argument (defaulting to the current directory if omitted, matching `git clone` behavior). The repository URL is only provided via the `--repo` flag, not as a positional argument.
+- [ ] Add `--repo` flag to `ordinator init` for remote cloning (deprecated in favor of positional argument, but may be supported for backward compatibility)
+- [ ] Prompt for or accept target directory
+- [ ] Clone the specified repository safely (with overwrite checks)
+- [ ] Set up configuration and profiles from the cloned repo
+- [ ] Optionally support branch/tag selection
+- [ ] Integrate with existing bootstrap and apply flows
+- [ ] Enhance `ordinator push` to accept a `--repo` or `--remote` URL, set the remote if not already configured, and push to that remote. This reduces reliance on a pre-installed git executable and improves onboarding for new users.
+- [ ] Add interactive prompts for repository URL input and directory selection
+- [ ] Implement progress indicators for cloning and setup operations
+- [ ] Enhance error messages for network issues and authentication problems
+- [ ] Add autocompletion for repository URLs and directory paths
+
+**Tests:**
+- [ ] Clones repo and initializes config correctly
+- [ ] Handles existing directory conflicts safely
+- [ ] Works with all supported profiles
+- [ ] UX is clear and error messages are helpful
+- [ ] Interactive prompts work for repository setup
+- [ ] Progress indicators display during cloning operations
+- [ ] Autocompletion works for repository URLs and paths
+
+**Acceptance Criteria:**
+```bash
+ordinator init https://github.com/yourname/dotfiles.git ~/.dotfiles
+# Clones the repo to ~/.dotfiles, sets up config, ready for apply
+ordinator init https://github.com/yourname/dotfiles.git
+# Clones the repo to the current directory by default
+# Interactive prompts guide user through setup
+# Progress indicators show cloning status
+```
+
+### 4.4 Auto-Generated README with Quick-Install & Secrets Instructions
+**Priority:** Medium  
+**Dependencies:** 1.1, 4.3  
+**Estimated Time:** 1 day  
+**Testable:** ✅
+
+**Tasks:**
+- [ ] Generate a `README.md` file on `ordinator init` if one does not exist
+- [ ] Include ideal install path and quick-start shell snippet
+- [ ] Add a section about the AGE key, its required location, and security warning
+- [ ] Document recommended profiles and bootstrap usage
+- [ ] Add links to the Ordinator project and documentation
+- [ ] Allow user to customize the README template (optional)
+- [ ] Add a shell one-liner for installation to the generated README
+- [ ] Include profile table, bootstrap explanation, troubleshooting, and security notes in README
+- [ ] Add interactive mode for customizing README template
+- [ ] Implement preview functionality to show generated README before saving
+- [ ] Add colorized output for highlighting important sections in generated README
+
+**Tests:**
+- [ ] README is created with correct content on new repo init
+- [ ] Existing README is not overwritten
+- [ ] Quick-install, AGE key, and documentation links are accurate and copy-pasteable
+- [ ] Interactive mode works for README customization
+- [ ] Preview functionality displays README correctly
+- [ ] Colorized output renders properly in different terminals
+
+**Acceptance Criteria:**
+```bash
+# After ordinator init, repo contains README.md with:
+# - Install path
+# - Quick-start shell snippet
+# - Profile/usage info
+# - AGE key warning and path
+# - Links to Ordinator project and docs
+# Interactive prompts allow README customization
+# Preview shows generated content before saving
+```
+
+### 4.5 Profile-Specific File Storage and Add Command Enhancement
+**Priority:** Medium  
+**Dependencies:** 2.1, 4.1  
+**Estimated Time:** 2 days  
+**Testable:** ✅
+
+**Tasks:**
+- [ ] Enhance `ordinator add` to support profile-specific file storage
+- [ ] When adding a file with `--profile`, store it in `files/<profile>/` subdirectory
+- [ ] Update config to track the correct source file for each profile
+- [ ] Ensure symlinking logic uses the correct profile-specific file
+- [ ] Update documentation and usage examples
+- [ ] Add interactive prompts for profile selection when adding files
+- [ ] Implement progress indicators for file copying and organization
+- [ ] Enhance error handling for file conflicts between profiles
+- [ ] Add colorized output for file operations and profile status
+
+**Tests:**
+- [ ] Adding the same file to multiple profiles stores separate copies
+- [ ] Applying a profile symlinks the correct version for that profile
+- [ ] No accidental overwrites between profiles
+- [ ] Backward compatibility for existing flat file structure
+- [ ] Interactive prompts work for profile selection
+- [ ] Progress indicators display during file operations
+- [ ] Error handling works for file conflicts
+
+**Acceptance Criteria:**
+```bash
+ordinator add ~/.zshrc --profile work
+# stores as files/work/.zshrc
+
+ordinator add ~/.zshrc --profile laptop
+# stores as files/laptop/.zshrc
+
+ordinator apply --profile work
+# symlinks files/work/.zshrc to ~/.zshrc
+# Interactive prompts guide profile selection
+# Progress indicators show file operations
+```
+
+### 4.6 Uninstall and Restore Original Configuration
+**Priority:** Medium  
+**Dependencies:** 2.2, 4.1  
+**Estimated Time:** 2 days  
+**Testable:** ✅
+
+**Tasks:**
+- [ ] Implement `ordinator uninstall` command
+- [ ] Remove all symlinks created by Ordinator for selected profile(s)
+- [ ] Optionally restore original files from backups
+- [ ] Support dry-run and force options
+- [ ] Prompt for config and repo cleanup (optional)
+- [ ] Update documentation and usage examples
+- [ ] Add interactive confirmation for destructive operations
+- [ ] Implement progress indicators for backup restoration
+- [ ] Add colorized output for showing what will be removed/restored
+- [ ] Enhance dry-run mode with detailed preview of uninstall actions
+
+**Backups Details:**
+- Backups are created during `ordinator apply` if a file already exists at the target location and backups are enabled (`create_backups = true`).
+- The original file is moved to a backup location (e.g., `~/.zshrc.ordinator.bak`) before the symlink is created.
+- Backups are typically stored in the same directory as the original file, with a `.ordinator.bak` or similar suffix.
+- During uninstall/restore, Ordinator will remove the symlink and, if a backup exists, move it back to the original location.
+- If multiple backups exist, the most recent is restored (or the user is prompted).
+- If backups are disabled, uninstall will only remove symlinks and not restore originals.
+- If no backup exists, the symlink is removed and the user is warned that the original file cannot be restored.
+- Best practice: Always enable backups to ensure safe restoration of original files.
+
+**Tests:**
+- [ ] Uninstall removes all symlinks for a profile
+- [ ] Backups are restored if requested
+- [ ] No data loss if backups are missing
+- [ ] Dry-run shows correct actions
+- [ ] Interactive confirmations work for destructive operations
+- [ ] Progress indicators display during restoration
+- [ ] Colorized output shows removal/restoration preview
+
+**Acceptance Criteria:**
+```bash
+ordinator uninstall --profile work --restore-backups
+# Removes all symlinks for 'work' profile and restores backups if available
+# Interactive prompts confirm destructive operations
+# Progress indicators show restoration status
+# Colorized output previews actions
+```
 
 ---
 
@@ -244,17 +434,27 @@ ordinator apply --skip-bootstrap       # Skips bootstrap
 - [ ] Validate command safety
 - [ ] Generate system script (`ordinator-system.sh`)
 - [ ] Never execute sudo commands directly
+- [ ] Add interactive mode for step-by-step system command execution
+- [ ] Implement progress indicators for script generation and validation
+- [ ] Add colorized output for safety level indicators (Safe/Warning/Dangerous/Blocked)
+- [ ] Enhance error messages for command validation failures
 
 **Tests**:
 - [ ] Commands are parsed correctly
 - [ ] Scripts are generated properly
 - [ ] Safety validation works
 - [ ] No sudo commands are executed
+- [ ] Interactive mode works for command execution
+- [ ] Progress indicators display during script generation
+- [ ] Colorized output renders safety levels correctly
 
 **Acceptance Criteria**:
 ```bash
 ordinator generate-script --profile work
 # Creates ordinator-system.sh for manual execution
+# Interactive mode guides through command execution
+# Progress indicators show generation status
+# Colorized output highlights safety levels
 ```
 
 ### 5.2 macOS-Specific Features
@@ -267,11 +467,26 @@ ordinator generate-script --profile work
 - [ ] `defaults write` command support
 - [ ] macOS-specific utilities
 - [ ] System preference management
+- [ ] Add interactive prompts for system preference changes
+- [ ] Implement preview mode to show what system changes will be made
+- [ ] Add confirmation dialogs for potentially destructive system changes
+- [ ] Add colorized output for system preference status
 
 **Tests**:
 - [ ] macOS commands are handled correctly
 - [ ] System preferences are managed
 - [ ] Cross-platform compatibility maintained
+- [ ] Interactive prompts work for system changes
+- [ ] Preview mode displays changes correctly
+- [ ] Confirmation dialogs prevent accidental changes
+
+**Acceptance Criteria**:
+```bash
+ordinator system --preview
+# Shows what system changes will be made
+ordinator system --interactive
+# Guides through system preference changes
+```
 
 ---
 
@@ -288,11 +503,17 @@ ordinator generate-script --profile work
 - [ ] `ordinator pull --rebase`
 - [ ] Auto-push after successful apply
 - [ ] Git conflict resolution
+- [ ] Add progress indicators for sync, pull, push operations
+- [ ] Implement interactive conflict resolution for merge conflicts
+- [ ] Add colorized output for Git status and diff information
 
 **Tests**:
 - [ ] Sync operations work correctly
 - [ ] Rebase functionality works
 - [ ] Auto-push functions properly
+- [ ] Progress indicators display during Git operations
+- [ ] Interactive conflict resolution works
+- [ ] Colorized output renders Git information correctly
 
 ### 6.2 Enhanced Logging & Output
 **Priority**: Low  
@@ -306,32 +527,90 @@ ordinator generate-script --profile work
 - [ ] Progress indicators
 - [x] Error reporting improvements
 - [x] Command documentation
+- [ ] Generate and install MAN page for CLI usage
+- [ ] Add structured logging with better log organization
+- [ ] Implement log file output for persistent logging capability
+- [ ] Add performance metrics and timing information for operations
+- [ ] Add silent mode for CI/CD integration
 
 **Tests**:
 - [ ] JSON output is valid
 - [x] Logging levels work correctly
 - [ ] Progress indicators function
 - [x] Documentation is comprehensive and accurate
+- [ ] MAN page is generated, installed, and accessible via `man ordinator`
+- [ ] Structured logging works correctly
+- [ ] Log file output functions properly
+- [ ] Performance metrics are accurate
+- [ ] Silent mode works for automated environments
+
+### 6.3 Advanced CLI Features
+**Priority**: Low  
+**Dependencies**: 1.1, 6.2  
+**Estimated Time**: 2-3 days  
+**Testable**: ✅
+
+**Tasks**:
+- [ ] Add comprehensive shell autocompletion (bash, zsh, fish)
+- [ ] Implement full interactive mode for enhanced CLI experience
+- [ ] Add configuration validation with interactive repair capabilities
+- [ ] Implement update notifications to check for updates and notify users
+- [ ] Add plugin system for extensible command system (future consideration)
+- [ ] Implement shell integration for better integration with user's shell environment
+
+**Tests**:
+- [ ] Shell autocompletion works for bash, zsh, and fish
+- [ ] Interactive mode provides enhanced user experience
+- [ ] Configuration validation and repair functions correctly
+- [ ] Update notifications work without being intrusive
+- [ ] Shell integration improves user workflow
+- [ ] Plugin system is extensible (future)
+
+**Acceptance Criteria**:
+```bash
+# Autocompletion works in user's shell
+ordinator <TAB>  # Shows available commands
+ordinator add <TAB>  # Shows available files
+
+# Interactive mode provides guided experience
+ordinator --interactive
+
+# Configuration validation and repair
+ordinator validate-config --repair
+
+# Update notifications
+ordinator --check-updates
+```
 
 ---
 
 ## Phase 7: Installation & Distribution 📦
 
-### 7.1 Homebrew Integration
+### 7.1 Installation Methods (Homebrew & Cargo)
 **Priority**: Medium  
 **Dependencies**: All previous phases  
 **Estimated Time**: 1-2 days  
 **Testable**: ✅
 
 **Tasks**:
-- [ ] Create Homebrew formula
-- [ ] Package for distribution
-- [ ] Installation script
+- [x] Create Homebrew formula
+- [x] Package for distribution
+- [x] Installation script (Homebrew formula and documented Homebrew install command)
+- [ ] Document and support installation via Cargo (`cargo install ordinator`)
+- [ ] Add installation verification with post-install checks and setup
+- [ ] Implement proper uninstall cleanup when removing Ordinator
+- [ ] Add self-update capability for easy updates
+- [ ] Add progress indicators for installation process
 
 **Tests**:
-- [ ] Homebrew installation works
-- [ ] Package installs correctly
-- [ ] All features function after installation
+- [x] Homebrew installation works
+- [ ] Cargo installation works
+- [x] Package installs correctly
+- [x] All features function after installation
+- [ ] Installation verification works correctly
+- [ ] Uninstall cleanup removes all components
+- [ ] Self-update functionality works
+- [ ] Progress indicators display during installation
 
 ### 7.2 Curl Install Script
 **Priority**: Medium  
@@ -343,11 +622,17 @@ ordinator generate-script --profile work
 - [ ] Create `curl | sh` installer
 - [ ] Silent mode support
 - [ ] Dependency checking
+- [ ] Add progress indicators for download and installation
+- [ ] Enhance dependency checking with better error messages
+- [ ] Add installation verification post-install
 
 **Tests**:
 - [ ] Installer works correctly
 - [ ] Silent mode functions
 - [ ] Dependencies are checked
+- [ ] Progress indicators display during download and installation
+- [ ] Enhanced error messages help users resolve issues
+- [ ] Installation verification validates successful installation
 
 ---
 

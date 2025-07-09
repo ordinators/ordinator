@@ -12,64 +12,121 @@
 - ✅ **Profile Support** - Environment profiles (work, personal, laptop)
 - ✅ **Secrets Management** - Secure secrets using Mozilla SOPS + age encryption
 - ✅ **Git Integration** - Git-inspired CLI commands without explicit git invocation
-- ✅ **macOS-Specific** - System settings and Homebrew integration
+- ✅ **macOS-Specific** - System settings support
 - ✅ **Dry-Run Mode** - Preview changes before applying them
 
 ## Quick Start
 
+### 1. Start a New Ordinator Dotfiles Repo (First-Time Setup)
+
 ```bash
-# Install via Homebrew
+# Install Ordinator via Homebrew
 brew install ordinators/ordinator/ordinator
 
-# Initialize a new dotfiles repository
-ordinator init --remote https://github.com/username/dotfiles
+# Initialize a new dotfiles repository in your chosen directory
+mkdir -p ~/.dotfiles
+cd ~/.dotfiles
+ordinator init
 
 # Add your first dotfile
 ordinator add ~/.zshrc
 
 # Apply your configuration
 ordinator apply
+
+# Commit your changes
+ordinator commit -m "Initial commit: track dotfiles with Ordinator"
+
+# Push to GitHub (sets remote if needed)
+ordinator push --repo https://github.com/username/dotfiles.git
 ```
 
-## Installation
+### 2. Replicate Your Dotfiles Repo to Another Device (Onboarding a New Machine)
 
-### Homebrew (Recommended)
 ```bash
+# Install Ordinator via Homebrew
 brew install ordinators/ordinator/ordinator
+
+# Initialize Ordinator with your remote repo (installs in current directory by default)
+ordinator init --repo https://github.com/username/dotfiles.git
+
+# Or specify a target directory
+ordinator init --repo https://github.com/username/dotfiles.git ~/.dotfiles
+
+# Change to the cloned directory if needed
+cd ~/.dotfiles
+
+# Apply your configuration (choose profile as needed)
+ordinator apply --profile work
 ```
 
-### Manual Installation
+When you run `ordinator apply`, Ordinator:
+
+- **Symlinks all tracked files** for the selected profile from your dotfiles repository into their correct locations in your home directory, backing up any existing files if configured.
+- **Generates the profile's bootstrap script** (if defined), which contains additional setup steps such as installing tools or configuring system settings.
+- **Decrypts secrets** (if secrets management is configured and not skipped), making encrypted files available for use.
+- **Performs safety checks** to avoid overwriting important files unless you use the `--force` flag.
+- **Supports dry-run mode** so you can preview all changes without making modifications by adding the `--dry-run` flag.
+
+This makes it easy to replicate your environment on any machine in a safe, repeatable, and automated way.
+
+## Bootstrap
+
+Ordinator generates a profile-specific bootstrap script (e.g., `scripts/bootstrap-work.sh`) after applying your profile. This script automates extra setup steps (like installing packages or configuring system settings) and may require elevated privileges.
+
+**You must review and run the script manually** for safety:
 ```bash
-# Clone and build
-git clone https://github.com/ordinators/ordinator.git
-cd ordinator
-cargo install --path .
+chmod +x scripts/bootstrap-work.sh
+./scripts/bootstrap-work.sh
 ```
+Manual execution ensures you control any privileged or system-altering commands.
+
+## Profiles
+
+Profiles in Ordinator are independent sets of tracked files, directories, and bootstrap scripts. When you apply a profile, only the files listed in that profile are symlinked; files can be included in multiple profiles if desired. Applying a new profile does not remove files from previous profiles—those files remain unless you manually clean them up or they are overwritten by the new profile.
+
+Ordinator supports multiple environment profiles (e.g., work, personal, laptop). Each profile can have its own set of tracked files, directories, and bootstrap script.
+
+- List available profiles:
+  ```bash
+  ordinator profiles
+  ```
+- Apply a specific profile:
+  ```bash
+  ordinator apply --profile work
+  ```
+
+## Secrets Management
+
+Ordinator integrates with Mozilla SOPS and age for secure secrets management. This enables you to encrypt your secrets and safely commit them to your GitHub repository without fear of compromise—only those with your private AGE key can decrypt them.
+
+Ordinator also scans tracked files for potential plaintext secrets and warns you if any are detected, helping prevent accidental exposure of sensitive information.
+
+- Encrypt a file:
+  ```bash
+  ordinator secrets encrypt secrets.yaml
+  ```
+- Decrypt a file:
+  ```bash
+  ordinator secrets decrypt secrets.enc.yaml
+  ```
+
+> **Never commit your AGE key or other sensitive secrets to your repository.**
+> The AGE key (typically at `~/.config/ordinator/age.key`) is required for decrypting secrets, but should always be kept private and out of version control.
 
 ## Documentation
 
 - [Product Requirements Document](PRD.md) - Complete feature specification
-- [Configuration Guide](CONFIGURATION.md) - Configuration file format and usage
-- [Commands Reference](COMMANDS.md) - Complete CLI command documentation
 - [Development Roadmap](DEVELOPMENT_ROADMAP.md) - Implementation plan
+- [Commands Reference](COMMANDS.md) - Complete CLI command documentation
+- [Configuration Guide](CONFIGURATION.md) - Configuration file format and usage
 - [Test Plan](TEST_PLAN.md) - Testing strategy
 
-## Development
+## Contributing & Feedback
 
-```bash
-# Setup development environment
-./scripts/dev-setup.sh
-
-# Run tests
-cargo test
-
-# Run linter
-cargo clippy
-
-# Format code
-cargo fmt
-```
+Contributions, bug reports, and feature requests are welcome!
+- [Open an issue or pull request](https://github.com/ordinators/ordinator/issues)
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details. 
+MIT License - see [LICENSE](LICENSE) for details.

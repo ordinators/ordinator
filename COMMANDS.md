@@ -86,7 +86,7 @@ ordinator apply [OPTIONS]
 
 **Options:**
 - `--profile <PROFILE>` - Profile to apply (default: "default")
-- `--skip-bootstrap` - Skip bootstrap script execution
+- `--skip-bootstrap` - Skip bootstrap script generation and validation
 - `--skip-secrets` - Skip secrets decryption
 - `--force` - Force overwrite existing files
 
@@ -108,9 +108,68 @@ ordinator apply --skip-bootstrap --skip-secrets
 **What it does:**
 - Creates symlinks for tracked files in home directory
 - Handles conflicts with existing files (backup if enabled)
-- Executes bootstrap scripts (unless skipped)
+- Generates a bootstrap script for the selected profile (unless skipped)
+- Validates the bootstrap script for safety (Blocked, Dangerous, Warning, Safe)
+- Prints the script path and safety level
+- **Never executes the script automatically** (see `ordinator bootstrap`)
 - Decrypts secrets (unless skipped)
 - Uses `--force` to overwrite non-symlink conflicts
+
+**Bootstrap Script Safety Levels:**
+- **Safe:** No dangerous commands detected
+- **Warning:** Contains potentially risky commands (e.g., `rm -rf <path>`, `chmod 777`)
+- **Dangerous:** Contains commands like `sudo` (requires manual review)
+- **Blocked:** Contains extremely dangerous commands (e.g., `rm -rf /`), execution is blocked
+
+**Bootstrap Workflow:**
+1. Run `ordinator apply` to generate and validate the bootstrap script
+2. Review the script path and safety level printed by the command
+3. Edit the script as needed using `ordinator bootstrap --edit`
+4. Run the script manually when ready (e.g., `bash /path/to/bootstrap.sh`)
+
+---
+
+### `ordinator bootstrap`
+
+Show information and instructions for running or editing the generated bootstrap script for a profile.
+
+```bash
+ordinator bootstrap [OPTIONS]
+```
+
+**Options:**
+- `--profile <PROFILE>` - Profile to bootstrap (default: "default")
+- `--edit` - Open the bootstrap script in $EDITOR (or nano) for editing
+
+**Examples:**
+```bash
+# Show info for default profile
+ordinator bootstrap
+
+# Show info for work profile
+ordinator bootstrap --profile work
+
+# Edit the bootstrap script for work profile
+ordinator bootstrap --profile work --edit
+```
+
+**What it does:**
+- Locates the generated bootstrap script for the selected profile
+- Validates the script for safety before execution
+- Prints the script path and safety level
+- Prints warnings if the script is Dangerous or Blocked
+- **Never executes the script itself**
+- Prints the exact shell command the user should run (e.g., `bash /path/to/bootstrap.sh`)
+- Advises the user to review and edit the script before running
+- If `--edit` is passed, opens the script in `$EDITOR` (or nano) for editing
+
+**Workflow:**
+1. Run `ordinator apply` to generate and validate the bootstrap script
+2. Run `ordinator bootstrap --edit` to update the script as needed
+3. Review the script and its safety level
+4. Run the script manually as instructed (e.g., `bash /path/to/bootstrap.sh`)
+
+---
 
 ### `ordinator status`
 

@@ -150,6 +150,17 @@ pub enum Commands {
         #[arg(long, default_value = "default")]
         profile: String,
     },
+
+    /// Execute bootstrap script for a profile
+    Bootstrap {
+        /// Profile to bootstrap
+        #[arg(long, default_value = "default")]
+        profile: String,
+
+        /// Open the bootstrap script in $EDITOR for editing
+        #[arg(long)]
+        edit: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -857,6 +868,54 @@ pub async fn run(args: Args) -> Result<()> {
                     eprintln!("  {}: Valid symlink", dest.display());
                 }
             }
+
+            // Generate bootstrap script if not skipped
+            if !skip_bootstrap {
+                use crate::bootstrap::BootstrapManager;
+                let bootstrap_manager = BootstrapManager::new(args.dry_run);
+
+                if let Some(script_path) =
+                    bootstrap_manager.generate_bootstrap_script(&profile, &config, _dotfiles_dir)?
+                {
+                    let safety_level = bootstrap_manager.get_script_safety_level(&script_path);
+
+                    if !args.quiet {
+                        eprintln!("Generated bootstrap script: {}", script_path.display());
+                        match safety_level {
+                            crate::bootstrap::SafetyLevel::Safe => {
+                                eprintln!("Script safety: Safe");
+                            }
+                            crate::bootstrap::SafetyLevel::Warning => {
+                                eprintln!("Script safety: Warning - Review before execution");
+                            }
+                            crate::bootstrap::SafetyLevel::Dangerous => {
+                                eprintln!(
+                                    "Script safety: Dangerous - Review carefully before execution"
+                                );
+                            }
+                            crate::bootstrap::SafetyLevel::Blocked => {
+                                eprintln!(
+                                    "Script safety: Blocked - Script contains dangerous commands"
+                                );
+                            }
+                        }
+                    }
+
+                    info!(
+                        "Generated bootstrap script: {} (safety: {:?})",
+                        script_path.display(),
+                        safety_level
+                    );
+                } else {
+                    if !args.quiet {
+                        eprintln!("No bootstrap script defined for profile '{profile}'");
+                    }
+                    info!("No bootstrap script defined for profile '{}'", profile);
+                }
+            } else {
+                info!("Skipped bootstrap script generation");
+            }
+
             info!("Apply completed");
             if !args.quiet {
                 eprintln!("Apply completed");
@@ -1234,6 +1293,84 @@ pub async fn run(args: Args) -> Result<()> {
             // TODO: Implement actual script generation logic
             info!("Script generation not yet implemented");
             eprintln!("Script generation not yet implemented");
+            Ok(())
+        }
+        Commands::Bootstrap { profile, edit } => {
+            info!("Bootstrap script info for profile: {}", profile);
+            if !args.quiet {
+                eprintln!("Bootstrap script info for profile: {profile}");
+            }
+
+            let (config, config_path) = Config::load()?;
+            if !config.profiles.contains_key(&profile) {
+                return Err(anyhow::anyhow!("Profile '{profile}' does not exist."));
+            }
+
+            let dotfiles_dir = config_path.parent().unwrap();
+            use crate::bootstrap::{BootstrapManager, SafetyLevel};
+            let bootstrap_manager = BootstrapManager::new(args.dry_run);
+
+            // Generate the bootstrap script first
+            if let Some(script_path) =
+                bootstrap_manager.generate_bootstrap_script(&profile, &config, dotfiles_dir)?
+            {
+                let safety_level = bootstrap_manager.get_script_safety_level(&script_path);
+
+                if !args.quiet {
+                    eprintln!("Bootstrap script: {}", script_path.display());
+                    eprintln!("Safety level: {safety_level:?}");
+                }
+
+                // Print warnings for dangerous/blocked scripts
+                match safety_level {
+                    SafetyLevel::Blocked => {
+                        eprintln!("❌ Script is BLOCKED: Contains extremely dangerous commands (e.g., rm -rf /). Review and edit the script before running.");
+                    }
+                    SafetyLevel::Dangerous => {
+                        eprintln!("⚠️  Script is DANGEROUS: Contains commands like 'sudo'. Review carefully before running.");
+                    }
+                    SafetyLevel::Warning => {
+                        eprintln!("⚠️  Script contains potentially risky commands. Review before running.");
+                    }
+                    SafetyLevel::Safe => {
+                        eprintln!("Script is marked as safe.");
+                    }
+                }
+
+                if edit {
+                    // Open the script in $EDITOR or nano
+                    let editor = std::env::var("EDITOR").unwrap_or_else(|_| "nano".to_string());
+                    let status = std::process::Command::new(editor)
+                        .arg(&script_path)
+                        .status();
+                    match status {
+                        Ok(status) if status.success() => {
+                            eprintln!("Script opened for editing: {}", script_path.display());
+                        }
+                        Ok(status) => {
+                            eprintln!("Editor exited with status: {status}");
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to open editor: {e}");
+                        }
+                    }
+                } else {
+                    // Always print the command for the user to run
+                    eprintln!("\nTo run the bootstrap script, execute:");
+                    eprintln!("  bash {}", script_path.display());
+                    eprintln!("\nOr review and edit the script before running as needed.");
+                }
+                info!(
+                    "Bootstrap script info presented to user: {}",
+                    script_path.display()
+                );
+            } else {
+                if !args.quiet {
+                    eprintln!("No bootstrap script defined for profile '{profile}'");
+                }
+                info!("No bootstrap script defined for profile '{}'", profile);
+            }
+
             Ok(())
         }
     }
