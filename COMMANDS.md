@@ -88,6 +88,7 @@ ordinator apply [OPTIONS]
 - `--profile <PROFILE>` - Profile to apply (default: "default")
 - `--skip-bootstrap` - Skip bootstrap script generation and validation
 - `--skip-secrets` - Skip secrets decryption
+- `--skip-brew` - Skip Homebrew package installation
 - `--force` - Force overwrite existing files
 
 **Examples:**
@@ -101,19 +102,30 @@ ordinator apply --profile work
 # Apply with force overwrite
 ordinator apply --force
 
-# Apply without bootstrap or secrets
-ordinator apply --skip-bootstrap --skip-secrets
+# Apply without bootstrap, secrets, or brew packages
+ordinator apply --skip-bootstrap --skip-secrets --skip-brew
+
+# Apply without brew package installation
+ordinator apply --profile work --skip-brew
 ```
 
 **What it does:**
-- Creates symlinks for tracked files in home directory
-- Handles conflicts with existing files (backup if enabled)
-- Generates a bootstrap script for the selected profile (unless skipped)
-- Validates the bootstrap script for safety (Blocked, Dangerous, Warning, Safe)
-- Prints the script path and safety level
-- **Never executes the script automatically** (see `ordinator bootstrap`)
-- Decrypts secrets (unless skipped)
-- Uses `--force` to overwrite non-symlink conflicts
+1. **Generates bootstrap script** for the selected profile (unless `--skip-bootstrap`)
+2. **Decrypts secrets** for the profile (unless `--skip-secrets`)
+3. **Installs Homebrew packages** defined in the profile (unless `--skip-brew`)
+4. **Creates symlinks** for tracked files in home directory
+5. **Handles conflicts** with existing files (backup if enabled)
+6. **Validates bootstrap script** for safety (Blocked, Dangerous, Warning, Safe)
+7. **Prints script path and safety level** (if bootstrap script was generated)
+8. **Never executes bootstrap script automatically** (see `ordinator bootstrap`)
+9. **Uses `--force`** to overwrite non-symlink conflicts
+
+**Order of Operations:**
+The apply command follows a specific order to ensure dependencies are satisfied:
+- Homebrew packages are installed **before** symlinks are created
+- This prevents broken symlinks to Homebrew-installed tools
+- Secrets are decrypted **before** symlinks to ensure encrypted files are available
+- Bootstrap scripts are generated **first** for user review and manual execution
 
 **Bootstrap Script Safety Levels:**
 - **Safe:** No dangerous commands detected
@@ -553,6 +565,101 @@ ordinator secrets check
 - Shows installation paths if found
 - Provides installation instructions if missing
 
+## Homebrew Package Management Commands
+
+### `ordinator brew export`
+
+Export currently installed Homebrew packages to the configuration.
+
+```bash
+ordinator brew export [OPTIONS]
+```
+
+**Options:**
+- `--profile <PROFILE>` - Profile to export packages to (default: "default")
+- `--dry-run` - Simulate export without making changes
+
+**Examples:**
+```bash
+# Export packages to default profile
+ordinator brew export
+
+# Export packages to work profile
+ordinator brew export --profile work
+
+# Simulate export without making changes
+ordinator brew export --dry-run
+```
+
+**What it does:**
+- Exports currently installed Homebrew formulae and casks
+- Stores package list in the profile's `homebrew_packages` configuration
+- Preserves package versions for reproducible environments
+- Updates `ordinator.toml` with the exported package list
+- Can be used to capture current Homebrew state for sharing
+
+### `ordinator brew install`
+
+Install Homebrew packages defined in the configuration.
+
+```bash
+ordinator brew install [OPTIONS]
+```
+
+**Options:**
+- `--profile <PROFILE>` - Profile to install packages for (default: "default")
+- `--dry-run` - Simulate installation without making changes
+
+**Examples:**
+```bash
+# Install packages for default profile
+ordinator brew install
+
+# Install packages for work profile
+ordinator brew install --profile work
+
+# Simulate installation without making changes
+ordinator brew install --dry-run
+```
+
+**What it does:**
+- Installs all Homebrew packages listed in the profile's `homebrew_packages` configuration
+- Uses `brew install` for formulae and `brew install --cask` for casks
+- Handles missing packages gracefully (continues with available packages)
+- Provides progress feedback during installation
+- Can be run independently or as part of `ordinator apply`
+
+### `ordinator brew list`
+
+List Homebrew packages defined in the configuration.
+
+```bash
+ordinator brew list [OPTIONS]
+```
+
+**Options:**
+- `--profile <PROFILE>` - Profile to list packages for (default: "default")
+- `--verbose` - Show detailed package information
+
+**Examples:**
+```bash
+# List packages for default profile
+ordinator brew list
+
+# List packages for work profile
+ordinator brew list --profile work
+
+# Show detailed package information
+ordinator brew list --verbose
+```
+
+**What it does:**
+- Lists all Homebrew packages defined in the profile's configuration
+- Shows formulae and casks separately
+- Displays package versions if specified
+- Can show detailed information with --verbose flag
+- Useful for reviewing what packages will be installed
+
 ## Management Commands
 
 ### `ordinator remove`
@@ -679,11 +786,15 @@ ordinator add ~/.zshrc
 ordinator add ~/.gitconfig --profile work
 ordinator add ~/.config/nvim
 
-# Apply configuration
-ordinator apply
+# Export Homebrew packages for reproducible environments
+ordinator brew export --profile work
+ordinator brew export --profile personal
+
+# Apply configuration (includes Homebrew package installation)
+ordinator apply --profile work
 
 # Commit and push changes
-ordinator commit -m "Initial dotfiles setup"
+ordinator commit -m "Initial dotfiles setup with Homebrew packages"
 ordinator push
 ```
 
@@ -733,6 +844,25 @@ ordinator secrets decrypt ~/.ssh/config.enc
 
 # Apply with secrets decryption
 ordinator apply
+```
+
+### Homebrew Package Management
+
+```bash
+# Export current Homebrew packages to configuration
+ordinator brew export --profile work
+
+# List packages that will be installed
+ordinator brew list --profile work
+
+# Install packages for a profile
+ordinator brew install --profile work
+
+# Apply configuration with Homebrew packages
+ordinator apply --profile work
+
+# Skip Homebrew installation during apply
+ordinator apply --profile work --skip-brew
 ```
 
 ### System Setup

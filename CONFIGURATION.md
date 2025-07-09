@@ -29,6 +29,7 @@ exclude = ["*.bak"]
 [profiles.default]
 files = ["~/.zshrc", "~/.gitconfig"]
 directories = ["~/.config/nvim"]
+homebrew_packages = ["git", "neovim", "ripgrep"]
 enabled = true
 description = "Default profile for basic dotfiles"
 exclude = ["*.bak"]
@@ -36,12 +37,14 @@ exclude = ["*.bak"]
 [profiles.work]
 files = ["~/.ssh/config"]
 directories = []
+homebrew_packages = ["git", "neovim", "ripgrep", "sops", "age", "jq", "yq"]
 enabled = true
 description = "Work environment profile"
 
 [profiles.personal]
 files = []
 directories = []
+homebrew_packages = ["git", "neovim"]
 enabled = true
 description = "Personal environment profile"
 
@@ -65,6 +68,12 @@ exclude_patterns = ["*.bak"]
 ### `[profiles.<name>]`
 - `files` (array of strings): List of files tracked by this profile.
 - `directories` (array of strings): List of directories tracked by this profile.
+- `homebrew_packages` (array of strings, optional): List of Homebrew packages to install for this profile.
+  - Can include both formulae and casks
+  - Packages are installed using `brew install` for formulae and `brew install --cask` for casks
+  - Installed automatically when running `ordinator apply` (unless `--skip-brew` is used)
+  - Can be exported from current system using `ordinator brew export --profile <name>`
+  - Example: `["git", "neovim", "ripgrep", "sops", "age"]`
 - `bootstrap_script` (string, optional): Path to a bootstrap script for this profile.
   - Relative path from the dotfiles directory (e.g., "scripts/bootstrap-default.sh")
   - Absolute paths are also supported (e.g., "/path/to/script.sh")
@@ -180,6 +189,70 @@ description = "Laptop setup with minimal tools"
   - Default: "age"
   - Supported values: "age", "gpg", "kms"
   - Must match available encryption keys in SOPS configuration
+
+## Homebrew Package Management
+
+Ordinator supports managing Homebrew packages per profile, allowing you to maintain reproducible development environments across different machines.
+
+### Homebrew Package Configuration
+
+**Profile-based Packages:**
+- Each profile can specify a `homebrew_packages` array
+- Packages are installed automatically during `ordinator apply`
+- Supports both formulae and casks
+- Packages are installed before symlinks are created to prevent broken links
+
+**Export Process:**
+When you run `ordinator brew export --profile <name>`, the following happens:
+1. **Package Detection**: Ordinator detects currently installed Homebrew formulae and casks
+2. **Configuration Update**: Updates the profile's `homebrew_packages` array in `ordinator.toml`
+3. **Version Preservation**: Captures package versions for reproducible environments
+4. **Profile Association**: Associates packages with the specified profile
+
+**Installation Process:**
+When you run `ordinator apply` or `ordinator brew install`, the following happens:
+1. **Package Resolution**: Ordinator reads the profile's `homebrew_packages` array
+2. **Installation**: Uses `brew install` for formulae and `brew install --cask` for casks
+3. **Error Handling**: Continues installation even if some packages fail
+4. **Progress Feedback**: Provides installation status and progress information
+
+### Example Homebrew Workflow
+
+```bash
+# 1. Export current Homebrew packages to work profile
+ordinator brew export --profile work
+
+# 2. Review what packages will be installed
+ordinator brew list --profile work
+
+# 3. Apply configuration (includes Homebrew installation)
+ordinator apply --profile work
+
+# 4. Or install packages separately
+ordinator brew install --profile work
+```
+
+### Homebrew Package Best Practices
+
+1. **Profile Organization**
+   - Use different packages for different environments (work, personal, laptop)
+   - Keep packages minimal and focused per profile
+   - Document why specific packages are needed
+
+2. **Version Management**
+   - Export packages when setting up new environments
+   - Review package lists regularly for updates
+   - Consider pinning specific versions for critical tools
+
+3. **Installation Order**
+   - Homebrew packages are installed before symlinks
+   - This prevents broken symlinks to Homebrew-installed tools
+   - Use `--skip-brew` to skip package installation during apply
+
+4. **Error Handling**
+   - Missing packages don't block the entire installation
+   - Review installation logs for failed packages
+   - Re-run installation for failed packages if needed
 
 ## SOPS Setup Process
 

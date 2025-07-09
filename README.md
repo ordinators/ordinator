@@ -62,11 +62,18 @@ ordinator apply --profile work
 
 When you run `ordinator apply`, Ordinator:
 
-- **Symlinks all tracked files** for the selected profile from your dotfiles repository into their correct locations in your home directory, backing up any existing files if configured.
-- **Generates the profile's bootstrap script** (if defined), which contains additional setup steps such as installing tools or configuring system settings.
-- **Decrypts secrets** (if secrets management is configured and not skipped), making encrypted files available for use.
-- **Performs safety checks** to avoid overwriting important files unless you use the `--force` flag.
-- **Supports dry-run mode** so you can preview all changes without making modifications by adding the `--dry-run` flag.
+1. **Generates the profile's bootstrap script** (if defined), which contains additional setup steps such as installing tools or configuring system settings.
+2. **Decrypts secrets** (if secrets management is configured and not skipped), making encrypted files available for use.
+3. **Installs Homebrew packages** defined in the profile (if package management is configured and not skipped).
+4. **Symlinks all tracked files** for the selected profile from your dotfiles repository into their correct locations in your home directory, backing up any existing files if configured.
+5. **Performs safety checks** to avoid overwriting important files unless you use the `--force` flag.
+6. **Supports dry-run mode** so you can preview all changes without making modifications by adding the `--dry-run` flag.
+
+**Order of Operations:**
+The apply command follows a specific order to ensure dependencies are satisfied:
+- Homebrew packages are installed **before** symlinks are created to prevent broken symlinks to Homebrew-installed tools
+- Secrets are decrypted **before** symlinks to ensure encrypted files are available
+- Bootstrap scripts are generated **first** for user review and manual execution
 
 This makes it easy to replicate your environment on any machine in a safe, repeatable, and automated way.
 
