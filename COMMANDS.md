@@ -53,6 +53,7 @@ ordinator init --profile work
 
 **For new repositories:**
 - Creates `ordinator.toml` configuration file
+- Creates `.gitignore` file with security-focused ignore rules
 - Initializes Git repository
 - Creates `files/` and `scripts/` directories
 - Sets up default profiles (default, work, personal)
@@ -301,8 +302,18 @@ ordinator commit -m "Update config" --force
 - Stages all changes in the dotfiles repository
 - **Scans all tracked files for plaintext secrets** (unless `--force` is used)
 - **Blocks commit with error code 1 if secrets are found** (unless `--force` is used)
+- **Warns if no remote 'origin' is set** (affects README generation)
 - Creates Git commit with specified message
 - Uses Git repository in dotfiles directory
+
+**Remote Warning:**
+If no remote 'origin' is configured, the commit will succeed but show a warning:
+```
+⚠️  Warning: No remote 'origin' set
+   This will cause the README to show placeholder URLs instead of your actual repository URL.
+   To fix this, run: ordinator push <your-repo-url>
+   Example: ordinator push https://github.com/yourname/dotfiles.git
+```
 
 ### `ordinator push`
 
@@ -699,6 +710,123 @@ ordinator brew list --verbose
 - Displays package versions if specified
 - Can show detailed information with --verbose flag
 - Useful for reviewing what packages will be installed
+
+### `ordinator readme`
+
+Manage README generation for the dotfiles repository.
+
+```bash
+ordinator readme [COMMAND] [OPTIONS]
+```
+
+**Subcommands:**
+
+#### `ordinator readme default`
+
+Generate default README if none exists.
+
+```bash
+ordinator readme default
+```
+
+**What it does:**
+- Checks if README.md already exists
+- If missing, generates a comprehensive README with:
+  - **Quick install instructions** with one-liner curl command
+  - **Copy-to-clipboard buttons** for easy command copying
+  - **Private repository support** with PAT input form
+  - **Profile usage information** with available profiles
+  - **AGE key setup guide** for secrets management
+  - **Troubleshooting section** for common issues
+  - **Security notes** and best practices
+- **Generates install script** in `scripts/install.sh` (in the dotfiles repository)
+- **Generates README.md** in the root of the dotfiles repository
+- **Generates state file** `readme_state.json` in the root of the dotfiles repository
+- All generated files are committed to the repository when you run `ordinator commit`
+- If README.md exists, shows message and exits
+
+#### `ordinator readme interactive`
+
+Interactive README customization.
+
+```bash
+ordinator readme interactive
+```
+
+**What it does:**
+- Steps through customization options:
+  - Repository information
+  - Installation path
+  - Profile configuration
+  - AGE key settings
+  - README sections to include
+- Shows preview before saving
+- Allows editing generated content
+
+#### `ordinator readme preview`
+
+Preview generated README before saving.
+
+```bash
+ordinator readme preview
+```
+
+**What it does:**
+- Generates README content (with current config)
+- **Uses actual repository URL** if remote is set, otherwise shows placeholder
+- Displays formatted preview with all sections
+- **Generates install script** in `scripts/install.sh` (in the dotfiles repository)
+- Shows interactive copy buttons and PAT input form
+- Doesn't save to file automatically
+- Provides instructions for saving the README
+
+#### `ordinator readme edit`
+
+Edit existing README in $EDITOR.
+
+```bash
+ordinator readme edit
+```
+
+**What it does:**
+- Opens existing README.md in $EDITOR
+- If README.md doesn't exist, generates default first
+- Handles missing $EDITOR gracefully
+- Preserves user customizations
+
+**Examples:**
+```bash
+# Generate default README
+ordinator readme default
+
+# Interactive customization
+ordinator readme interactive
+
+# Preview what would be generated
+ordinator readme preview
+
+# Edit existing README
+ordinator readme edit
+```
+
+**Configuration:**
+README generation can be configured in `ordinator.toml`:
+
+```toml
+[readme]
+auto_update = false  # Enable automatic updates
+update_on_changes = ["profiles", "bootstrap"]  # Specific triggers
+```
+
+**Auto-Update Behavior:**
+- **Manual Mode** (default): Users get notifications when README may need updating
+- **Auto Mode**: README automatically regenerates when config changes
+- **Smart Detection**: Only updates when profiles, bootstrap, or AGE key info changes
+- **File Locations**: All generated files are placed in the dotfiles repository:
+  - `README.md` - Root of the repository
+  - `scripts/install.sh` - Install script for the repository
+  - `readme_state.json` - State tracking file (root of repository)
+- **Git Integration**: Generated files are automatically committed when you run `ordinator commit`
 
 ## Management Commands
 

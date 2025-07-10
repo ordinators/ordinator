@@ -160,6 +160,10 @@ impl GitManager {
         };
 
         info!("Commit created successfully: {}", commit_id);
+
+        // Warn if no remote is set
+        self.warn_if_no_remote_set();
+
         Ok(())
     }
 
@@ -364,6 +368,41 @@ impl GitManager {
             Repository::open(&self.repo_path).is_ok()
         }
     }
+
+    /// Get the origin remote URL
+    pub fn get_origin_url(&self) -> Result<Option<String>> {
+        if Self::is_test_mode() {
+            return Ok(Some("https://github.com/testuser/dotfiles.git".to_string()));
+        }
+
+        let repo = match Repository::open(&self.repo_path) {
+            Ok(repo) => repo,
+            Err(_) => return Ok(None),
+        };
+
+        let remote = match repo.find_remote("origin") {
+            Ok(remote) => remote,
+            Err(_) => return Ok(None),
+        };
+
+        Ok(remote.url().map(|url| url.to_string()))
+    }
+
+    /// Warn if no remote is set (for README generation)
+    fn warn_if_no_remote_set(&self) {
+        if Self::is_test_mode() {
+            return;
+        }
+
+        if let Ok(repo) = Repository::open(&self.repo_path) {
+            if repo.find_remote("origin").is_err() {
+                eprintln!("⚠️  Warning: No remote 'origin' set");
+                eprintln!("   This will cause the README to show placeholder URLs instead of your actual repository URL.");
+                eprintln!("   To fix this, run: ordinator push <your-repo-url>");
+                eprintln!("   Example: ordinator push https://github.com/yourname/dotfiles.git");
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -433,7 +472,7 @@ mod tests {
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "test content").unwrap();
 
-        // Commit the file
+        // Commit the file (this will trigger a warning about no remote, but should still succeed)
         git_manager.commit("Initial commit").unwrap();
 
         // Verify commit was created
@@ -866,5 +905,54 @@ mod tests {
         let git_manager = GitManager::new(expected_path.clone());
 
         assert_eq!(git_manager.path(), expected_path.as_path());
+    }
+
+    #[test]
+    fn test_commit_without_remote_warning() {
+        let temp_dir = tempdir().unwrap();
+        let git_manager = GitManager::new(temp_dir.path().to_path_buf());
+
+        // Initialize repository
+        git_manager.init().unwrap();
+
+        // Create a test file
+        let test_file = temp_dir.path().join("test.txt");
+        fs::write(&test_file, "test content").unwrap();
+
+        // Commit the file (should trigger warning but still succeed)
+        git_manager.commit("Test commit").unwrap();
+
+        // Verify commit was created despite warning
+        let repo = Repository::open(temp_dir.path()).unwrap();
+        let head = repo.head().unwrap();
+        let commit = repo.find_commit(head.target().unwrap()).unwrap();
+        assert_eq!(commit.message().unwrap(), "Test commit");
+    }
+
+    #[test]
+    fn test_commit_with_remote_no_warning() {
+        let temp_dir = tempdir().unwrap();
+        let git_manager = GitManager::new(temp_dir.path().to_path_buf());
+
+        // Initialize repository
+        git_manager.init().unwrap();
+
+        // Add remote first
+        git_manager
+            .add_remote("origin", "https://github.com/user/dotfiles.git")
+            .unwrap();
+
+        // Create a test file
+        let test_file = temp_dir.path().join("test.txt");
+        fs::write(&test_file, "test content").unwrap();
+
+        // Commit the file (should not trigger warning)
+        git_manager.commit("Test commit with remote").unwrap();
+
+        // Verify commit was created
+        let repo = Repository::open(temp_dir.path()).unwrap();
+        let head = repo.head().unwrap();
+        let commit = repo.find_commit(head.target().unwrap()).unwrap();
+        assert_eq!(commit.message().unwrap(), "Test commit with remote");
     }
 }

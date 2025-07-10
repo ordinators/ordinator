@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use std::process::Command;
 use tracing::{info, warn};
 
-use crate::config::{Config, HomebrewPackage, HomebrewPackages};
+use crate::config::Config;
 
 pub struct BrewManager {
     dry_run: bool,
@@ -22,9 +22,8 @@ impl BrewManager {
         if let Some(profile_config) = config.get_profile_mut(profile) {
             profile_config.homebrew_packages = current_packages;
             info!(
-                "Exported {} formulae and {} casks to profile '{}'",
-                profile_config.homebrew_packages.formulae.len(),
-                profile_config.homebrew_packages.casks.len(),
+                "Exported {} packages to profile '{}'",
+                profile_config.homebrew_packages.len(),
                 profile
             );
         } else {
@@ -44,25 +43,15 @@ impl BrewManager {
 
         let packages = &profile_config.homebrew_packages;
 
-        if packages.formulae.is_empty() && packages.casks.is_empty() {
+        if packages.is_empty() {
             info!("No Homebrew packages defined for profile '{}'", profile);
             return Ok(());
         }
 
-        // Install formulae
-        if !packages.formulae.is_empty() {
-            info!("Installing {} formulae", packages.formulae.len());
-            for package in &packages.formulae {
-                self.install_formula(package).await?;
-            }
-        }
-
-        // Install casks
-        if !packages.casks.is_empty() {
-            info!("Installing {} casks", packages.casks.len());
-            for package in &packages.casks {
-                self.install_cask(package).await?;
-            }
+        // Install all packages (treat as formulae for now)
+        info!("Installing {} packages", packages.len());
+        for package in packages {
+            self.install_formula(package).await?;
         }
 
         info!(
@@ -79,22 +68,16 @@ impl BrewManager {
             .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found", profile))?;
 
         println!("Homebrew packages for profile '{profile}':");
-        println!("Formulae:");
-        for formula in &profile_config.homebrew_packages.formulae {
-            println!("  - {}", formula.name);
-        }
-        println!("Casks:");
-        for cask in &profile_config.homebrew_packages.casks {
-            println!("  - {}", cask.name);
+        for package in &profile_config.homebrew_packages {
+            println!("  - {package}");
         }
 
         Ok(())
     }
 
     /// Get current Homebrew packages
-    async fn get_current_packages(&self) -> Result<HomebrewPackages> {
-        let mut formulae = Vec::new();
-        let mut casks = Vec::new();
+    async fn get_current_packages(&self) -> Result<Vec<String>> {
+        let mut packages = Vec::new();
 
         // Get installed formulae
         let formulae_output = Command::new("brew")
@@ -109,11 +92,7 @@ impl BrewManager {
             for line in formulae_str.lines() {
                 let name = line.trim();
                 if !name.is_empty() {
-                    formulae.push(HomebrewPackage {
-                        name: name.to_string(),
-                        version: None, // TODO: Get versions if needed
-                        pinned: None,
-                    });
+                    packages.push(name.to_string());
                 }
             }
         }
@@ -131,76 +110,34 @@ impl BrewManager {
             for line in casks_str.lines() {
                 let name = line.trim();
                 if !name.is_empty() {
-                    casks.push(HomebrewPackage {
-                        name: name.to_string(),
-                        version: None, // TODO: Get versions if needed
-                        pinned: None,
-                    });
+                    packages.push(name.to_string());
                 }
             }
         }
 
-        Ok(HomebrewPackages { formulae, casks })
+        Ok(packages)
     }
 
     /// Install a single formula
-    async fn install_formula(&self, package: &HomebrewPackage) -> Result<()> {
+    async fn install_formula(&self, package: &str) -> Result<()> {
         if self.dry_run {
-            println!("[DRY-RUN] Would install formula: {}", package.name);
+            println!("[DRY-RUN] Would install formula: {package}");
             return Ok(());
         }
 
         let mut cmd = Command::new("brew");
         cmd.arg("install");
-
-        if let Some(version) = &package.version {
-            cmd.args([&package.name, &format!("@{version}")]);
-        } else {
-            cmd.arg(&package.name);
-        }
+        cmd.arg(package);
 
         let output = cmd
             .output()
-            .with_context(|| format!("Failed to run brew install for formula: {}", package.name))?;
+            .with_context(|| format!("Failed to run brew install for formula: {package}"))?;
 
         if output.status.success() {
-            info!("Installed formula: {}", package.name);
+            info!("Installed formula: {}", package);
         } else {
             let error = String::from_utf8_lossy(&output.stderr);
-            warn!("Failed to install formula {}: {}", package.name, error);
-        }
-
-        Ok(())
-    }
-
-    /// Install a single cask
-    async fn install_cask(&self, package: &HomebrewPackage) -> Result<()> {
-        if self.dry_run {
-            println!("[DRY-RUN] Would install cask: {}", package.name);
-            return Ok(());
-        }
-
-        let mut cmd = Command::new("brew");
-        cmd.args(["install", "--cask"]);
-
-        if let Some(version) = &package.version {
-            cmd.args([&package.name, &format!("@{version}")]);
-        } else {
-            cmd.arg(&package.name);
-        }
-
-        let output = cmd.output().with_context(|| {
-            format!(
-                "Failed to run brew install --cask for cask: {}",
-                package.name
-            )
-        })?;
-
-        if output.status.success() {
-            info!("Installed cask: {}", package.name);
-        } else {
-            let error = String::from_utf8_lossy(&output.stderr);
-            warn!("Failed to install cask {}: {}", package.name, error);
+            warn!("Failed to install formula {}: {}", package, error);
         }
 
         Ok(())
@@ -301,26 +238,15 @@ mod tests {
 
     #[test]
     fn test_config_homebrew_package_roundtrip() {
-        use crate::config::{Config, HomebrewPackage};
+        use crate::config::Config;
         let mut config = Config::create_default();
         let profile = config.profiles.get_mut("default").unwrap();
-        profile.homebrew_packages.formulae.push(HomebrewPackage {
-            name: "dummyformula".to_string(),
-            version: None,
-            pinned: None,
-        });
-        profile.homebrew_packages.casks.push(HomebrewPackage {
-            name: "dummycask".to_string(),
-            version: None,
-            pinned: None,
-        });
+        profile.homebrew_packages.push("dummyformula".to_string());
+        profile.homebrew_packages.push("dummycask".to_string());
         let toml = toml::to_string_pretty(&config).unwrap();
         let parsed: Config = toml::from_str(&toml).unwrap();
         let parsed_profile = parsed.get_profile("default").unwrap();
-        assert_eq!(
-            parsed_profile.homebrew_packages.formulae[0].name,
-            "dummyformula"
-        );
-        assert_eq!(parsed_profile.homebrew_packages.casks[0].name, "dummycask");
+        assert_eq!(parsed_profile.homebrew_packages[0], "dummyformula");
+        assert_eq!(parsed_profile.homebrew_packages[1], "dummycask");
     }
 }
