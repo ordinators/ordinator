@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tracing::{info, warn};
 
 use crate::config::Config;
@@ -31,13 +31,21 @@ pub struct Args {
 pub enum Commands {
     /// Initialize a new dotfiles repository
     Init {
-        /// Remote Git repository URL
-        #[arg(long)]
-        remote: Option<String>,
+        /// Repository URL to clone from (GitHub HTTPS or SSH)
+        #[arg(value_name = "REPO_URL")]
+        repo_url: Option<String>,
 
-        /// Profile to use for initialization
+        /// Target directory for the repository (defaults to current directory)
+        #[arg(value_name = "TARGET_DIR")]
+        target_dir: Option<String>,
+
+        /// Profile to use for initialization (when not cloning from repo)
         #[arg(long, default_value = "default")]
         profile: String,
+
+        /// Force overwrite existing directory
+        #[arg(long)]
+        force: bool,
     },
 
     /// Add a file to the dotfiles repository
@@ -71,6 +79,10 @@ pub enum Commands {
 
     /// Push changes to remote repository
     Push {
+        /// Repository URL to push to (sets remote if not configured)
+        #[arg(value_name = "REPO_URL")]
+        repo_url: Option<String>,
+
         /// Force push (use with caution)
         #[arg(long)]
         force: bool,
@@ -292,65 +304,86 @@ pub async fn run(args: Args) -> Result<()> {
     }
 
     match args.command {
-        Commands::Init { remote, profile } => {
-            info!("Initializing repository with profile: {}", profile);
-            if !args.quiet {
-                eprintln!("Initializing repository with profile: {profile}");
-            }
-            if let Some(url) = &remote {
-                info!("Remote URL: {}", url);
+        Commands::Init {
+            repo_url,
+            target_dir,
+            profile,
+            force,
+        } => {
+            if let Some(url) = &repo_url {
+                // Initialize from remote repository
+                info!("Initializing from repository: {}", url);
                 if !args.quiet {
-                    eprintln!("Remote URL: {url}");
+                    eprintln!("Initializing from repository: {url}");
                 }
-            }
 
-            if args.dry_run {
-                info!(
-                    "[DRY RUN] Would initialize repository with profile: {}",
-                    profile
-                );
-                eprintln!("DRY-RUN: Would initialize repository with profile: {profile}");
-                if let Some(url) = remote {
-                    info!("[DRY RUN] Would set remote URL: {}", url);
-                    eprintln!("DRY-RUN: Would set remote URL: {url}");
+                if args.dry_run {
+                    info!("[DRY RUN] Would initialize from repository: {}", url);
+                    eprintln!("DRY-RUN: Would initialize from repository: {url}");
+                    return Ok(());
                 }
-                return Ok(());
-            }
 
-            // Initialize the dotfiles repository
-            let config_path = Config::init_dotfiles_repository()?;
-            info!("Created configuration file: {}", config_path.display());
-            eprintln!("Created configuration file: {}", config_path.display());
+                // Determine target directory
+                let target_path = if let Some(dir) = &target_dir {
+                    PathBuf::from(dir)
+                } else {
+                    std::env::current_dir()?
+                };
 
-            // Initialize Git repository
-            let dotfiles_path = config_path.parent().unwrap().to_path_buf();
-            let git_manager = GitManager::new(dotfiles_path.clone());
+                // Initialize from repository
+                let repo_manager = crate::repo::RepoManager::new(target_path);
+                repo_manager.init_from_url(url, force).await?;
 
-            if !git_manager.exists() {
-                git_manager.init()?;
-                info!("Git repository initialized at: {}", dotfiles_path.display());
-                eprintln!("Git repository initialized at: {}", dotfiles_path.display());
+                eprintln!("Repository initialized successfully from {url}");
+                eprintln!("Next steps:");
+                eprintln!("  1. Review the configuration: cat ordinator.toml");
+                eprintln!("  2. Apply the dotfiles: ordinator apply");
+                eprintln!("  3. Set up secrets (if needed): ordinator secrets setup");
+                Ok(())
             } else {
-                info!(
-                    "Git repository already exists at: {}",
-                    dotfiles_path.display()
-                );
-                eprintln!(
-                    "Git repository already exists at: {}",
-                    dotfiles_path.display()
-                );
-            }
+                // Initialize new repository (existing behavior)
+                info!("Initializing new repository with profile: {}", profile);
+                if !args.quiet {
+                    eprintln!("Initializing new repository with profile: {profile}");
+                }
 
-            // Add remote if provided
-            if let Some(url) = remote {
-                git_manager.add_remote("origin", &url)?;
-                info!("Remote 'origin' added: {}", url);
-                eprintln!("Remote 'origin' added: {url}");
-            }
+                if args.dry_run {
+                    info!(
+                        "[DRY RUN] Would initialize repository with profile: {}",
+                        profile
+                    );
+                    eprintln!("DRY-RUN: Would initialize repository with profile: {profile}");
+                    return Ok(());
+                }
 
-            info!("Repository initialization completed");
-            eprintln!("Repository initialization completed");
-            Ok(())
+                // Initialize the dotfiles repository
+                let config_path = Config::init_dotfiles_repository()?;
+                info!("Created configuration file: {}", config_path.display());
+                eprintln!("Created configuration file: {}", config_path.display());
+
+                // Initialize Git repository
+                let dotfiles_path = config_path.parent().unwrap().to_path_buf();
+                let git_manager = GitManager::new(dotfiles_path.clone());
+
+                if !git_manager.exists() {
+                    git_manager.init()?;
+                    info!("Git repository initialized at: {}", dotfiles_path.display());
+                    eprintln!("Git repository initialized at: {}", dotfiles_path.display());
+                } else {
+                    info!(
+                        "Git repository already exists at: {}",
+                        dotfiles_path.display()
+                    );
+                    eprintln!(
+                        "Git repository already exists at: {}",
+                        dotfiles_path.display()
+                    );
+                }
+
+                info!("Repository initialization completed");
+                eprintln!("Repository initialization completed");
+                Ok(())
+            }
         }
         Commands::Add { path, profile } => {
             let (mut config, config_path) = Config::load()?;
@@ -453,7 +486,7 @@ pub async fn run(args: Args) -> Result<()> {
             // Load config and get dotfiles repo path
             let (config, config_path) = Config::load()?;
             let dotfiles_path = config_path.parent().unwrap().to_path_buf();
-            let git_manager = GitManager::new(dotfiles_path);
+            let git_manager = GitManager::new(dotfiles_path.clone());
             if !git_manager.exists() {
                 return Err(anyhow::anyhow!(
                     "No Git repository found. Run 'ordinator init' first."
@@ -532,7 +565,7 @@ pub async fn run(args: Args) -> Result<()> {
             eprintln!("Changes committed successfully");
             Ok(())
         }
-        Commands::Push { force } => {
+        Commands::Push { repo_url, force } => {
             info!("Pushing changes{}", if force { " (force)" } else { "" });
             eprintln!("Pushing changes{}", if force { " (force)" } else { "" });
 
@@ -551,12 +584,31 @@ pub async fn run(args: Args) -> Result<()> {
             // Load config and get dotfiles repo path
             let (_config, config_path) = Config::load()?;
             let dotfiles_path = config_path.parent().unwrap().to_path_buf();
-            let git_manager = GitManager::new(dotfiles_path);
+            let git_manager = GitManager::new(dotfiles_path.clone());
             if !git_manager.exists() {
                 return Err(anyhow::anyhow!(
                     "No Git repository found. Run 'ordinator init' first."
                 ));
             }
+
+            // If repository URL is provided, validate it first
+            if let Some(url) = &repo_url {
+                // Validate the repository URL format
+                let repo_manager = crate::repo::RepoManager::new(dotfiles_path.clone());
+                match repo_manager.parse_github_url(url) {
+                    Ok(_) => {
+                        info!("Setting remote 'origin' to: {}", url);
+                        if !args.quiet {
+                            eprintln!("Setting remote 'origin' to: {url}");
+                        }
+                        git_manager.add_remote("origin", url)?;
+                    }
+                    Err(e) => {
+                        return Err(anyhow::anyhow!("Invalid repository URL '{}': {}", url, e));
+                    }
+                }
+            }
+
             git_manager.push(force)?;
             info!("Changes pushed successfully");
             eprintln!("Changes pushed successfully");
@@ -581,7 +633,7 @@ pub async fn run(args: Args) -> Result<()> {
             // Load config and get dotfiles repo path
             let (_config, config_path) = Config::load()?;
             let dotfiles_path = config_path.parent().unwrap().to_path_buf();
-            let git_manager = GitManager::new(dotfiles_path);
+            let git_manager = GitManager::new(dotfiles_path.clone());
             if !git_manager.exists() {
                 return Err(anyhow::anyhow!(
                     "No Git repository found. Run 'ordinator init' first."
@@ -611,7 +663,7 @@ pub async fn run(args: Args) -> Result<()> {
             // Load config and get dotfiles repo path
             let (_config, config_path) = Config::load()?;
             let dotfiles_path = config_path.parent().unwrap().to_path_buf();
-            let git_manager = GitManager::new(dotfiles_path);
+            let git_manager = GitManager::new(dotfiles_path.clone());
             if !git_manager.exists() {
                 return Err(anyhow::anyhow!(
                     "No Git repository found. Run 'ordinator init' first."

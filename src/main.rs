@@ -6,6 +6,7 @@ mod brew;
 mod cli;
 mod config;
 mod git;
+mod repo;
 mod secrets;
 mod utils;
 

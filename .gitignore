@@ -30,6 +30,10 @@ pids
 # Coverage directory used by tools like istanbul
 coverage/
 
+# Coverage reports
+cobertura.xml
+*.xml
+
 # Temporary files
 *.tmp
 *.temp

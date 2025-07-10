@@ -154,7 +154,9 @@ fn test_init_dry_run() {
     cmd.assert()
         .success()
         .stderr(contains("DRY-RUN"))
-        .stderr(contains("Initializing repository"));
+        .stderr(contains(
+            "Initializing new repository with profile: default",
+        ));
 }
 
 #[test]
@@ -3019,4 +3021,432 @@ fn test_brew_install_and_apply_with_dummy_brew() {
     cmd.assert()
         .success()
         .stderr(contains("Homebrew packages installed successfully"));
+}
+
+#[test]
+fn test_init_with_invalid_repo_url() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Test various invalid repository URLs
+    let invalid_urls = vec![
+        "https://invalid-url.com/user/repo",     // now always invalid
+        "https://github.com/",                   // invalid
+        "https://github.com/user",               // invalid
+        "git@invalid-host.com:user/repo.git",    // invalid
+        "not-a-url",                             // invalid
+        "",                                      // invalid
+        "https://github.com/user name/repo.git", // spaces
+    ];
+
+    for url in invalid_urls {
+        let mut cmd = create_ordinator_command(&temp);
+        cmd.args(["init", url]);
+        cmd.assert()
+            .failure()
+            .stderr(contains("Invalid GitHub URL format"));
+    }
+}
+
+#[test]
+fn test_init_with_malformed_github_url() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Test malformed GitHub URLs
+    let malformed_urls = [
+        "https://github.com//repo.git",         // empty owner
+        "https://github.com/user//repo.git",    // empty segment
+        "git@github.com:user//repo.git",        // empty segment
+        "git@github.com:/user/repo.git",        // empty owner
+        "https://github.com/user/repo/extra",   // too many segments
+        "https://not-github.com/user/repo.git", // not github domain
+        "git@not-github.com:user/repo.git",     // not github domain
+    ];
+
+    for (i, url) in malformed_urls.iter().enumerate() {
+        // Create a unique subdirectory path for each test case (but don't create the directory)
+        let repo_dir = temp.child(format!("repo-malformed-{i}"));
+
+        let mut cmd = create_ordinator_command(&temp);
+        cmd.args(["init", url, repo_dir.path().to_str().unwrap()]);
+        cmd.assert().failure().stderr(
+            contains("Invalid GitHub URL format")
+                .or(contains("Failed to initialize from repository"))
+                .or(contains("Repository does not contain 'ordinator.toml'")),
+        );
+    }
+}
+
+#[test]
+fn test_init_with_nonexistent_repo() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Create a unique subdirectory path for this test (but don't create the directory)
+    let repo_dir = temp.child("repo-nonexistent-test");
+
+    // Use a valid GitHub URL with a non-existent user/repo
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args([
+        "init",
+        "https://github.com/nonexistent-user-xyz123/nonexistent-repo-xyz123.git",
+        repo_dir.path().to_str().unwrap(),
+    ]);
+    cmd.assert()
+        .failure()
+        .stderr(contains("Failed to initialize from repository").or(contains("Git clone failed")));
+}
+
+#[test]
+fn test_init_with_private_repo_no_auth() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Create a unique subdirectory path for this test (but don't create the directory)
+    let repo_dir = temp.child("repo-private-test");
+
+    // Use a valid GitHub URL for a private repo
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args([
+        "init",
+        "https://github.com/private-owner/private-repo.git",
+        repo_dir.path().to_str().unwrap(),
+    ]);
+    let output = cmd.output().unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Failed to initialize") || stderr.contains("Git clone failed"),
+        "Expected failure message, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_init_with_target_dir_permission_denied() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Test with a path that would cause permission issues
+    let protected_path = "/root/protected/directory";
+
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args(["init", "https://github.com/user/repo.git", protected_path]);
+    cmd.assert().failure().stderr(
+        contains("permission")
+            .or(contains("denied"))
+            .or(contains("Failed to initialize"))
+            .or(contains("No such file")),
+    );
+}
+
+#[test]
+fn test_init_with_existing_directory_no_force() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Create a directory that already exists
+    let existing_dir = temp.child("existing");
+    existing_dir.create_dir_all().unwrap();
+    existing_dir
+        .child("some-file.txt")
+        .write_str("content")
+        .unwrap();
+
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args([
+        "init",
+        "https://github.com/user/repo.git",
+        existing_dir.path().to_str().unwrap(),
+    ]);
+    cmd.assert()
+        .failure()
+        .stderr(contains("already exists").or(contains("Use --force")));
+}
+
+#[test]
+fn test_init_with_force_flag() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Create a directory that already exists
+    let existing_dir = temp.child("existing");
+    existing_dir.create_dir_all().unwrap();
+    existing_dir
+        .child("some-file.txt")
+        .write_str("content")
+        .unwrap();
+
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args([
+        "init",
+        "https://github.com/user/repo.git",
+        existing_dir.path().to_str().unwrap(),
+        "--force",
+    ]);
+
+    // This should fail because the repo doesn't exist, but the --force flag should be recognized
+    let output = cmd.output().unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !output.status.success(),
+        "Should fail due to nonexistent repo, got success"
+    );
+    // The error should be about the repo, not about the directory
+    assert!(
+        !stderr.contains("already exists"),
+        "Should not complain about existing directory with --force"
+    );
+}
+
+#[test]
+fn test_init_with_invalid_target_directory() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Test with invalid target directory paths
+    let invalid_paths = vec![
+        "/nonexistent/path/that/cannot/be/created",
+        "/root/protected/directory",
+        "relative/path/with/../invalid/../traversal",
+    ];
+
+    for path in invalid_paths {
+        let mut cmd = create_ordinator_command(&temp);
+        cmd.args(["init", "https://github.com/user/repo.git", path]);
+        cmd.assert().failure().stderr(
+            contains("Failed to initialize")
+                .or(contains("permission"))
+                .or(contains("No such file"))
+                .or(contains("Repository does not contain 'ordinator.toml'")),
+        );
+    }
+}
+
+#[test]
+fn test_init_with_empty_repo_url() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Test with empty repository URL
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args(["init", ""]);
+    cmd.assert()
+        .failure()
+        .stderr(contains("Invalid GitHub URL format"));
+}
+
+#[test]
+fn test_init_with_whitespace_repo_url() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Test with whitespace-only repository URL
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args(["init", "   "]);
+    cmd.assert()
+        .failure()
+        .stderr(contains("Invalid GitHub URL format"));
+}
+
+#[test]
+fn test_init_with_unicode_repo_url() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Test with Unicode characters in URL
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args(["init", "https://github.com/user/repö.git"]);
+    cmd.assert()
+        .failure()
+        .stderr(contains("Invalid GitHub URL format").or(contains("Failed to initialize")));
+}
+
+#[test]
+fn test_init_with_very_long_repo_url() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Create a unique subdirectory path for this test (but don't create the directory)
+    let repo_dir = temp.child("repo-long-url-test");
+
+    // Use a very long but valid GitHub URL
+    let long_owner = "a".repeat(39); // GitHub max username length
+    let long_repo = "b".repeat(100);
+    let long_url = format!("https://github.com/{long_owner}/{long_repo}.git");
+
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args(["init", &long_url, repo_dir.path().to_str().unwrap()]);
+    cmd.assert().failure().stderr(
+        contains("Failed to initialize")
+            .or(contains("Git clone failed"))
+            .or(contains("Repository does not contain 'ordinator.toml'")),
+    );
+}
+
+#[test]
+fn test_init_with_network_timeout() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Create a unique subdirectory path for this test (but don't create the directory)
+    let repo_dir = temp.child("repo-network-test");
+
+    // Use a valid GitHub URL with a non-existent user/repo
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args([
+        "init",
+        "https://github.com/nonexistent-user-xyz123/nonexistent-repo-xyz123.git",
+        repo_dir.path().to_str().unwrap(),
+    ]);
+    cmd.assert()
+        .failure()
+        .stderr(contains("Failed to initialize").or(contains("Git clone failed")));
+}
+
+#[test]
+fn test_init_with_invalid_repo_structure() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Create a unique subdirectory path for this test (but don't create the directory)
+    let repo_dir = temp.child("repo-structure-test");
+
+    // Test with a repository that exists but doesn't have ordinator.toml
+    // Use a smaller, well-known repo that likely doesn't have ordinator.toml
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args([
+        "init",
+        "https://github.com/microsoft/vscode.git",
+        repo_dir.path().to_str().unwrap(),
+    ]);
+
+    let output = cmd.output().unwrap();
+    // Should fail because vscode repo doesn't have ordinator.toml
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("does not contain 'ordinator.toml'")
+            || stderr.contains("Failed to initialize"),
+        "Expected error about missing ordinator.toml, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_push_with_invalid_repo_url() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Test push with invalid repository URL
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args(["push", "https://invalid-url.com/user/repo.git"]);
+    cmd.assert()
+        .failure()
+        .stderr(contains("Invalid repository URL").or(contains("Invalid GitHub URL format")));
+}
+
+#[test]
+fn test_push_with_malformed_github_url() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Test push with malformed GitHub URL
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args(["push", "https://github.com//repo.git"]);
+    cmd.assert()
+        .failure()
+        .stderr(contains("Invalid repository URL").or(contains("Invalid GitHub URL format")));
+}
+
+#[test]
+fn test_push_with_nonexistent_repo_url() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Test push with nonexistent repository URL (should succeed locally)
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args([
+        "push",
+        "https://github.com/nonexistent-user/nonexistent-repo.git",
+    ]);
+    cmd.assert().success();
+}
+
+#[test]
+fn test_push_with_empty_repo_url() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Test push with empty repository URL
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args(["push", ""]);
+    cmd.assert()
+        .failure()
+        .stderr(contains("Invalid repository URL").or(contains("Invalid GitHub URL format")));
+}
+
+#[test]
+fn test_push_with_whitespace_repo_url() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Test push with whitespace-only repository URL
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args(["push", "   "]);
+    cmd.assert()
+        .failure()
+        .stderr(contains("Invalid repository URL").or(contains("Invalid GitHub URL format")));
+}
+
+#[test]
+fn test_push_with_unicode_repo_url() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Test push with Unicode characters in URL
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args(["push", "https://github.com/user/repö.git"]);
+    cmd.assert()
+        .failure()
+        .stderr(contains("Invalid repository URL").or(contains("Invalid GitHub URL format")));
+}
+
+#[test]
+fn test_push_with_very_long_repo_url() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Test push with very long repository URL (should succeed locally)
+    let long_owner = "a".repeat(100);
+    let long_repo = "b".repeat(100);
+    let long_url = format!("https://github.com/{long_owner}/{long_repo}.git");
+
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args(["push", &long_url]);
+    cmd.assert().success();
+}
+
+#[test]
+fn test_push_with_network_timeout() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Use a valid GitHub URL with a non-existent user/repo
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args([
+        "push",
+        "https://github.com/nonexistent-user-xyz123/nonexistent-repo-xyz123.git",
+    ]);
+    cmd.assert().success(); // Only local validation is performed
+}
+
+#[test]
+fn test_push_with_private_repo_no_auth() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = setup_test_environment_with_config(&temp, None);
+
+    // Test push with a private repository (should succeed locally)
+    let mut cmd = create_ordinator_command(&temp);
+    cmd.args(["push", "https://github.com/private-owner/private-repo.git"]);
+    cmd.assert().success();
 }

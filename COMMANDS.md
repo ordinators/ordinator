@@ -17,31 +17,63 @@ All commands support these global options:
 Initialize a new dotfiles repository.
 
 ```bash
-ordinator init [OPTIONS]
+ordinator init [REPO_URL] [TARGET_DIR] [OPTIONS]
 ```
 
+**Arguments:**
+- `REPO_URL` - Repository URL to clone from (GitHub HTTPS or SSH)
+- `TARGET_DIR` - Target directory for the repository (defaults to current directory)
+
 **Options:**
-- `--remote <URL>` - Remote Git repository URL (e.g., GitHub)
-- `--profile <PROFILE>` - Profile to use for initialization (default: "default")
+- `--profile <PROFILE>` - Profile to use for initialization (when not cloning from repo)
+- `--force` - Force overwrite existing directory
 
 **Examples:**
 ```bash
-# Basic initialization
+# Basic initialization (new repository)
 ordinator init
 
-# Initialize with remote repository
-ordinator init --remote https://github.com/username/dotfiles
+# Initialize from remote repository
+ordinator init https://github.com/username/dotfiles
 
-# Initialize with specific profile
-ordinator init --profile work --remote https://github.com/username/work-dotfiles
+# Initialize from SSH repository
+ordinator init git@github.com:username/dotfiles
+
+# Initialize to specific directory
+ordinator init https://github.com/username/dotfiles ~/my-dotfiles
+
+# Initialize with force overwrite
+ordinator init https://github.com/username/dotfiles --force
+
+# Initialize new repository with specific profile
+ordinator init --profile work
 ```
 
 **What it does:**
+
+**For new repositories:**
 - Creates `ordinator.toml` configuration file
 - Initializes Git repository
 - Creates `files/` and `scripts/` directories
 - Sets up default profiles (default, work, personal)
-- Adds remote repository if specified
+
+**For remote repositories:**
+- Parses GitHub URLs (HTTPS and SSH formats)
+- Attempts Git clone first (for public repositories)
+- Falls back to source archive download (for private repositories)
+- Validates repository structure (checks for `ordinator.toml`)
+- Initializes Git repository if not present
+- Guides user to next steps after successful initialization
+
+**Supported URL Formats:**
+- HTTPS: `https://github.com/username/repo.git`
+- SSH: `git@github.com:username/repo.git`
+- Both formats are automatically detected and handled
+
+**Next Steps After Remote Initialization:**
+1. Review the configuration: `cat ordinator.toml`
+2. Apply the dotfiles: `ordinator apply`
+3. Set up secrets (if needed): `ordinator secrets setup`
 
 ### `ordinator add`
 
@@ -277,28 +309,36 @@ ordinator commit -m "Update config" --force
 Push changes to remote repository.
 
 ```bash
-ordinator push [OPTIONS]
+ordinator push [REPO_URL] [OPTIONS]
 ```
 
+**Arguments:**
+- `REPO_URL` - Repository URL to push to (sets remote if not configured)
+
 **Options:**
-- `--force` - Force push changes
-- `--no-rebase` - Skip rebase before push
+- `--force` - Force push (use with caution)
 
 **Examples:**
 ```bash
-# Push changes
+# Push to current remote
 ordinator push
 
-# Force push
-ordinator push --force
+# Push to specific repository (sets remote if not configured)
+ordinator push https://github.com/username/dotfiles.git
+
+# Force push to specific repository
+ordinator push https://github.com/username/dotfiles.git --force
+
+# Push to SSH repository
+ordinator push git@github.com:username/dotfiles.git
 ```
 
 **What it does:**
-- Pushes local changes to remote repository
-- Uses git push command
-- Supports force push option
-- Supports rebase strategy for clean history
-- Updates local dotfiles with remote changes
+- Pushes committed changes to the remote repository
+- If repository URL is provided, sets it as the remote 'origin' before pushing
+- Uses the currently configured remote if no URL is provided
+- Supports force push with `--force` flag
+- Automatically configures the remote if not already set
 
 ### `ordinator pull`
 
