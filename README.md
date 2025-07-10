@@ -38,7 +38,7 @@ ordinator apply
 ordinator commit -m "Initial commit: track dotfiles with Ordinator"
 
 # Push to GitHub (sets remote if needed)
-ordinator push --repo https://github.com/username/dotfiles.git
+ordinator push https://github.com/username/dotfiles.git
 ```
 
 ### 2. Replicate Your Dotfiles Repo to Another Device (Onboarding a New Machine)
@@ -47,11 +47,14 @@ ordinator push --repo https://github.com/username/dotfiles.git
 # Install Ordinator via Homebrew
 brew install ordinators/ordinator/ordinator
 
-# Initialize Ordinator with your remote repo (installs in current directory by default)
-ordinator init --repo https://github.com/username/dotfiles.git
+# Initialize Ordinator with your remote repo (clones to current directory by default)
+ordinator init https://github.com/username/dotfiles.git
 
 # Or specify a target directory
-ordinator init --repo https://github.com/username/dotfiles.git ~/.dotfiles
+ordinator init https://github.com/username/dotfiles.git ~/.dotfiles
+
+# Or use SSH URL
+ordinator init git@github.com:username/dotfiles.git
 
 # Change to the cloned directory if needed
 cd ~/.dotfiles
