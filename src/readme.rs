@@ -352,7 +352,7 @@ impl READMEGenerator {
     }
 
     fn generate_age_key(&self) -> String {
-        String::from("## AGE Key Setup\n\nThis repository uses encrypted secrets. You'll need to set up an AGE key:\n\n1. Generate an AGE key:\n```bash\nordinator secrets setup --profile <profile-name>\n```\n\n2. The key will be created at `~/.config/age/<profile>.key`\n\n3. **Never commit your AGE key to version control!**\n\n")
+        String::from("## AGE Key Setup\n\nThis repository uses encrypted secrets. You'll need to set up an AGE key:\n\n1. Generate an AGE key:\n```bash\nordinator secrets setup --profile <profile-name>\n```\n\n2. The key will be created at `~/.config/ordinator/age/<profile>.txt`\n\n3. **Never commit your AGE key to version control!**\n\n")
     }
 
     fn generate_troubleshooting(&self) -> String {

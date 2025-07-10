@@ -122,7 +122,7 @@ Ordinator also scans tracked files for potential plaintext secrets and warns you
   ```
 
 > **Never commit your AGE key or other sensitive secrets to your repository.**
-> The AGE key (typically at `~/.config/ordinator/age.key`) is required for decrypting secrets, but should always be kept private and out of version control.
+> The AGE key (typically at `~/.config/ordinator/age/key.txt`) and SOPS configuration (typically at `~/.config/ordinator/.sops.yaml`) are required for decrypting secrets, but should always be kept private and out of version control.
 
 ## Repository Structure
 
