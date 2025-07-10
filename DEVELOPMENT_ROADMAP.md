@@ -389,6 +389,8 @@ ordinator readme default
 - [ ] Implement progress indicators for file copying and organization
 - [ ] Enhance error handling for file conflicts between profiles
 - [ ] Add colorized output for file operations and profile status
+- [ ] Update README generator to dynamically list profiles from ordinator.toml (remove hardcoded 'work', 'personal', 'laptop')
+- [ ] Ensure README always matches actual profiles in config
 
 **Tests:**
 - [ ] Adding the same file to multiple profiles stores separate copies
@@ -398,6 +400,9 @@ ordinator readme default
 - [ ] Interactive prompts work for profile selection
 - [ ] Progress indicators display during file operations
 - [ ] Error handling works for file conflicts
+- [ ] Generated README lists only the profiles present in ordinator.toml
+- [ ] Changing profiles in config updates README accordingly
+- [ ] No hardcoded profiles appear in README
 
 **Acceptance Criteria:**
 ```bash
@@ -411,6 +416,8 @@ ordinator apply --profile work
 # symlinks files/work/.zshrc to ~/.zshrc
 # Interactive prompts guide profile selection
 # Progress indicators show file operations
+# README profile section is always accurate to ordinator.toml
+# No mention of profiles that do not exist in the config
 ```
 
 ### 4.6 Uninstall and Restore Original Configuration
