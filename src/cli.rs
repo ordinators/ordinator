@@ -183,6 +183,12 @@ pub enum Commands {
         #[command(subcommand)]
         subcommand: BrewCommands,
     },
+
+    /// Manage README generation
+    Readme {
+        #[command(subcommand)]
+        subcommand: ReadmeCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -276,6 +282,21 @@ pub enum BrewCommands {
         #[arg(long)]
         verbose: bool,
     },
+}
+
+#[derive(Subcommand)]
+pub enum ReadmeCommands {
+    /// Generate default README (if none exists)
+    Default,
+
+    /// Interactive README customization
+    Interactive,
+
+    /// Preview generated README before saving
+    Preview,
+
+    /// Edit existing README in $EDITOR
+    Edit,
 }
 
 pub async fn run(args: Args) -> Result<()> {
@@ -451,6 +472,29 @@ pub async fn run(args: Args) -> Result<()> {
             }
 
             println!("Added '{path}' to profile '{profile_name}'");
+
+            // Auto-update README if needed
+            if !args.dry_run {
+                let dotfiles_dir = config_path.parent().unwrap();
+                if crate::readme::readme_needs_update(&config) {
+                    if config.readme.auto_update {
+                        if let Err(e) = crate::readme::auto_update_readme(&config, dotfiles_dir) {
+                            if !args.quiet {
+                                eprintln!("Warning: Failed to auto-update README: {e}");
+                            }
+                        }
+                    } else {
+                        eprintln!(
+                            "⚠️  Ordinator config changed ({}). Your README.md may be out of date.",
+                            config.readme.update_on_changes.join(", ")
+                        );
+                        eprintln!(
+                            "   Run: ordinator readme default   (or ordinator readme preview)"
+                        );
+                    }
+                }
+            }
+
             Ok(())
         }
         Commands::Remove { path } => {
@@ -1063,6 +1107,24 @@ pub async fn run(args: Args) -> Result<()> {
             if !args.quiet {
                 eprintln!("Apply completed");
             }
+
+            // Auto-update README if needed
+            if !args.dry_run && crate::readme::readme_needs_update(&config) {
+                if config.readme.auto_update {
+                    if let Err(e) = crate::readme::auto_update_readme(&config, _dotfiles_dir) {
+                        if !args.quiet {
+                            eprintln!("Warning: Failed to auto-update README: {e}");
+                        }
+                    }
+                } else {
+                    eprintln!(
+                        "⚠️  Ordinator config changed ({}). Your README.md may be out of date.",
+                        config.readme.update_on_changes.join(", ")
+                    );
+                    eprintln!("   Run: ordinator readme default   (or ordinator readme preview)");
+                }
+            }
+
             Ok(())
         }
         Commands::Repair { profile, verbose } => {
@@ -1545,10 +1607,7 @@ pub async fn run(args: Args) -> Result<()> {
 
                     // Check if packages already exist and force is not set
                     let profile_config = config.get_profile(&profile).unwrap();
-                    if (!profile_config.homebrew_packages.formulae.is_empty()
-                        || !profile_config.homebrew_packages.casks.is_empty())
-                        && !force
-                    {
+                    if !profile_config.homebrew_packages.is_empty() && !force {
                         eprintln!("⚠️  Profile '{profile}' already has Homebrew packages defined.");
                         eprintln!("   Use --force to overwrite existing package list.");
                         std::process::exit(1);
@@ -1570,6 +1629,25 @@ pub async fn run(args: Args) -> Result<()> {
 
                     if !args.quiet {
                         eprintln!("✅ Exported Homebrew packages to profile '{profile}'");
+                    }
+
+                    // Auto-update README if needed
+                    if !args.dry_run {
+                        let dotfiles_dir = config_path.parent().unwrap();
+                        if crate::readme::readme_needs_update(&config) {
+                            if config.readme.auto_update {
+                                if let Err(e) =
+                                    crate::readme::auto_update_readme(&config, dotfiles_dir)
+                                {
+                                    if !args.quiet {
+                                        eprintln!("Warning: Failed to auto-update README: {e}");
+                                    }
+                                }
+                            } else {
+                                eprintln!("⚠️  Ordinator config changed ({}). Your README.md may be out of date.", config.readme.update_on_changes.join(", "));
+                                eprintln!("   Run: ordinator readme default   (or ordinator readme preview)");
+                            }
+                        }
                     }
 
                     Ok(())
@@ -1622,6 +1700,111 @@ pub async fn run(args: Args) -> Result<()> {
                     Ok(())
                 }
             }
+        }
+        Commands::Readme { subcommand } => {
+            match subcommand {
+                ReadmeCommands::Default => {
+                    info!("Generating default README.md");
+                    if !args.quiet {
+                        eprintln!("Generating default README.md");
+                    }
+
+                    let (config, config_path) = Config::load()?;
+                    let dotfiles_dir = config_path.parent().unwrap();
+                    let readme_manager = crate::readme::ReadmeManager::new(args.dry_run);
+
+                    if let Some(readme_path) =
+                        readme_manager.generate_default_readme(&config, dotfiles_dir)?
+                    {
+                        if !args.quiet {
+                            eprintln!("Generated default README.md: {}", readme_path.display());
+                        }
+                        info!("Generated default README.md: {}", readme_path.display());
+                    } else {
+                        if !args.quiet {
+                            eprintln!("No default README.md found to generate.");
+                        }
+                        info!("No default README.md found to generate.");
+                    }
+                }
+                ReadmeCommands::Interactive => {
+                    info!("Interactive README customization");
+                    if !args.quiet {
+                        eprintln!("Interactive README customization");
+                    }
+
+                    let (config, config_path) = Config::load()?;
+                    let dotfiles_dir = config_path.parent().unwrap();
+                    let readme_manager = crate::readme::ReadmeManager::new(args.dry_run);
+
+                    if let Some(readme_path) =
+                        readme_manager.interactive_customization(&config, dotfiles_dir)?
+                    {
+                        if !args.quiet {
+                            eprintln!(
+                                "Interactive README customization complete. Generated: {}",
+                                readme_path.display()
+                            );
+                        }
+                        info!(
+                            "Interactive README customization complete. Generated: {}",
+                            readme_path.display()
+                        );
+                    } else {
+                        if !args.quiet {
+                            eprintln!("Interactive README customization cancelled or failed.");
+                        }
+                        info!("Interactive README customization cancelled or failed.");
+                    }
+                }
+                ReadmeCommands::Preview => {
+                    info!("Previewing generated README");
+                    if !args.quiet {
+                        eprintln!("Previewing generated README");
+                    }
+
+                    let (config, config_path) = Config::load()?;
+                    let dotfiles_dir = config_path.parent().unwrap();
+                    let readme_manager = crate::readme::ReadmeManager::new(args.dry_run);
+
+                    if let Some(readme_path) =
+                        readme_manager.preview_readme(&config, dotfiles_dir)?
+                    {
+                        if !args.quiet {
+                            eprintln!("Previewing README: {}", readme_path.display());
+                        }
+                        info!("Previewing README: {}", readme_path.display());
+                    } else {
+                        if !args.quiet {
+                            eprintln!("No README.md found to preview.");
+                        }
+                        info!("No README.md found to preview.");
+                    }
+                }
+                ReadmeCommands::Edit => {
+                    info!("Editing existing README.md");
+                    if !args.quiet {
+                        eprintln!("Editing existing README.md");
+                    }
+
+                    let (config, config_path) = Config::load()?;
+                    let dotfiles_dir = config_path.parent().unwrap();
+                    let readme_manager = crate::readme::ReadmeManager::new(args.dry_run);
+
+                    if let Some(readme_path) = readme_manager.edit_readme(&config, dotfiles_dir)? {
+                        if !args.quiet {
+                            eprintln!("README.md edited: {}", readme_path.display());
+                        }
+                        info!("README.md edited: {}", readme_path.display());
+                    } else {
+                        if !args.quiet {
+                            eprintln!("No README.md found to edit.");
+                        }
+                        info!("No README.md found to edit.");
+                    }
+                }
+            }
+            Ok(())
         }
     }
 }

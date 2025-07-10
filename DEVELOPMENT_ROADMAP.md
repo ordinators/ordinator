@@ -309,41 +309,69 @@ ordinator init https://github.com/yourname/dotfiles.git --force
 ### 4.4 Auto-Generated README with Quick-Install & Secrets Instructions
 **Priority:** Medium  
 **Dependencies:** 1.1, 4.3  
-**Estimated Time:** 1 day  
+**Estimated Time:** 2 days  
 **Testable:** ✅
 
 **Tasks:**
-- [ ] Generate a `README.md` file on `ordinator init` if one does not exist
-- [ ] Include ideal install path and quick-start shell snippet
-- [ ] Add a section about the AGE key, its required location, and security warning
-- [ ] Document recommended profiles and bootstrap usage
-- [ ] Add links to the Ordinator project and documentation
-- [ ] Allow user to customize the README template (optional)
-- [ ] Add a shell one-liner for installation to the generated README
-- [ ] Include profile table, bootstrap explanation, troubleshooting, and security notes in README
-- [ ] Add interactive mode for customizing README template
-- [ ] Implement preview functionality to show generated README before saving
-- [ ] Add colorized output for highlighting important sections in generated README
+- [x] Generate a `README.md` file on `ordinator init` if one does not exist
+- [x] Include ideal install path and quick-start shell snippet
+- [x] Add a section about the AGE key, its required location, and security warning
+- [x] Document recommended profiles and bootstrap usage
+- [x] Add links to the Ordinator project and documentation
+- [x] Allow user to customize the README template (optional)
+- [x] Add a shell one-liner for installation to the generated README
+- [x] Include profile table, bootstrap explanation, troubleshooting, and security notes in README
+- [x] Add interactive mode for customizing README template
+- [x] Implement preview functionality to show generated README before saving
+- [x] Add colorized output for highlighting important sections in generated README
+- [x] Implement warning system for missing remote 'origin' configuration
+- [x] Warn during `ordinator commit` if no remote is set
+- [x] Warn during `ordinator push` if no remote is set
+- [x] Provide clear instructions to fix the issue
+- [x] Use actual repository URL in README generation when remote is set
+- [x] Show placeholder URLs when no remote is configured
+- [x] Add helpful error messages with specific commands to run
 
 **Tests:**
-- [ ] README is created with correct content on new repo init
-- [ ] Existing README is not overwritten
-- [ ] Quick-install, AGE key, and documentation links are accurate and copy-pasteable
-- [ ] Interactive mode works for README customization
-- [ ] Preview functionality displays README correctly
-- [ ] Colorized output renders properly in different terminals
+- [x] README is created with correct content on new repo init
+- [x] Existing README is not overwritten
+- [x] Quick-install, AGE key, and documentation links are accurate and copy-pasteable
+- [x] Interactive mode works for README customization
+- [x] Preview functionality displays README correctly
+- [x] Colorized output renders properly in different terminals
+- [x] Warning is shown when committing without remote
+- [x] Warning is shown when pushing without remote
+- [x] Commit and push still succeed despite warnings
+- [x] No warnings when remote is properly configured
+- [x] README uses actual URL when remote is set
+- [x] README shows placeholder when no remote is set
 
 **Acceptance Criteria:**
 ```bash
-# After ordinator init, repo contains README.md with:
-# - Install path
-# - Quick-start shell snippet
-# - Profile/usage info
-# - AGE key warning and path
-# - Links to Ordinator project and docs
+# After ordinator init, repo contains:
+# - README.md (root) with install path, quick-start shell snippet, profile/usage info, AGE key warning and path, links to Ordinator project and docs
+# - scripts/install.sh (install script for the repository)
+# - readme_state.json (state tracking file in root)
 # Interactive prompts allow README customization
 # Preview shows generated content before saving
+
+# Without remote set:
+ordinator commit -m "Update config"
+# Shows warning but succeeds
+
+ordinator push
+# Shows warning but succeeds
+
+# With remote set:
+ordinator commit -m "Update config"
+# No warning, succeeds normally
+
+# README generation uses actual URL when remote is set
+ordinator readme default
+# Uses actual repository URL instead of placeholder
 ```
+
+**Completion Statement:** This completes Phase 4.4 (Auto-Generated README with Remote URL Warning System) and prepares for Phase 4.5 (Profile-Specific File Storage).
 
 ### 4.5 Profile-Specific File Storage and Add Command Enhancement
 **Priority:** Medium  

@@ -499,6 +499,7 @@ fn test_commit_errors_without_git_repo() {
     let mut cmd = Command::cargo_bin("ordinator").unwrap();
     cmd.current_dir(&temp);
     let _config_guard = EnvVarGuard::set("ORDINATOR_CONFIG", &config_path);
+    // Don't set test mode for this test - we want to test actual failure
     cmd.args(["commit", "-m", "test"]);
     assert_config_error(cmd.assert().failure());
 }

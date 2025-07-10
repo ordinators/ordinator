@@ -5,6 +5,8 @@ use std::collections::HashMap;
 use std::env;
 use std::path::{Path, PathBuf};
 
+use crate::readme::ReadmeConfig;
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct Config {
     /// Global configuration
@@ -18,6 +20,10 @@ pub struct Config {
     /// Secrets configuration
     #[serde(default)]
     pub secrets: SecretsConfig,
+
+    /// README configuration
+    #[serde(default)]
+    pub readme: ReadmeConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -76,30 +82,7 @@ pub struct ProfileConfig {
 
     /// Homebrew packages for this profile
     #[serde(default)]
-    pub homebrew_packages: HomebrewPackages,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct HomebrewPackages {
-    /// Formulae (command-line tools)
-    #[serde(default)]
-    pub formulae: Vec<HomebrewPackage>,
-
-    /// Casks (GUI applications)
-    #[serde(default)]
-    pub casks: Vec<HomebrewPackage>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct HomebrewPackage {
-    /// Package name
-    pub name: String,
-
-    /// Package version (optional)
-    pub version: Option<String>,
-
-    /// Whether to pin this version
-    pub pinned: Option<bool>,
+    pub homebrew_packages: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -209,7 +192,7 @@ impl Config {
                 enabled: true,
                 description: Some("Default profile for basic dotfiles".to_string()),
                 exclude: Vec::new(),
-                homebrew_packages: HomebrewPackages::default(),
+                homebrew_packages: Vec::new(),
             },
         );
 
@@ -223,7 +206,7 @@ impl Config {
                 enabled: true,
                 description: Some("Work environment profile".to_string()),
                 exclude: Vec::new(),
-                homebrew_packages: HomebrewPackages::default(),
+                homebrew_packages: Vec::new(),
             },
         );
 
@@ -237,7 +220,7 @@ impl Config {
                 enabled: true,
                 description: Some("Personal environment profile".to_string()),
                 exclude: Vec::new(),
-                homebrew_packages: HomebrewPackages::default(),
+                homebrew_packages: Vec::new(),
             },
         );
 
@@ -245,6 +228,7 @@ impl Config {
             global: GlobalConfig::default(),
             profiles,
             secrets: SecretsConfig::default(),
+            readme: ReadmeConfig::default(),
         }
     }
 
@@ -275,6 +259,10 @@ impl Config {
             std::fs::create_dir_all(&files_dir).with_context(|| {
                 format!("Failed to create files directory: {}", files_dir.display())
             })?;
+
+            // Create .gitignore file
+            Self::create_gitignore(repo_dir)?;
+
             return Ok(config_path);
         }
         let dotfiles_dir = get_dotfiles_dir()?;
@@ -305,6 +293,9 @@ impl Config {
         std::fs::create_dir_all(&files_dir).with_context(|| {
             format!("Failed to create files directory: {}", files_dir.display())
         })?;
+
+        // Create .gitignore file
+        Self::create_gitignore(&dotfiles_dir)?;
 
         Ok(config_path)
     }
@@ -406,6 +397,87 @@ impl Config {
                 }
             })
     }
+
+    /// Create a .gitignore file for the dotfiles repository
+    fn create_gitignore(dotfiles_dir: &Path) -> Result<()> {
+        let gitignore_path = dotfiles_dir.join(".gitignore");
+
+        // Don't overwrite existing .gitignore
+        if gitignore_path.exists() {
+            return Ok(());
+        }
+
+        let gitignore_content = r#"# Ordinator dotfiles repository .gitignore
+
+# Sensitive files and keys
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cert
+*.p8
+*.keystore
+*.jks
+
+# Age encryption keys
+age.key
+age.txt
+*.age
+
+# SOPS encrypted files
+*.enc.yaml
+*.enc.yml
+*.enc.json
+*.enc.toml
+*.enc.txt
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+*.tmp
+*.temp
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.sublime-*
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+"#;
+
+        std::fs::write(&gitignore_path, gitignore_content).with_context(|| {
+            format!(
+                "Failed to write .gitignore file: {}",
+                gitignore_path.display()
+            )
+        })?;
+
+        println!("✅ Created .gitignore file: {}", gitignore_path.display());
+        Ok(())
+    }
 }
 
 // Helper functions for default values
@@ -470,7 +542,7 @@ mod tests {
             enabled: true,
             description: Some("Test profile".to_string()),
             exclude: Vec::new(),
-            homebrew_packages: HomebrewPackages::default(),
+            homebrew_packages: Vec::new(),
         };
 
         config.add_profile("test".to_string(), new_profile);

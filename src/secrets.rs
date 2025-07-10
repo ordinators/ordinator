@@ -330,13 +330,13 @@ pub fn setup_sops_and_age(profile: &str, force: bool) -> anyhow::Result<()> {
             install_sops_and_age()?;
         }
     }
-    let config_base = if let Ok(home) = std::env::var("ORDINATOR_HOME") {
-        PathBuf::from(home)
-    } else {
-        dirs::config_dir()
-            .ok_or_else(|| anyhow::anyhow!("Could not determine config directory"))?
-            .join("ordinator")
-    };
+    // Use consistent config directory logic - ~/.config/ordinator on all platforms
+    let config_base = std::env::var("ORDINATOR_CONFIG_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+            PathBuf::from(home).join(".config").join("ordinator")
+        });
     let age_key_path = generate_age_key(&config_base, profile, force)?;
     let sops_config_path = create_sops_config(profile, &age_key_path, force)?;
     update_ordinator_config(profile, &age_key_path, &sops_config_path)?;
@@ -374,21 +374,28 @@ fn install_sops_and_age() -> anyhow::Result<()> {
 
 /// Generate an age key for the specified profile
 fn generate_age_key(
-    base_dir: &Path,
+    _base_dir: &Path, // Keep parameter for compatibility but don't use it
     profile: &str,
     force: bool,
 ) -> anyhow::Result<std::path::PathBuf> {
-    let config_dir = base_dir.join("age");
-    fs::create_dir_all(&config_dir)?;
+    // Use the same config directory logic as create_sops_config
+    let ordinator_config = std::env::var("ORDINATOR_CONFIG_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+            PathBuf::from(home).join(".config").join("ordinator")
+        });
+
+    let age_dir = ordinator_config.join("age");
+    fs::create_dir_all(&age_dir)?;
+
     let key_filename = if profile == "default" {
         "key.txt".to_string()
     } else {
         format!("{profile}.txt")
     };
-    let key_path = config_dir.join(key_filename);
-    if let Some(parent) = key_path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
+    let key_path = age_dir.join(key_filename);
+
     if key_path.exists() && force {
         fs::remove_file(&key_path)?;
     }
@@ -424,7 +431,18 @@ fn create_sops_config(
         format!(".sops.{profile}.yaml")
     };
 
-    let sops_config_path = std::env::current_dir()?.join(&config_filename);
+    // Create SOPS config in Ordinator config directory (~/.config/ordinator)
+    let ordinator_config = std::env::var("ORDINATOR_CONFIG_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+            PathBuf::from(home).join(".config").join("ordinator")
+        });
+
+    // Create the ordinator config directory if it doesn't exist
+    fs::create_dir_all(&ordinator_config)?;
+
+    let sops_config_path = ordinator_config.join(&config_filename);
 
     if sops_config_path.exists() && !force {
         println!(
@@ -1124,7 +1142,9 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
     fn test_generate_age_key_with_invalid_path() {
         let invalid_path = PathBuf::from("/nonexistent/path");
         let result = generate_age_key(&invalid_path, "test", false);
-        assert!(result.is_err()); // Should fail with invalid path
+        // The function now ignores the base_dir parameter and uses ~/.config/ordinator/age/
+        // So it should succeed even with an invalid path parameter
+        assert!(result.is_ok()); // Should succeed since it uses proper config directory
     }
 
     #[test]

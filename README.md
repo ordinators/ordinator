@@ -124,6 +124,37 @@ Ordinator also scans tracked files for potential plaintext secrets and warns you
 > **Never commit your AGE key or other sensitive secrets to your repository.**
 > The AGE key (typically at `~/.config/ordinator/age.key`) is required for decrypting secrets, but should always be kept private and out of version control.
 
+## Repository Structure
+
+When you initialize an Ordinator dotfiles repository, it creates the following structure:
+
+```
+dotfiles-repo/
+├── .git/                   # Git repository
+├── .gitignore              # Auto-generated git ignore rules
+├── ordinator.toml          # Configuration file
+├── README.md               # Auto-generated README (root)
+├── readme_state.json       # README state tracking (root)
+├── files/                  # Tracked dotfiles
+│   ├── .zshrc
+│   ├── .gitconfig
+│   └── .config/
+├── scripts/                # Generated scripts
+│   ├── install.sh          # Repository install script
+│   └── bootstrap-*.sh      # Profile bootstrap scripts
+└── secrets/                # Encrypted secrets (optional)
+    ├── secrets.enc.yaml
+    └── config.enc.json
+```
+
+**Generated Files:**
+- **README.md** - Auto-generated with installation instructions, profiles, and troubleshooting
+- **scripts/install.sh** - One-liner installation script for the repository
+- **readme_state.json** - Tracks configuration changes for smart README updates
+- **scripts/bootstrap-*.sh** - Profile-specific setup scripts (generated during apply)
+
+All generated files are committed to the repository when you run `ordinator commit`.
+
 ## Documentation
 
 - [Product Requirements Document](PRD.md) - Complete feature specification

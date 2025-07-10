@@ -49,7 +49,7 @@ enabled = true
 description = "Personal environment profile"
 
 [secrets]
-age_key_file = "~/.config/age/key.txt"
+age_key_file = "~/.config/ordinator/age/key.txt"
 sops_config = "~/.sops.yaml"
 encrypt_patterns = ["secrets/*.yaml"]
 exclude_patterns = ["*.bak"]
@@ -152,6 +152,7 @@ description = "Laptop setup with minimal tools"
 - `age_key_file` (string, optional): Path to the age key file for decryption.
   - Must contain a valid age key in the format `age1...`
   - Used for both encryption and decryption operations
+  - Default location: `~/.config/ordinator/age/key.txt` (or `{profile}.txt` for profile-specific keys)
   - If not specified, SOPS will use default key locations
 
 - `sops_config` (string, optional): Path to the SOPS configuration file.
@@ -189,6 +190,30 @@ description = "Laptop setup with minimal tools"
   - Default: "age"
   - Supported values: "age", "gpg", "kms"
   - Must match available encryption keys in SOPS configuration
+
+### `[readme]`
+- `auto_update` (bool): Whether to automatically update README.md when configuration changes.
+  - Default: `false` (manual mode)
+  - When `true`, README is automatically regenerated when profiles, bootstrap, or AGE key info changes
+  - When `false`, users get notifications about potential README updates
+
+- `update_on_changes` (array of strings): Specific changes that trigger README updates.
+  - Default: `["profiles", "bootstrap"]`
+  - Supported values: `"profiles"`, `"bootstrap"`, `"age_key"`
+  - Only relevant when `auto_update = true`
+  - Controls which configuration changes trigger automatic README updates
+
+**README Features:**
+- **Interactive copy buttons** for easy command copying
+- **Private repository support** with PAT input form
+- **Automatic repository URL detection** from Git remote
+- **Install script generation** in `scripts/install.sh` (in the dotfiles repository)
+- **README generation** in `README.md` (root of the dotfiles repository)
+- **State tracking** in `readme_state.json` (root of the dotfiles repository)
+- **Comprehensive sections** including quick install, profiles, AGE setup, troubleshooting
+- **Security notes** and best practices
+- **Warning system** for missing remote configuration
+- **Git integration** - All generated files are committed to the repository
 
 ## Homebrew Package Management
 
@@ -268,7 +293,7 @@ When you run `ordinator secrets setup`, the following happens:
    - Used for both encryption and decryption
 
 3. **SOPS Configuration**: Creates `.sops.yaml` configuration file
-   - Location: `~/.config/sops/{profile}.yaml`
+   - Location: `~/.config/ordinator/.sops.{profile}.yaml`
    - Configures age encryption method
    - Sets up creation rules for encrypted files
 
@@ -284,10 +309,10 @@ When you run `ordinator secrets setup`, the following happens:
 $ ordinator secrets setup --profile work
 ✅ SOPS and age are already installed
 ✅ Age key already exists: ~/.config/age/work.key
-✅ SOPS config already exists: ~/.config/sops/work.yaml
+✅ SOPS config already exists: ~/.config/ordinator/.sops.work.yaml
 ✅ SOPS and age setup complete for profile: work
    Age key: ~/.config/age/work.key
-   SOPS config: ~/.config/sops/work.yaml
+   SOPS config: ~/.config/ordinator/.sops.work.yaml
 ```
 
 ### Generated Configuration
@@ -296,8 +321,8 @@ After setup, your `ordinator.toml` will include:
 
 ```toml
 [secrets]
-age_key_file = "~/.config/age/work.key"
-sops_config = "~/.config/sops/work.yaml"
+age_key_file = "~/.config/ordinator/age/work.key"
+sops_config = "~/.config/ordinator/.sops.work.yaml"
 encrypt_patterns = [
     "secrets/**/*.yaml",
     "secrets/**/*.json",
@@ -386,8 +411,8 @@ The scanner looks for:
 5. **Configuration Example**
    ```toml
    [secrets]
-   age_key_file = "~/.config/age/work.key"
-   sops_config = "~/.config/sops/work-config.yaml"
+   age_key_file = "~/.config/ordinator/age/work.key"
+   sops_config = "~/.config/ordinator/.sops.work-config.yaml"
    encrypt_patterns = [
      "secrets/**/*.yaml",
      "secrets/**/*.json",
@@ -406,7 +431,7 @@ The scanner looks for:
 
 ### Key Management
 - **Separate keys per environment**: Use different age keys for work, personal, and laptop profiles
-- **Secure key storage**: Store age keys in `~/.config/age/` with restricted permissions (600)
+- **Secure key storage**: Store age keys in `~/.config/ordinator/age/` with restricted permissions (600)
 - **Key backup**: Backup age keys securely (not in version control)
 - **Key rotation**: Regularly rotate encryption keys for sensitive data
 
