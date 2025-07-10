@@ -1154,8 +1154,7 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
                 let error_msg = e.to_string().to_lowercase();
                 assert!(
                     error_msg.contains("age-keygen") || error_msg.contains("command not found"),
-                    "Expected error about age-keygen not found, got: {}",
-                    e
+                    "Expected error about age-keygen not found, got: {e}",
                 );
             }
         }
