@@ -21,7 +21,10 @@ ordinator init [REPO_URL] [TARGET_DIR] [OPTIONS]
 ```
 
 **Arguments:**
-- `REPO_URL` - Repository URL to clone from (GitHub HTTPS or SSH)
+- `REPO_URL` - Repository URL (optional)
+  - If provided and repository exists: Clone the existing repository
+  - If provided and repository doesn't exist: Initialize new repository and set remote URL
+  - If not provided: Initialize new repository without remote
 - `TARGET_DIR` - Target directory for the repository (defaults to current directory)
 
 **Options:**
@@ -33,17 +36,17 @@ ordinator init [REPO_URL] [TARGET_DIR] [OPTIONS]
 # Basic initialization (new repository)
 ordinator init
 
-# Initialize from remote repository
-ordinator init https://github.com/username/dotfiles
+# Initialize new repository with remote URL
+ordinator init https://github.com/username/dotfiles.git
 
-# Initialize from SSH repository
-ordinator init git@github.com:username/dotfiles
+# Initialize new repository in specific directory
+ordinator init https://github.com/username/dotfiles.git ~/my-dotfiles
 
-# Initialize to specific directory
-ordinator init https://github.com/username/dotfiles ~/my-dotfiles
+# Clone existing repository
+ordinator init https://github.com/username/existing-dotfiles.git
 
 # Initialize with force overwrite
-ordinator init https://github.com/username/dotfiles --force
+ordinator init https://github.com/username/dotfiles.git --force
 
 # Initialize new repository with specific profile
 ordinator init --profile work
@@ -51,14 +54,17 @@ ordinator init --profile work
 
 **What it does:**
 
-**For new repositories:**
+**For new repositories with URL:**
 - Creates `ordinator.toml` configuration file
 - Creates `.gitignore` file with security-focused ignore rules
 - Initializes Git repository
 - Creates `files/` and `scripts/` directories
 - Sets up default profiles (default, work, personal)
+- Sets the remote URL to the provided URL
+- Generates README.md with correct repository URL
+- Ready for immediate use
 
-**For remote repositories:**
+**For existing repositories:**
 - Parses GitHub URLs (HTTPS and SSH formats)
 - Attempts Git clone first (for public repositories)
 - Falls back to source archive download (for private repositories)
@@ -71,10 +77,10 @@ ordinator init --profile work
 - SSH: `git@github.com:username/repo.git`
 - Both formats are automatically detected and handled
 
-**Next Steps After Remote Initialization:**
-1. Review the configuration: `cat ordinator.toml`
-2. Apply the dotfiles: `ordinator apply`
-3. Set up secrets (if needed): `ordinator secrets setup`
+**Next Steps After New Repository Initialization:**
+1. Add your first file: `ordinator add ~/.zshrc --profile work`
+2. Apply your configuration: `ordinator apply --profile work`
+3. Commit and push: `ordinator commit -m "Initial setup" && ordinator push`
 
 ### `ordinator add`
 
@@ -100,14 +106,43 @@ ordinator add ~/.gitconfig --profile work
 
 # Add directory
 ordinator add ~/.config/nvim
+
+# Interactive profile selection (if --profile not specified)
+ordinator add ~/.bashrc
+# Prompts: "Select a profile to add this file to:"
+#          1. default
+#          2. work
+#          3. personal
+#          Enter number (default: default):
 ```
 
 **What it does:**
-- Copies file to `files/` directory
-- Updates configuration to track the file
-- Associates file with specified profile
-- Respects exclusion patterns from config
+- **Profile-specific storage**: Files are stored in `files/<profile>/` subdirectories
+- **Interactive profile selection**: If `--profile` is not specified, prompts user to select from available profiles
+- **Progress indicators**: Shows progress when copying files and directories
+- **Conflict detection**: Warns if the same file exists in other profiles and prompts for confirmation
+- **Colorized output**: Uses colors for success (green), warnings (yellow), and info (cyan)
 - **Automatically scans for plaintext secrets** and warns if found (does not block the operation)
+
+**File Storage Structure:**
+```
+dotfiles-repo/
+├── files/
+│   ├── default/
+│   │   ├── .zshrc
+│   │   └── .gitconfig
+│   ├── work/
+│   │   ├── .zshrc
+│   │   └── .ssh/config
+│   └── personal/
+│       ├── .zshrc
+│       └── .config/alacritty/alacritty.yml
+```
+
+**Conflict Handling:**
+- If the same file exists in multiple profiles, separate copies are created
+- User is prompted to confirm when conflicts are detected
+- Non-interactive mode defaults to creating separate copies
 
 ### `ordinator apply`
 
@@ -144,14 +179,22 @@ ordinator apply --profile work --skip-brew
 
 **What it does:**
 1. **Generates bootstrap script** for the selected profile (unless `--skip-bootstrap`)
-2. **Decrypts secrets** for the profile (unless `--skip-secrets`)
-3. **Installs Homebrew packages** defined in the profile (unless `--skip-brew`)
-4. **Creates symlinks** for tracked files in home directory
-5. **Handles conflicts** with existing files (backup if enabled)
-6. **Validates bootstrap script** for safety (Blocked, Dangerous, Warning, Safe)
-7. **Prints script path and safety level** (if bootstrap script was generated)
-8. **Never executes bootstrap script automatically** (see `ordinator bootstrap`)
-9. **Uses `--force`** to overwrite non-symlink conflicts
+2. **Decrypts secrets** using SOPS and age (unless `--skip-secrets`)
+3. **Installs Homebrew packages** for the profile (unless `--skip-brew`)
+4. **Creates symlinks** from profile-specific storage to home directory
+5. **Enhanced error handling** with colorized output and clear guidance
+6. **Progress indicators** showing each file being symlinked
+
+**File Resolution:**
+- **Profile-specific files**: First looks for files in `files/<profile>/` directory
+- **Backward compatibility**: Falls back to flat `files/` structure for existing repositories
+- **Missing files**: Provides clear guidance when source files are not found
+
+**Error Handling:**
+- **Colorized output**: Uses colors for success (green), warnings (yellow), and errors (red)
+- **Conflict resolution**: Clear guidance when files already exist
+- **Missing source files**: Shows expected and target locations with re-add instructions
+- **Broken symlinks**: Automatically detects and repairs broken symlinks
 
 **Order of Operations:**
 The apply command follows a specific order to ensure dependencies are satisfied:

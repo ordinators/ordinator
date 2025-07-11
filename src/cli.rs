@@ -1,6 +1,10 @@
+use std::io::{self, Write};
+use std::path::PathBuf;
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use std::path::{Path, PathBuf};
+use colored::*;
+use is_terminal::IsTerminal;
 use tracing::{info, warn};
 
 use crate::config::Config;
@@ -299,6 +303,117 @@ pub enum ReadmeCommands {
     Edit,
 }
 
+fn check_file_conflicts(config: &Config, file_path: &str, target_profile: &str) -> Vec<String> {
+    let mut conflicts = Vec::new();
+    for (profile_name, profile_config) in &config.profiles {
+        if profile_name != target_profile && profile_config.files.contains(&file_path.to_string()) {
+            conflicts.push(profile_name.clone());
+        }
+    }
+    conflicts
+}
+
+fn prompt_for_conflict_resolution(
+    file_path: &str,
+    conflicts: &[String],
+    _target_profile: &str,
+) -> bool {
+    if conflicts.is_empty() {
+        return true;
+    }
+
+    eprintln!("⚠️  Warning: File '{file_path}' already exists in other profiles:");
+    for conflict in conflicts {
+        eprintln!("   - {conflict}");
+    }
+    eprintln!("   This will create separate copies for each profile.");
+
+    if io::stdin().is_terminal() {
+        eprint!("Continue? [y/N]: ");
+        io::stdout().flush().unwrap();
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+        let input = input.trim().to_lowercase();
+        input == "y" || input == "yes"
+    } else {
+        eprintln!("[WARN] Non-interactive mode. Proceeding with separate copies.");
+        true
+    }
+}
+
+fn prompt_for_profile(profiles: &[&String], default_profile: &str) -> String {
+    if profiles.is_empty() {
+        eprintln!("No profiles are defined. Please add a profile first.");
+        std::process::exit(1);
+    }
+    if profiles.len() == 1 {
+        return profiles[0].clone();
+    }
+    // Check if stdin is a tty
+    if io::stdin().is_terminal() {
+        eprintln!("Select a profile to add this file to:");
+        for (i, profile) in profiles.iter().enumerate() {
+            eprintln!("  {}. {}", i + 1, profile);
+        }
+        eprint!("Enter number (default: {default_profile}): ");
+        io::stdout().flush().unwrap();
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+        let input = input.trim();
+        if input.is_empty() {
+            return default_profile.to_string();
+        }
+        if let Ok(idx) = input.parse::<usize>() {
+            if idx > 0 && idx <= profiles.len() {
+                return profiles[idx - 1].clone();
+            }
+        }
+        eprintln!("Invalid selection. Using default profile: {default_profile}");
+        default_profile.to_string()
+    } else {
+        eprintln!("[WARN] No profile specified and not running interactively. Using default profile: {default_profile}");
+        default_profile.to_string()
+    }
+}
+
+fn color_enabled() -> bool {
+    io::stdout().is_terminal()
+}
+
+fn handle_missing_source_file(
+    _file: &str,
+    source_path: &std::path::Path,
+    dest: &std::path::Path,
+) -> anyhow::Result<()> {
+    let msg = format!("Source file not found: {}", source_path.display());
+    if color_enabled() {
+        eprintln!("{}", msg.red());
+        eprintln!(
+            "{}",
+            "This file may have been moved or deleted from the dotfiles repository.".yellow()
+        );
+        eprintln!(
+            "{}",
+            format!("Expected location: {}", source_path.display()).cyan()
+        );
+        eprintln!("{}", format!("Target location: {}", dest.display()).cyan());
+        eprintln!(
+            "{}",
+            "Run 'ordinator add <file> --profile <profile>' to re-add the file.".yellow()
+        );
+    } else {
+        eprintln!("{msg}");
+        eprintln!("This file may have been moved or deleted from the dotfiles repository.");
+        eprintln!("Expected location: {}", source_path.display());
+        eprintln!("Target location: {}", dest.display());
+        eprintln!("Run 'ordinator add <file> --profile <profile>' to re-add the file.");
+    }
+    Err(anyhow::anyhow!(
+        "Source file not found: {}",
+        source_path.display()
+    ))
+}
+
 pub async fn run(args: Args) -> Result<()> {
     eprintln!("[DEBUG] args.verbose: {}", args.verbose);
     eprintln!(
@@ -332,35 +447,98 @@ pub async fn run(args: Args) -> Result<()> {
             force,
         } => {
             if let Some(url) = &repo_url {
-                // Initialize from remote repository
-                info!("Initializing from repository: {}", url);
-                if !args.quiet {
-                    eprintln!("Initializing from repository: {url}");
-                }
-
-                if args.dry_run {
-                    info!("[DRY RUN] Would initialize from repository: {}", url);
-                    eprintln!("DRY-RUN: Would initialize from repository: {url}");
-                    return Ok(());
-                }
-
-                // Determine target directory
+                // Validate the repository URL format first
                 let target_path = if let Some(dir) = &target_dir {
                     PathBuf::from(dir)
                 } else {
                     std::env::current_dir()?
                 };
+                let repo_manager = crate::repo::RepoManager::new(target_path.clone());
+                if let Err(e) = repo_manager.parse_github_url(url) {
+                    return Err(anyhow::anyhow!("Invalid GitHub URL '{}': {}", url, e));
+                }
+                // Try to clone first (existing repository)
+                match repo_manager.init_from_url(url, force).await {
+                    Ok(_) => {
+                        // Successfully cloned existing repository
+                        info!("Repository initialized from existing repository: {}", url);
+                        if !args.quiet {
+                            eprintln!("Repository initialized successfully from {url}");
+                            eprintln!("Next steps:");
+                            eprintln!("  1. Review the configuration: cat ordinator.toml");
+                            eprintln!("  2. Apply the dotfiles: ordinator apply");
+                            eprintln!("  3. Set up secrets (if needed): ordinator secrets setup");
+                        }
+                        Ok(())
+                    }
+                    Err(_) => {
+                        // Failed to clone - treat as new repository URL
+                        info!("Initializing new repository with remote URL: {}", url);
+                        if !args.quiet {
+                            eprintln!("Initializing new repository with remote URL: {url}");
+                        }
 
-                // Initialize from repository
-                let repo_manager = crate::repo::RepoManager::new(target_path);
-                repo_manager.init_from_url(url, force).await?;
+                        if args.dry_run {
+                            info!(
+                                "[DRY RUN] Would initialize new repository with remote: {}",
+                                url
+                            );
+                            eprintln!(
+                                "DRY-RUN: Would initialize new repository with remote: {url}"
+                            );
+                            return Ok(());
+                        }
 
-                eprintln!("Repository initialized successfully from {url}");
-                eprintln!("Next steps:");
-                eprintln!("  1. Review the configuration: cat ordinator.toml");
-                eprintln!("  2. Apply the dotfiles: ordinator apply");
-                eprintln!("  3. Set up secrets (if needed): ordinator secrets setup");
-                Ok(())
+                        // Initialize new repository
+                        let config_path = Config::init_dotfiles_repository()?;
+                        info!("Created configuration file: {}", config_path.display());
+                        eprintln!("Created configuration file: {}", config_path.display());
+
+                        // Initialize Git repository
+                        let dotfiles_path = config_path.parent().unwrap().to_path_buf();
+                        let git_manager = GitManager::new(dotfiles_path.clone());
+
+                        if !git_manager.exists() {
+                            git_manager.init()?;
+                            info!("Git repository initialized at: {}", dotfiles_path.display());
+                            eprintln!("Git repository initialized at: {}", dotfiles_path.display());
+                        } else {
+                            info!(
+                                "Git repository already exists at: {}",
+                                dotfiles_path.display()
+                            );
+                            eprintln!(
+                                "Git repository already exists at: {}",
+                                dotfiles_path.display()
+                            );
+                        }
+
+                        // Set the remote URL
+                        git_manager.add_remote("origin", url)?;
+                        info!("Set remote 'origin' to: {}", url);
+                        eprintln!("Set remote 'origin' to: {url}");
+
+                        // Generate README with correct URL
+                        let config = Config::from_file(&config_path)?;
+                        if let Err(e) = crate::readme::auto_update_readme(&config, &dotfiles_path) {
+                            if !args.quiet {
+                                eprintln!("Warning: Failed to generate README: {e}");
+                            }
+                        } else {
+                            eprintln!("Generated README.md with correct repository URL");
+                        }
+
+                        info!("Repository initialization completed");
+                        eprintln!("Repository initialization completed");
+                        eprintln!("Next steps:");
+                        eprintln!(
+                            "  1. Add your first file: ordinator add ~/.zshrc --profile work"
+                        );
+                        eprintln!("  2. Apply your configuration: ordinator apply --profile work");
+                        eprintln!("  3. Commit and push: ordinator commit -m 'Initial setup' && ordinator push");
+                        Ok(())
+                    }
+                }
             } else {
                 // Initialize new repository (existing behavior)
                 info!("Initializing new repository with profile: {}", profile);
@@ -408,7 +586,13 @@ pub async fn run(args: Args) -> Result<()> {
         }
         Commands::Add { path, profile } => {
             let (mut config, config_path) = Config::load()?;
-            let profile_name = profile.unwrap_or_else(|| config.global.default_profile.clone());
+            let profile_name = match profile {
+                Some(p) => p,
+                None => {
+                    let profiles = config.list_profiles();
+                    prompt_for_profile(&profiles, &config.global.default_profile)
+                }
+            };
             if !config.profiles.contains_key(&profile_name) {
                 return Err(anyhow::anyhow!(
                     "Profile '{}' does not exist. To create it, run: ordinator profile add {}",
@@ -428,10 +612,82 @@ pub async fn run(args: Args) -> Result<()> {
                 println!("DRY-RUN: Would add '{path}' to profile '{profile_name}'");
                 return Ok(());
             }
-            let path_obj = Path::new(&path);
+            let path_obj = std::path::Path::new(&path);
             if !path_obj.exists() {
                 return Err(anyhow::anyhow!("Path '{}' does not exist on disk.", path));
             }
+
+            // Check for conflicts with other profiles
+            let conflicts = check_file_conflicts(&config, &path, &profile_name);
+            if !conflicts.is_empty()
+                && !prompt_for_conflict_resolution(&path, &conflicts, &profile_name)
+            {
+                eprintln!("Operation cancelled by user.");
+                return Ok(());
+            }
+
+            // Get the profile-specific file path
+            let profile_file_path = config.get_profile_file_path(&profile_name, &path)?;
+
+            // Create the profile directory if it doesn't exist
+            if let Some(parent) = profile_file_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+
+            // Copy the file to the profile-specific location
+            if path_obj.is_file() {
+                std::fs::copy(path_obj, &profile_file_path)?;
+                if !args.quiet {
+                    let msg = format!("[1/1] Copied '{path}' to profile '{profile_name}' storage");
+                    if color_enabled() {
+                        println!("{}", msg.green());
+                    } else {
+                        println!("{msg}");
+                    }
+                }
+            } else if path_obj.is_dir() {
+                // For directories, we need to copy recursively
+                let mut file_count = 0;
+                for entry in walkdir::WalkDir::new(path_obj).into_iter().flatten() {
+                    if entry.path().is_file() {
+                        file_count += 1;
+                    }
+                }
+                let mut copied = 0;
+                for entry in walkdir::WalkDir::new(path_obj) {
+                    let entry = entry?;
+                    let src_path = entry.path();
+                    if src_path.is_file() {
+                        let rel_path = src_path.strip_prefix(path_obj).unwrap();
+                        let dst_path = profile_file_path.join(rel_path);
+                        if let Some(parent) = dst_path.parent() {
+                            std::fs::create_dir_all(parent)?;
+                        }
+                        std::fs::copy(src_path, &dst_path)?;
+                        copied += 1;
+                        if !args.quiet && color_enabled() {
+                            println!(
+                                "[{} / {}] {}",
+                                copied,
+                                file_count,
+                                dst_path.display().to_string().cyan()
+                            );
+                        } else if !args.quiet {
+                            println!("[{} / {}] {}", copied, file_count, dst_path.display());
+                        }
+                    }
+                }
+                if !args.quiet {
+                    let msg =
+                        format!("Copied directory '{path}' to profile '{profile_name}' storage");
+                    if color_enabled() {
+                        println!("{}", msg.green());
+                    } else {
+                        println!("{msg}");
+                    }
+                }
+            }
+
             config.add_file_to_profile(&profile_name, path.clone())?;
             config.save_to_file(&config_path)?;
 
@@ -892,39 +1148,61 @@ pub async fn run(args: Args) -> Result<()> {
             }
 
             for file in &config.get_profile(&profile).unwrap().files {
-                // Source: dotfiles repo (files/<file>), Dest: home dir/<file>
+                // Get the source file path (profile-specific or fallback to flat structure)
+                let source_path = config.get_source_file_path(&profile, file)?;
                 let dest = home_dir.join(file);
 
                 eprintln!("[DEBUG] Checking file: {file}");
+                eprintln!("[DEBUG] Source: {}", source_path.display());
                 eprintln!("[DEBUG] Dest: {}", dest.display());
+
+                if !source_path.exists() {
+                    return handle_missing_source_file(file, &source_path, &dest);
+                }
 
                 if !dest.exists() {
                     // Create new symlink
-                    eprintln!(
-                        "[DEBUG] Creating new symlink: {} -> {}",
+                    let msg = format!(
+                        "[{}] Symlinking {} -> {}",
+                        file,
                         dest.display(),
-                        _dotfiles_dir.join("files").join(file).display()
+                        source_path.display()
                     );
+                    if !args.quiet && color_enabled() {
+                        println!("{}", msg.cyan());
+                    } else if !args.quiet {
+                        println!("{msg}");
+                    }
                     if args.dry_run {
-                        eprintln!(
+                        let msg = format!(
                             "DRY-RUN: Would create symlink {} -> {}",
                             dest.display(),
-                            _dotfiles_dir.join("files").join(file).display()
+                            source_path.display()
                         );
+                        if color_enabled() {
+                            println!("{}", msg.yellow());
+                        } else {
+                            println!("{msg}");
+                        }
                     } else {
                         create_symlink_with_conflict_resolution(
-                            &_dotfiles_dir.join("files").join(file),
+                            &source_path,
                             &dest,
                             force,
                             config.global.create_backups,
                             &config_path,
                         )?;
                         if !args.quiet {
-                            eprintln!(
+                            let msg = format!(
                                 "Symlinked: {} -> {}",
                                 dest.display(),
-                                _dotfiles_dir.join("files").join(file).display()
+                                source_path.display()
                             );
+                            if color_enabled() {
+                                println!("{}", msg.green());
+                            } else {
+                                println!("{msg}");
+                            }
                         }
                     }
                     continue;
@@ -932,43 +1210,67 @@ pub async fn run(args: Args) -> Result<()> {
 
                 if !is_symlink(&dest) {
                     // Handle non-symlink conflict
-                    eprintln!("[DEBUG] Non-symlink conflict: {}", dest.display());
-                    if !force {
+                    let msg = format!(
+                        "Conflict: {} already exists and is not a symlink",
+                        dest.display()
+                    );
+                    if color_enabled() {
+                        eprintln!("{}", msg.red());
                         eprintln!(
-                            "  {}: Already exists and is not a symlink. Use --force to overwrite.",
-                            dest.display()
+                            "{}",
+                            "Use --force to overwrite, or manually remove the file first.".yellow()
                         );
+                    } else {
+                        eprintln!("{msg}");
+                        eprintln!("Use --force to overwrite, or manually remove the file first.");
+                    }
+                    if !force {
                         return Err(anyhow::anyhow!(
                             "Target {} already exists and is not a symlink. Use --force to overwrite.",
                             dest.display()
                         ));
                     }
                     // Force overwrite - create symlink
-                    eprintln!(
-                        "[DEBUG] Force creating symlink: {} -> {}",
+                    let msg = format!(
+                        "Force creating symlink: {} -> {}",
                         dest.display(),
-                        _dotfiles_dir.join("files").join(file).display()
+                        source_path.display()
                     );
+                    if !args.quiet && color_enabled() {
+                        println!("{}", msg.yellow());
+                    } else if !args.quiet {
+                        println!("{msg}");
+                    }
                     if args.dry_run {
-                        eprintln!(
+                        let msg = format!(
                             "DRY-RUN: Would force create symlink {} -> {}",
                             dest.display(),
-                            _dotfiles_dir.join("files").join(file).display()
+                            source_path.display()
                         );
+                        if color_enabled() {
+                            println!("{}", msg.yellow());
+                        } else {
+                            println!("{msg}");
+                        }
                     } else {
                         create_symlink_with_conflict_resolution(
-                            &_dotfiles_dir.join("files").join(file),
+                            &source_path,
                             &dest,
                             force,
                             config.global.create_backups,
                             &config_path,
                         )?;
                         if !args.quiet {
-                            eprintln!(
+                            let msg = format!(
                                 "Symlinked: {} -> {}",
                                 dest.display(),
-                                _dotfiles_dir.join("files").join(file).display()
+                                source_path.display()
                             );
+                            if color_enabled() {
+                                println!("{}", msg.green());
+                            } else {
+                                println!("{msg}");
+                            }
                         }
                     }
                     continue;
@@ -978,13 +1280,9 @@ pub async fn run(args: Args) -> Result<()> {
                 let needs_repair = match get_symlink_target(&dest) {
                     Ok(actual_target) => {
                         eprintln!("[DEBUG] actual_target: {}", actual_target.display());
-                        eprintln!(
-                            "[DEBUG] expected source: {}",
-                            _dotfiles_dir.join("files").join(file).display()
-                        );
+                        eprintln!("[DEBUG] expected source: {}", source_path.display());
                         eprintln!("[DEBUG] actual_target.exists(): {}", actual_target.exists());
-                        let needs = actual_target != _dotfiles_dir.join("files").join(file)
-                            || !actual_target.exists();
+                        let needs = actual_target != source_path || !actual_target.exists();
                         eprintln!("[DEBUG] needs_repair: {needs}");
                         needs
                     }
@@ -1010,13 +1308,9 @@ pub async fn run(args: Args) -> Result<()> {
                         eprintln!("DRY-RUN: Would repair {}", dest.display());
                     } else {
                         use crate::utils::repair_symlink;
-                        repair_symlink(&dest, &_dotfiles_dir.join("files").join(file))?;
+                        repair_symlink(&dest, &source_path)?;
                         if !args.quiet {
-                            eprintln!(
-                                "Repaired: {} -> {}",
-                                dest.display(),
-                                _dotfiles_dir.join("files").join(file).display()
-                            );
+                            eprintln!("Repaired: {} -> {}", dest.display(), source_path.display());
                         }
                     }
                 } else if args.verbose {

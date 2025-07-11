@@ -1,6 +1,6 @@
 [package]
 name = "ordinator"
-version = "0.4.4"
+version = "0.4.5"
 edition = "2021"
 authors = ["Anthony Norfleet <anthony.norfleet@gmail.com>"]
 description = "Dotfiles and Environment Manager for macOS"
@@ -65,6 +65,11 @@ url = "2.5"
 
 # Archive handling for repository downloads
 tar = "0.4"
+
+colored = "2.0"
+
+# Terminal detection
+is-terminal = "0.1"
 
 [dev-dependencies]
 # Testing frameworks
