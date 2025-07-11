@@ -1,5 +1,6 @@
 use std::io::{self, Write};
 use std::path::PathBuf;
+use std::time::SystemTime;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -132,6 +133,21 @@ pub enum Commands {
         skip_brew: bool,
 
         /// Force overwrite existing files (use with caution)
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Uninstall dotfiles and restore original configuration
+    Uninstall {
+        /// Profile to uninstall (defaults to all profiles)
+        #[arg(long)]
+        profile: Option<String>,
+
+        /// Restore original files from backups
+        #[arg(long)]
+        restore_backups: bool,
+
+        /// Skip interactive confirmations
         #[arg(long)]
         force: bool,
     },
@@ -1189,7 +1205,7 @@ pub async fn run(args: Args) -> Result<()> {
                             &source_path,
                             &dest,
                             force,
-                            config.global.create_backups,
+                            config.global.create_backups.unwrap_or(true),
                             &config_path,
                         )?;
                         if !args.quiet {
@@ -1257,7 +1273,7 @@ pub async fn run(args: Args) -> Result<()> {
                             &source_path,
                             &dest,
                             force,
-                            config.global.create_backups,
+                            config.global.create_backups.unwrap_or(true),
                             &config_path,
                         )?;
                         if !args.quiet {
@@ -1418,6 +1434,289 @@ pub async fn run(args: Args) -> Result<()> {
                     eprintln!("   Run: ordinator readme default   (or ordinator readme preview)");
                 }
             }
+
+            Ok(())
+        }
+        Commands::Uninstall {
+            profile,
+            restore_backups,
+            force,
+        } => {
+            info!(
+                "Uninstalling dotfiles for profile: {}",
+                profile.as_deref().unwrap_or("all")
+            );
+            if !args.quiet {
+                eprintln!(
+                    "Uninstalling dotfiles for profile: {}",
+                    profile.as_deref().unwrap_or("all")
+                );
+            }
+
+            let (config, config_path) = match Config::load() {
+                Ok(val) => val,
+                Err(e) => {
+                    eprintln!("Error: Failed to parse config file: {e}");
+                    return Err(e);
+                }
+            };
+            let dotfiles_dir = config_path.parent().unwrap();
+            let home_dir = crate::utils::get_home_dir()?;
+
+            let profiles_to_uninstall = if let Some(profile_name) = profile {
+                if !config.profiles.contains_key(&profile_name) {
+                    eprintln!("Error: Profile '{profile_name}' does not exist in config.");
+                    return Err(anyhow::anyhow!("Profile '{profile_name}' does not exist."));
+                }
+                vec![profile_name]
+            } else {
+                let profiles = config.list_profiles();
+                if profiles.is_empty() {
+                    eprintln!("Error: No profiles found in config. Nothing to uninstall.");
+                    return Err(anyhow::anyhow!("No profiles found in config."));
+                }
+                profiles.into_iter().map(|s| s.to_string()).collect()
+            };
+
+            let mut total_symlinks_removed = 0;
+            let mut total_backups_restored = 0;
+            let mut total_profiles_processed = 0;
+
+            let dry_run = args.dry_run;
+
+            for profile_name in &profiles_to_uninstall {
+                if let Some(profile_cfg) = config.get_profile(profile_name) {
+                    if !args.quiet {
+                        if color_enabled() {
+                            eprintln!("🔧 Processing profile: {}", profile_name.cyan());
+                        } else {
+                            eprintln!("Processing profile: {profile_name}");
+                        }
+                    }
+
+                    if profile_cfg.files.is_empty() {
+                        eprintln!("Info: Profile '{profile_name}' has no tracked files. Nothing to uninstall.");
+                        continue;
+                    }
+
+                    let mut profile_symlinks_removed = 0;
+                    let mut profile_backups_restored = 0;
+
+                    // Collect files with backups for progress indicator
+                    let mut files_with_backups = Vec::new();
+                    if restore_backups {
+                        let backup_dir = dotfiles_dir.join("backups");
+                        for file_path in &profile_cfg.files {
+                            let target_path = home_dir.join(file_path);
+                            let filename = target_path.file_name().unwrap_or_default();
+                            let mut backup_files = Vec::new();
+                            if backup_dir.exists() {
+                                if let Ok(entries) = std::fs::read_dir(&backup_dir) {
+                                    for entry in entries.flatten() {
+                                        let path = entry.path();
+                                        if let Some(name) = path.file_name() {
+                                            let name_str = name.to_string_lossy();
+                                            if name_str.starts_with(&format!(
+                                                "{}.backup.",
+                                                filename.to_string_lossy()
+                                            )) {
+                                                backup_files.push(path);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if !backup_files.is_empty() {
+                                files_with_backups.push((file_path.clone(), backup_files));
+                            }
+                        }
+                    }
+                    let total_to_restore = files_with_backups.len();
+                    let mut restore_idx = 0;
+
+                    for file_path in &profile_cfg.files {
+                        let target_path = home_dir.join(file_path);
+                        if !args.quiet {
+                            if color_enabled() {
+                                eprintln!(
+                                    "  📁 Checking: {}",
+                                    target_path.display().to_string().yellow()
+                                );
+                            } else {
+                                eprintln!("  Checking: {}", target_path.display());
+                            }
+                        }
+                        if crate::utils::is_symlink(&target_path) {
+                            if force {
+                                if dry_run {
+                                    eprintln!("Would remove symlink: {}", target_path.display());
+                                    profile_symlinks_removed += 1;
+                                } else if std::fs::remove_file(&target_path).is_ok() {
+                                    eprintln!("Removed symlink: {}", target_path.display());
+                                    profile_symlinks_removed += 1;
+                                } else {
+                                    eprintln!(
+                                        "Error: Failed to remove symlink: {}",
+                                        target_path.display()
+                                    );
+                                }
+                            } else if dry_run {
+                                eprintln!(
+                                    "Would prompt to remove symlink: {}",
+                                    target_path.display()
+                                );
+                                profile_symlinks_removed += 1;
+                            } else {
+                                use std::io::Write;
+                                eprint!("Remove symlink at {}? [y/N]: ", target_path.display());
+                                std::io::stdout().flush().ok();
+                                let mut input = String::new();
+                                if std::io::stdin().read_line(&mut input).is_ok() {
+                                    if input.trim().eq_ignore_ascii_case("y") {
+                                        if std::fs::remove_file(&target_path).is_ok() {
+                                            eprintln!("Removed symlink: {}", target_path.display());
+                                            profile_symlinks_removed += 1;
+                                        } else {
+                                            eprintln!(
+                                                "Error: Failed to remove symlink: {}",
+                                                target_path.display()
+                                            );
+                                        }
+                                    } else {
+                                        eprintln!(
+                                            "Skipped symlink removal: {}",
+                                            target_path.display()
+                                        );
+                                    }
+                                }
+                            }
+                        } else if target_path.exists() {
+                            eprintln!(
+                                "File exists (not a symlink): {}. Skipping.",
+                                target_path.display()
+                            );
+                        } else {
+                            eprintln!("File does not exist: {}. Skipping.", target_path.display());
+                        }
+
+                        // Handle backup restoration if requested
+                        if restore_backups {
+                            if let Some((_, _backup_files)) =
+                                files_with_backups.iter().find(|(f, _)| f == file_path)
+                            {
+                                restore_idx += 1;
+                                let msg = format!(
+                                    "Restoring backup {}/{} for profile {}: {}",
+                                    restore_idx,
+                                    total_to_restore,
+                                    profile_name,
+                                    target_path.display()
+                                );
+                                eprintln!("{msg}");
+                            }
+                            if let Some((_, backup_files)) =
+                                files_with_backups.iter().find(|(f, _)| f == file_path)
+                            {
+                                if !backup_files.is_empty() {
+                                    let latest_backup = backup_files.iter().max_by_key(|p| {
+                                        p.metadata()
+                                            .map(|m| m.modified().unwrap_or(SystemTime::UNIX_EPOCH))
+                                            .unwrap_or(SystemTime::UNIX_EPOCH)
+                                    });
+                                    if let Some(latest_backup) = latest_backup {
+                                        if force {
+                                            if dry_run {
+                                                eprintln!(
+                                                    "Would restore from backup: {}",
+                                                    target_path.display()
+                                                );
+                                                profile_backups_restored += 1;
+                                            } else {
+                                                if let Some(parent) = target_path.parent() {
+                                                    let _ = std::fs::create_dir_all(parent);
+                                                }
+                                                if std::fs::copy(latest_backup, &target_path)
+                                                    .is_ok()
+                                                {
+                                                    eprintln!(
+                                                        "Restored from backup: {}",
+                                                        target_path.display()
+                                                    );
+                                                    profile_backups_restored += 1;
+                                                } else {
+                                                    eprintln!(
+                                                        "Error: Failed to restore from backup: {}",
+                                                        target_path.display()
+                                                    );
+                                                }
+                                            }
+                                        } else if dry_run {
+                                            eprintln!(
+                                                "Would prompt to restore from backup: {}",
+                                                target_path.display()
+                                            );
+                                            profile_backups_restored += 1;
+                                        } else {
+                                            use std::io::Write;
+                                            eprint!(
+                                                "Restore backup to {}? [y/N]: ",
+                                                target_path.display()
+                                            );
+                                            std::io::stdout().flush().ok();
+                                            let mut input = String::new();
+                                            if std::io::stdin().read_line(&mut input).is_ok() {
+                                                if input.trim().eq_ignore_ascii_case("y") {
+                                                    if let Some(parent) = target_path.parent() {
+                                                        let _ = std::fs::create_dir_all(parent);
+                                                    }
+                                                    if std::fs::copy(latest_backup, &target_path)
+                                                        .is_ok()
+                                                    {
+                                                        eprintln!(
+                                                            "Restored from backup: {}",
+                                                            target_path.display()
+                                                        );
+                                                        profile_backups_restored += 1;
+                                                    } else {
+                                                        eprintln!("Error: Failed to restore from backup: {}", target_path.display());
+                                                    }
+                                                } else {
+                                                    eprintln!(
+                                                        "Skipped backup restoration: {}",
+                                                        target_path.display()
+                                                    );
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    eprintln!(
+                                        "No backup found for: {}. Skipping restore.",
+                                        target_path.display()
+                                    );
+                                }
+                            } else if !config.global.create_backups.unwrap_or(true) {
+                                eprintln!(
+                                    "Backups are disabled in config. No backups will be restored."
+                                );
+                            }
+                        }
+                    }
+
+                    total_symlinks_removed += profile_symlinks_removed;
+                    total_backups_restored += profile_backups_restored;
+                    total_profiles_processed += 1;
+
+                    eprintln!("Profile '{profile_name}' summary: {profile_symlinks_removed} symlinks removed, {profile_backups_restored} backups restored");
+                }
+            }
+
+            // Summary
+            eprintln!();
+            eprintln!("Uninstall Summary:");
+            eprintln!("  Profiles processed: {total_profiles_processed}");
+            eprintln!("  Symlinks removed: {total_symlinks_removed}");
+            eprintln!("  Backups restored: {total_backups_restored}");
 
             Ok(())
         }

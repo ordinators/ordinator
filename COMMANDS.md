@@ -871,6 +871,66 @@ update_on_changes = ["profiles", "bootstrap"]  # Specific triggers
   - `readme_state.json` - State tracking file (root of repository)
 - **Git Integration**: Generated files are automatically committed when you run `ordinator commit`
 
+### `ordinator uninstall`
+
+Uninstall dotfiles and restore original configuration for one or more profiles.
+
+```bash
+ordinator uninstall [OPTIONS]
+```
+
+**Options:**
+- `--profile <PROFILE>` - Profile to uninstall (defaults to all profiles)
+- `--restore-backups` - Restore original files from backups (if available)
+- `--force` - Skip interactive confirmations for destructive actions
+- `--dry-run` - Simulate all actions without making changes
+
+**Examples:**
+```bash
+# Uninstall all profiles (interactive confirmations)
+ordinator uninstall
+
+# Uninstall a specific profile
+ordinator uninstall --profile work
+
+# Uninstall and restore backups for a profile
+ordinator uninstall --profile work --restore-backups
+
+# Uninstall with no prompts (force)
+ordinator uninstall --profile work --force
+
+# Preview all uninstall actions without making changes
+ordinator uninstall --profile work --restore-backups --dry-run
+```
+
+**What it does:**
+- Removes all symlinks created by Ordinator for the selected profile(s)
+- Optionally restores original files from backups (if `--restore-backups` is set)
+- Prompts for confirmation before destructive actions (unless `--force` is set)
+- Shows progress indicators for backup restoration
+- Uses colorized output for removals, restores, skips, and errors
+- Supports dry-run mode for safe preview of all actions
+- Prompts to delete the config file and/or dotfiles repo after uninstall (unless `--force`)
+
+**Safety Features:**
+- Interactive confirmations for all destructive actions
+- Dry-run mode previews all changes
+- Backups are restored only if available; otherwise, user is warned
+- No data loss if backups are missing (symlinks are removed, originals are not restored)
+- Colorized output for clear feedback
+
+**Typical Workflow:**
+```bash
+# Uninstall and restore everything for the 'work' profile
+ordinator uninstall --profile work --restore-backups
+
+# Preview what would be removed/restored (no changes made)
+ordinator uninstall --profile work --restore-backups --dry-run
+
+# Remove all profiles and clean up config/repo (no prompts)
+ordinator uninstall --force
+```
+
 ## Management Commands
 
 ### `ordinator remove`

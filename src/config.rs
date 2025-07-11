@@ -37,8 +37,8 @@ pub struct GlobalConfig {
     pub auto_push: bool,
 
     /// Whether to create backups before making changes
-    #[serde(default = "default_backup")]
-    pub create_backups: bool,
+    #[serde(default)]
+    pub create_backups: Option<bool>,
 
     /// Patterns for files/directories to exclude globally
     #[serde(default)]
@@ -50,7 +50,7 @@ impl Default for GlobalConfig {
         Self {
             default_profile: default_profile(),
             auto_push: false,
-            create_backups: default_backup(),
+            create_backups: Some(default_backup()),
             exclude: Vec::new(),
         }
     }

@@ -429,16 +429,16 @@ ordinator apply --profile work
 **Testable:** ✅
 
 **Tasks:**
-- [ ] Implement `ordinator uninstall` command
-- [ ] Remove all symlinks created by Ordinator for selected profile(s)
-- [ ] Optionally restore original files from backups
-- [ ] Support dry-run and force options
-- [ ] Prompt for config and repo cleanup (optional)
-- [ ] Update documentation and usage examples
-- [ ] Add interactive confirmation for destructive operations
-- [ ] Implement progress indicators for backup restoration
-- [ ] Add colorized output for showing what will be removed/restored
-- [ ] Enhance dry-run mode with detailed preview of uninstall actions
+- [x] Implement `ordinator uninstall` command
+- [x] Remove all symlinks created by Ordinator for selected profile(s)
+- [x] Optionally restore original files from backups
+- [x] Support dry-run and force options
+- [x] Prompt for config and repo cleanup (optional)
+- [x] Update documentation and usage examples
+- [x] Add interactive confirmation for destructive operations
+- [x] Implement progress indicators for backup restoration
+- [x] Add colorized output for showing what will be removed/restored
+- [x] Enhance dry-run mode with detailed preview of uninstall actions
 
 **Backups Details:**
 - Backups are created during `ordinator apply` if a file already exists at the target location and backups are enabled (`create_backups = true`).
@@ -451,13 +451,13 @@ ordinator apply --profile work
 - Best practice: Always enable backups to ensure safe restoration of original files.
 
 **Tests:**
-- [ ] Uninstall removes all symlinks for a profile
-- [ ] Backups are restored if requested
-- [ ] No data loss if backups are missing
-- [ ] Dry-run shows correct actions
-- [ ] Interactive confirmations work for destructive operations
-- [ ] Progress indicators display during restoration
-- [ ] Colorized output shows removal/restoration preview
+- [x] Uninstall removes all symlinks for a profile
+- [x] Backups are restored if requested
+- [x] No data loss if backups are missing
+- [x] Dry-run shows correct actions
+- [x] Interactive confirmations work for destructive operations
+- [x] Progress indicators display during restoration
+- [x] Colorized output shows removal/restoration preview
 
 **Acceptance Criteria:**
 ```bash
@@ -467,6 +467,8 @@ ordinator uninstall --profile work --restore-backups
 # Progress indicators show restoration status
 # Colorized output previews actions
 ```
+
+**Completion Statement:** This completes Phase 4.6 (Uninstall and Restore Original Configuration) and prepares for Phase 4.7 (Secrets Workflow Review and Enhancement).
 
 ### 4.7 Secrets Workflow Review and Enhancement
 **Priority:** High  

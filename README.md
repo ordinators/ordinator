@@ -68,47 +68,7 @@ curl -fsSL https://raw.githubusercontent.com/username/dotfiles/master/scripts/in
 ordinator apply --profile work
 ```
 
-## Phase 4.5 Features
-
-### Profile-Specific File Storage
-
-Ordinator now stores files in profile-specific directories, preventing conflicts between different environments:
-
-```bash
-# Add files to different profiles
-ordinator add ~/.zshrc --profile work
-ordinator add ~/.zshrc --profile personal
-# Creates: files/work/.zshrc and files/personal/.zshrc
-
-# Apply specific profile
-ordinator apply --profile work
-# Symlinks files/work/.zshrc to ~/.zshrc
-```
-
-### Interactive Profile Selection
-
-When adding files without specifying a profile, Ordinator prompts you to choose:
-
-```bash
-ordinator add ~/.gitconfig
-# Prompts:
-# Select a profile to add this file to:
-#   1. default
-#   2. work  
-#   3. personal
-# Enter number (default: default):
-```
-
-### Enhanced Error Handling
-
-- **Colorized output** for better readability
-- **Conflict detection** when the same file exists in multiple profiles
-- **Clear guidance** for resolving issues
-- **Progress indicators** for file operations
-
-### Backward Compatibility
-
-Existing repositories with flat `files/` structure continue to work seamlessly. Ordinator automatically detects and uses the appropriate file structure.
+## How It Works
 
 When you run `ordinator apply`, Ordinator:
 
@@ -118,14 +78,6 @@ When you run `ordinator apply`, Ordinator:
 4. **Symlinks all tracked files** for the selected profile from your dotfiles repository into their correct locations in your home directory, backing up any existing files if configured.
 5. **Performs safety checks** to avoid overwriting important files unless you use the `--force` flag.
 6. **Supports dry-run mode** so you can preview all changes without making modifications by adding the `--dry-run` flag.
-
-**Order of Operations:**
-The apply command follows a specific order to ensure dependencies are satisfied:
-- Homebrew packages are installed **before** symlinks are created to prevent broken symlinks to Homebrew-installed tools
-- Secrets are decrypted **before** symlinks to ensure encrypted files are available
-- Bootstrap scripts are generated **first** for user review and manual execution
-
-This makes it easy to replicate your environment on any machine in a safe, repeatable, and automated way.
 
 ## Bootstrap
 
@@ -169,4 +121,44 @@ Ordinator also scans tracked files for potential plaintext secrets and warns you
   ```
 
 > **Never commit your AGE key or other sensitive secrets to your repository.**
-> The AGE key (typically at `~/.config/ordinator/age/key.txt`) and SOPS configuration (typically at `
+> The AGE key (typically at `~/.config/ordinator/age/key.txt`) and SOPS configuration (typically at `~/.config/ordinator/sops/.sops.yaml`) should be kept secure and backed up separately.
+
+## Uninstall and Restore
+
+Ordinator makes it easy to safely remove your dotfiles and restore your original configuration:
+
+- Remove all symlinks for a profile or all profiles
+- Optionally restore original files from backups
+- Interactive confirmations for destructive actions (unless --force is set)
+- Dry-run mode previews all changes without making modifications
+- Colorized output and progress indicators for clear feedback
+
+**Example:**
+```bash
+# Uninstall and restore everything for the 'work' profile
+ordinator uninstall --profile work --restore-backups
+
+# Preview what would be removed/restored (no changes made)
+ordinator uninstall --profile work --restore-backups --dry-run
+```
+
+## Documentation
+
+- [Commands Reference](COMMANDS.md) - Complete CLI command documentation
+- [Configuration Guide](CONFIGURATION.md) - Configuration file format and options
+- [Development Roadmap](DEVELOPMENT_ROADMAP.md) - Project development phases and progress
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Issues and Suggestions
+
+Found a bug or have a feature request? We'd love to hear from you! Please visit our [Issues page](https://github.com/ordinators/ordinator/issues) to:
+
+- Report bugs or unexpected behavior
+- Suggest new features or improvements
+- Ask questions about usage or configuration
+- Share feedback on your experience with Ordinator
+
+Your feedback helps make Ordinator better for everyone!
