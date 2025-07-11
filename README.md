@@ -7,61 +7,108 @@
 
 ## Features
 
-- ✅ **Dotfiles Management** - Track and sync dotfiles in Git with symlink management
-- ✅ **Bootstrap Process** - Execute setup scripts and install tools non-interactively
-- ✅ **Profile Support** - Environment profiles (work, personal, laptop)
-- ✅ **Secrets Management** - Secure secrets using Mozilla SOPS + age encryption
-- ✅ **Git Integration** - Git-inspired CLI commands without explicit git invocation
-- ✅ **macOS-Specific** - System settings support
-- ✅ **Dry-Run Mode** - Preview changes before applying them
+- **Profile-based dotfiles management** - Organize your dotfiles by environment (work, personal, laptop)
+- **Profile-specific file storage** - Each profile has its own directory for file storage, preventing conflicts
+- **Interactive profile selection** - Choose which profile to add files to with a simple prompt
+- **Enhanced error handling** - Colorized output and clear guidance for resolving conflicts
+- **Automatic secrets scanning** - Detects potential plaintext secrets in tracked files
+- **SOPS and age integration** - Encrypt sensitive files with industry-standard tools
+- **Homebrew package management** - Track and install packages per profile
+- **Bootstrap script generation** - Create setup scripts for new environments
+- **Git integration** - Seamless commit, push, and sync operations
+- **Auto-generated README** - Professional documentation with installation instructions
 
 ## Quick Start
 
-### 1. Start a New Ordinator Dotfiles Repo (First-Time Setup)
+### 1. Install Ordinator and Create Your First Dotfiles Repository
 
+**Install Ordinator:**
 ```bash
-# Install Ordinator via Homebrew
 brew install ordinators/ordinator/ordinator
-
-# Initialize a new dotfiles repository in your chosen directory
-mkdir -p ~/.dotfiles
-cd ~/.dotfiles
-ordinator init
-
-# Add your first dotfile
-ordinator add ~/.zshrc
-
-# Apply your configuration
-ordinator apply
-
-# Commit your changes
-ordinator commit -m "Initial commit: track dotfiles with Ordinator"
-
-# Push to GitHub (sets remote if needed)
-ordinator push https://github.com/username/dotfiles.git
 ```
 
-### 2. Replicate Your Dotfiles Repo to Another Device (Onboarding a New Machine)
-
+**Initialize and set up your dotfiles:**
 ```bash
-# Install Ordinator via Homebrew
-brew install ordinators/ordinator/ordinator
-
-# Initialize Ordinator with your remote repo (clones to current directory by default)
+# Initialize a new repository with remote URL
 ordinator init https://github.com/username/dotfiles.git
 
-# Or specify a target directory
-ordinator init https://github.com/username/dotfiles.git ~/.dotfiles
+# Add your first file
+ordinator add ~/.zshrc --profile work
 
-# Or use SSH URL
-ordinator init git@github.com:username/dotfiles.git
+# Set up secrets management for sensitive files
+ordinator secrets setup --profile work
 
-# Change to the cloned directory if needed
-cd ~/.dotfiles
+# Add a sensitive file securely (encrypts before storing)
+# TODO: This should be: ordinator secrets add ~/.ssh/config --profile work
+# For now, we need to manually handle the encryption workflow:
+ordinator add ~/.ssh/config --profile work
+ordinator secrets encrypt files/work/.ssh/config
+rm files/work/.ssh/config  # Remove plaintext version
 
-# Apply your configuration (choose profile as needed)
+# Export your Homebrew packages for reproducible environments
+ordinator brew export --profile work
+
+# Apply your configuration
+ordinator apply --profile work
+
+# Commit and push to GitHub
+ordinator commit -m "Initial commit: track dotfiles with Ordinator"
+ordinator push
+```
+
+### 2. Replicate Your Dotfiles Repository to Another Device
+
+**Step 1:** Click the generated install link in your repository's README and run it in your terminal:
+```bash
+curl -fsSL https://raw.githubusercontent.com/username/dotfiles/master/scripts/install.sh | sh
+```
+
+**Step 2:** Apply your configuration:
+```bash
 ordinator apply --profile work
 ```
+
+## Phase 4.5 Features
+
+### Profile-Specific File Storage
+
+Ordinator now stores files in profile-specific directories, preventing conflicts between different environments:
+
+```bash
+# Add files to different profiles
+ordinator add ~/.zshrc --profile work
+ordinator add ~/.zshrc --profile personal
+# Creates: files/work/.zshrc and files/personal/.zshrc
+
+# Apply specific profile
+ordinator apply --profile work
+# Symlinks files/work/.zshrc to ~/.zshrc
+```
+
+### Interactive Profile Selection
+
+When adding files without specifying a profile, Ordinator prompts you to choose:
+
+```bash
+ordinator add ~/.gitconfig
+# Prompts:
+# Select a profile to add this file to:
+#   1. default
+#   2. work  
+#   3. personal
+# Enter number (default: default):
+```
+
+### Enhanced Error Handling
+
+- **Colorized output** for better readability
+- **Conflict detection** when the same file exists in multiple profiles
+- **Clear guidance** for resolving issues
+- **Progress indicators** for file operations
+
+### Backward Compatibility
+
+Existing repositories with flat `files/` structure continue to work seamlessly. Ordinator automatically detects and uses the appropriate file structure.
 
 When you run `ordinator apply`, Ordinator:
 
@@ -122,52 +169,4 @@ Ordinator also scans tracked files for potential plaintext secrets and warns you
   ```
 
 > **Never commit your AGE key or other sensitive secrets to your repository.**
-> The AGE key (typically at `~/.config/ordinator/age/key.txt`) and SOPS configuration (typically at `~/.config/ordinator/.sops.yaml`) are required for decrypting secrets, but should always be kept private and out of version control.
-
-## Repository Structure
-
-When you initialize an Ordinator dotfiles repository, it creates the following structure:
-
-```
-dotfiles-repo/
-├── .git/                   # Git repository
-├── .gitignore              # Auto-generated git ignore rules
-├── ordinator.toml          # Configuration file
-├── README.md               # Auto-generated README (root)
-├── readme_state.json       # README state tracking (root)
-├── files/                  # Tracked dotfiles
-│   ├── .zshrc
-│   ├── .gitconfig
-│   └── .config/
-├── scripts/                # Generated scripts
-│   ├── install.sh          # Repository install script
-│   └── bootstrap-*.sh      # Profile bootstrap scripts
-└── secrets/                # Encrypted secrets (optional)
-    ├── secrets.enc.yaml
-    └── config.enc.json
-```
-
-**Generated Files:**
-- **README.md** - Auto-generated with installation instructions, profiles, and troubleshooting
-- **scripts/install.sh** - One-liner installation script for the repository
-- **readme_state.json** - Tracks configuration changes for smart README updates
-- **scripts/bootstrap-*.sh** - Profile-specific setup scripts (generated during apply)
-
-All generated files are committed to the repository when you run `ordinator commit`.
-
-## Documentation
-
-- [Product Requirements Document](PRD.md) - Complete feature specification
-- [Development Roadmap](DEVELOPMENT_ROADMAP.md) - Implementation plan
-- [Commands Reference](COMMANDS.md) - Complete CLI command documentation
-- [Configuration Guide](CONFIGURATION.md) - Configuration file format and usage
-- [Test Plan](TEST_PLAN.md) - Testing strategy
-
-## Contributing & Feedback
-
-Contributions, bug reports, and feature requests are welcome!
-- [Open an issue or pull request](https://github.com/ordinators/ordinator/issues)
-
-## License
-
-MIT License - see [LICENSE](LICENSE) for details.
+> The AGE key (typically at `~/.config/ordinator/age/key.txt`) and SOPS configuration (typically at `

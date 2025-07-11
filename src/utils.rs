@@ -217,19 +217,14 @@ pub fn create_symlink_with_conflict_resolution(
 pub fn repair_symlink(symlink_path: &Path, expected_target: &Path) -> Result<()> {
     if !is_symlink(symlink_path) {
         return Err(anyhow::anyhow!(
-            "Path {} is not a symlink",
+            "Path is not a symlink: {}",
             symlink_path.display()
         ));
     }
 
-    if !expected_target.exists() {
-        // Handle missing source file gracefully
-        fs::remove_file(symlink_path)?;
-        eprintln!(
-            "Removed broken symlink: {} (source file missing)",
-            symlink_path.display()
-        );
-        return Ok(()); // Success, not error
+    let actual_target = get_symlink_target(symlink_path)?;
+    if actual_target == expected_target && expected_target.exists() {
+        return Ok(()); // Already correct
     }
 
     // Remove the broken symlink
@@ -240,7 +235,7 @@ pub fn repair_symlink(symlink_path: &Path, expected_target: &Path) -> Result<()>
         fs::create_dir_all(parent)?;
     }
 
-    // Recreate the symlink
+    // Create the correct symlink
     #[cfg(unix)]
     std::os::unix::fs::symlink(expected_target, symlink_path)?;
 

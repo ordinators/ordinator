@@ -68,7 +68,7 @@ impl RepoManager {
         if let Ok(parsed_url) = Url::parse(url) {
             // Only accept GitHub domains
             let host = parsed_url.host_str().unwrap_or("");
-            if !host.ends_with("github.com") {
+            if host != "github.com" {
                 return Err(anyhow!("Invalid GitHub URL format"));
             }
 
@@ -126,27 +126,30 @@ impl RepoManager {
         // Example: git@github.com:user/repo.git
         if let Some((user_host, path)) = url.split_once(':') {
             // Only accept GitHub SSH URLs
-            if user_host.ends_with("github.com") {
+            if user_host == "git@github.com" {
                 // Reject if path contains fragment or query
                 if path.contains('#') || path.contains('?') {
                     return Err(anyhow!("Invalid GitHub URL format"));
                 }
-                let path = path.trim_start_matches('/');
-                let mut segments = path.split('/');
-                let owner = segments
-                    .next()
-                    .ok_or_else(|| anyhow!("Invalid SSH GitHub URL: missing owner"))?;
-                let repo_name = segments
-                    .next()
-                    .ok_or_else(|| anyhow!("Invalid SSH GitHub URL: missing repo"))?
-                    .trim_end_matches(".git");
-                // Reject if owner or repo is empty or if there are extra segments
-                if owner.trim().is_empty()
-                    || repo_name.trim().is_empty()
-                    || segments.next().is_some()
-                {
+                // Reject if path starts with a slash (invalid SSH URL)
+                if path.starts_with('/') {
                     return Err(anyhow!("Invalid GitHub URL format"));
                 }
+                let segments: Vec<&str> = path.split('/').collect();
+
+                // Must have exactly 2 segments: owner/repo
+                if segments.len() != 2 {
+                    return Err(anyhow!("Invalid GitHub URL format"));
+                }
+
+                let owner = segments[0];
+                let repo_name = segments[1].trim_end_matches(".git");
+
+                // Reject if owner or repo is empty
+                if owner.trim().is_empty() || repo_name.trim().is_empty() {
+                    return Err(anyhow!("Invalid GitHub URL format"));
+                }
+
                 // Only allow valid GitHub characters (alphanumeric, hyphens, underscores)
                 let valid = |s: &str| {
                     s.chars()
@@ -155,6 +158,7 @@ impl RepoManager {
                 if !valid(owner) || !valid(repo_name) {
                     return Err(anyhow!("Invalid GitHub URL format"));
                 }
+
                 return Ok(GitHubRepoInfo {
                     owner: owner.to_string(),
                     repo: repo_name.to_string(),
@@ -381,6 +385,11 @@ mod tests {
             "git@github.com:user/repo.git#main",
             "git@github.com:user/repo.git?ref=main",
             "git@github.com:user/repo/extra",
+            // Malformed SSH URLs with empty owner or repo
+            "git@github.com:/user/repo.git",
+            "git@github.com:user/.git",
+            "git@github.com:user/",
+            "git@github.com:/repo.git",
         ];
         for url in invalid_urls {
             let result = manager.parse_github_url(url);

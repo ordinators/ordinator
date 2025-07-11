@@ -357,6 +357,43 @@ impl Config {
         }
     }
 
+    /// Get the profile-specific file path for a tracked file
+    pub fn get_profile_file_path(&self, profile_name: &str, file_path: &str) -> Result<PathBuf> {
+        if !self.has_profile(profile_name) {
+            return Err(anyhow::anyhow!("Profile '{}' not found", profile_name));
+        }
+
+        // For profile-specific storage, files are stored as files/<profile>/<file>
+        let dotfiles_dir = get_dotfiles_dir()?;
+        let profile_files_dir = dotfiles_dir.join("files").join(profile_name);
+        let profile_file_path = profile_files_dir.join(file_path);
+
+        Ok(profile_file_path)
+    }
+
+    /// Get the source file path for symlinking (handles both flat and profile-specific structures)
+    pub fn get_source_file_path(&self, profile_name: &str, file_path: &str) -> Result<PathBuf> {
+        let dotfiles_dir = get_dotfiles_dir()?;
+
+        // First check if profile-specific file exists
+        let profile_file_path = dotfiles_dir
+            .join("files")
+            .join(profile_name)
+            .join(file_path);
+        if profile_file_path.exists() {
+            return Ok(profile_file_path);
+        }
+
+        // Fall back to flat structure for backward compatibility
+        let flat_file_path = dotfiles_dir.join("files").join(file_path);
+        if flat_file_path.exists() {
+            return Ok(flat_file_path);
+        }
+
+        // If neither exists, return the profile-specific path (for new files)
+        Ok(profile_file_path)
+    }
+
     /// Remove a file from a profile
     #[allow(dead_code)]
     pub fn remove_file_from_profile(&mut self, profile_name: &str, file_path: &str) -> Result<()> {
@@ -495,6 +532,9 @@ fn default_enabled() -> bool {
 
 /// Get the dotfiles directory path
 fn get_dotfiles_dir() -> Result<PathBuf> {
+    if let Ok(ordinator_home) = std::env::var("ORDINATOR_HOME") {
+        return Ok(PathBuf::from(ordinator_home));
+    }
     let home_dir =
         dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?;
     Ok(home_dir.join(".dotfiles"))

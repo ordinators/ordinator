@@ -193,7 +193,7 @@ impl ReadmeManager {
     /// Preview README content
     pub fn preview_readme(
         &self,
-        _config: &crate::config::Config,
+        config: &crate::config::Config,
         dotfiles_dir: &Path,
     ) -> Result<Option<PathBuf>> {
         let readme_path = dotfiles_dir.join("README.md");
@@ -211,7 +211,7 @@ impl ReadmeManager {
         self.generate_install_script(dotfiles_dir)?;
 
         let generator = READMEGenerator::new_with_repo_url(false, true, repo_url);
-        let content = generator.generate_readme()?;
+        let content = generator.generate_readme_with_config(config)?;
 
         // Show preview
         println!("{content}");
@@ -225,7 +225,7 @@ impl ReadmeManager {
     /// Edit README in $EDITOR
     pub fn edit_readme(
         &self,
-        _config: &crate::config::Config,
+        config: &crate::config::Config,
         dotfiles_dir: &Path,
     ) -> Result<Option<PathBuf>> {
         let readme_path = dotfiles_dir.join("README.md");
@@ -245,7 +245,7 @@ impl ReadmeManager {
             self.generate_install_script(dotfiles_dir)?;
 
             let generator = READMEGenerator::new_with_repo_url(false, false, repo_url);
-            let content = generator.generate_readme()?;
+            let content = generator.generate_readme_with_config(config)?;
             fs::write(&readme_path, content)?;
             eprintln!("Generated README.md for editing");
         }
@@ -331,6 +331,26 @@ impl READMEGenerator {
         Ok(content)
     }
 
+    /// Generate README content from template with config
+    pub fn generate_readme_with_config(&self, config: &crate::config::Config) -> Result<String> {
+        let mut content = String::new();
+
+        // Add header
+        content.push_str(&self.generate_header());
+
+        // Add sections
+        content.push_str(&self.generate_quick_install());
+        content.push_str(&self.generate_profiles_with_config(config));
+        content.push_str(&self.generate_age_key());
+        content.push_str(&self.generate_troubleshooting());
+        content.push_str(&self.generate_security());
+
+        // Add footer
+        content.push_str(&self.generate_footer());
+
+        Ok(content)
+    }
+
     // Template generation methods
     fn generate_header(&self) -> String {
         String::from("# Dotfiles Repository\n\n")
@@ -341,14 +361,35 @@ impl READMEGenerator {
             .repo_url
             .as_deref()
             .unwrap_or("https://github.com/yourname/dotfiles.git");
-        let install_command = format!("curl -fsSL https://raw.githubusercontent.com/ordinators/ordinator/main/scripts/install.sh | sh && ordinator init {repo_url} && ordinator apply --profile work");
-        let pat_command = "curl -fsSL https://raw.githubusercontent.com/ordinators/ordinator/main/scripts/install.sh | sh && ordinator init https://username:YOUR_PAT@github.com/username/dotfiles.git && ordinator apply --profile work".to_string();
+        let install_command = format!("curl -fsSL https://raw.githubusercontent.com/ordinators/ordinator/master/scripts/install.sh | sh && ordinator init {repo_url} && ordinator apply");
+        let pat_command = "curl -fsSL https://raw.githubusercontent.com/ordinators/ordinator/master/scripts/install.sh | sh && ordinator init https://username:YOUR_PAT@github.com/username/dotfiles.git && ordinator apply".to_string();
 
         format!("## Quick Install\n\n```bash\n{install_command}\n```\n\n<button onclick=\"navigator.clipboard.writeText('{install_command}')\">📋 Copy to Clipboard</button>\n\n### For Private Repositories\n\nIf this is a private repository, you'll need a Personal Access Token (PAT). Paste your PAT below and click the button to get a command with your token:\n\n<input type=\"text\" id=\"pat-input\" placeholder=\"Paste your GitHub Personal Access Token here\" style=\"width: 100%; padding: 8px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px;\">\n<button onclick=\"const pat = document.getElementById('pat-input').value; if (pat) {{ navigator.clipboard.writeText('{pat_command}'); alert('Command with PAT copied to clipboard!'); }} else {{ alert('Please enter your Personal Access Token first.'); }}\">🔐 Copy Command with PAT</button>\n\n**Note**: Your PAT will be included in the command. Keep it secure and don't share the command with others.\n\n")
     }
 
     fn generate_profiles(&self) -> String {
+        // This method will be updated to accept a config parameter
+        // For now, return the hardcoded version for backward compatibility
         String::from("## Profiles\n\nThis repository contains the following profiles:\n\n- **work**: Work environment configuration\n- **personal**: Personal environment configuration\n- **laptop**: Laptop-specific configuration\n\nTo apply a profile:\n```bash\nordinator apply --profile <profile-name>\n```\n\n")
+    }
+
+    fn generate_profiles_with_config(&self, config: &crate::config::Config) -> String {
+        let mut content =
+            String::from("## Profiles\n\nThis repository contains the following profiles:\n\n");
+
+        for (profile_name, profile_config) in &config.profiles {
+            let description = profile_config
+                .description
+                .as_deref()
+                .unwrap_or("No description");
+            content.push_str(&format!("- **{profile_name}**: {description}\n"));
+        }
+
+        content.push_str(
+            "\nTo apply a profile:\n```bash\nordinator apply --profile <profile-name>\n```\n\n",
+        );
+
+        content
     }
 
     fn generate_age_key(&self) -> String {

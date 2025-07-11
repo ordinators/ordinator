@@ -380,29 +380,29 @@ ordinator readme default
 **Testable:** ✅
 
 **Tasks:**
-- [ ] Enhance `ordinator add` to support profile-specific file storage
-- [ ] When adding a file with `--profile`, store it in `files/<profile>/` subdirectory
-- [ ] Update config to track the correct source file for each profile
-- [ ] Ensure symlinking logic uses the correct profile-specific file
-- [ ] Update documentation and usage examples
-- [ ] Add interactive prompts for profile selection when adding files
-- [ ] Implement progress indicators for file copying and organization
-- [ ] Enhance error handling for file conflicts between profiles
-- [ ] Add colorized output for file operations and profile status
-- [ ] Update README generator to dynamically list profiles from ordinator.toml (remove hardcoded 'work', 'personal', 'laptop')
-- [ ] Ensure README always matches actual profiles in config
+- [x] Enhance `ordinator add` to support profile-specific file storage
+- [x] When adding a file with `--profile`, store it in `files/<profile>/` subdirectory
+- [x] Update config to track the correct source file for each profile
+- [x] Ensure symlinking logic uses the correct profile-specific file
+- [x] Update documentation and usage examples
+- [x] Add interactive prompts for profile selection when adding files
+- [x] Implement progress indicators for file copying and organization
+- [x] Enhance error handling for file conflicts between profiles
+- [x] Add colorized output for file operations and profile status
+- [x] Update README generator to dynamically list profiles from ordinator.toml (remove hardcoded 'work', 'personal', 'laptop')
+- [x] Ensure README always matches actual profiles in config
 
 **Tests:**
-- [ ] Adding the same file to multiple profiles stores separate copies
-- [ ] Applying a profile symlinks the correct version for that profile
-- [ ] No accidental overwrites between profiles
-- [ ] Backward compatibility for existing flat file structure
-- [ ] Interactive prompts work for profile selection
-- [ ] Progress indicators display during file operations
-- [ ] Error handling works for file conflicts
-- [ ] Generated README lists only the profiles present in ordinator.toml
-- [ ] Changing profiles in config updates README accordingly
-- [ ] No hardcoded profiles appear in README
+- [x] Adding the same file to multiple profiles stores separate copies
+- [x] Applying a profile symlinks the correct version for that profile
+- [x] No accidental overwrites between profiles
+- [x] Backward compatibility for existing flat file structure
+- [x] Interactive prompts work for profile selection
+- [x] Progress indicators display during file operations
+- [x] Error handling works for file conflicts
+- [x] Generated README lists only the profiles present in ordinator.toml
+- [x] Changing profiles in config updates README accordingly
+- [x] No hardcoded profiles appear in README
 
 **Acceptance Criteria:**
 ```bash
@@ -419,6 +419,8 @@ ordinator apply --profile work
 # README profile section is always accurate to ordinator.toml
 # No mention of profiles that do not exist in the config
 ```
+
+**Completion Statement:** This completes Phase 4.5 (Profile-Specific File Storage and Add Command Enhancement) and prepares for Phase 4.6 (Uninstall and Restore Original Configuration).
 
 ### 4.6 Uninstall and Restore Original Configuration
 **Priority:** Medium  
@@ -466,7 +468,68 @@ ordinator uninstall --profile work --restore-backups
 # Colorized output previews actions
 ```
 
-### 4.7 Enhanced README with Homebrew Packages Section
+### 4.7 Secrets Workflow Review and Enhancement
+**Priority:** High  
+**Dependencies:** 3.1, 3.2  
+**Estimated Time:** 2-3 days  
+**Testable:** ✅
+
+**Tasks:**
+- [ ] Review current secrets workflow for security issues
+- [ ] Identify problems with current `add` + `encrypt` workflow
+- [ ] Design new `ordinator secrets add` command for secure file handling
+- [ ] Implement `ordinator secrets add <file> --profile <profile>` command
+- [ ] Ensure encrypted files are never stored in plaintext in repository
+- [ ] Update documentation to reflect secure workflow
+- [ ] Add tests for new secure secrets workflow
+- [ ] Update Quick Start guide with correct workflow
+- [ ] Add validation to prevent plaintext secrets in repository
+- [ ] Update commit scanning to detect plaintext secrets more effectively
+- [ ] Add interactive prompts for secrets workflow decisions
+- [ ] Enhance error messages for secrets-related operations
+
+**Current Issues:**
+- `ordinator add` stores plaintext files in repository
+- `ordinator secrets encrypt` creates encrypted version but leaves plaintext
+- Manual cleanup required to remove plaintext files
+- Security risk of plaintext secrets in Git repository
+- Workflow is complex and error-prone
+
+**New Secure Workflow:**
+```bash
+# Secure way to add sensitive files
+ordinator secrets add ~/.ssh/config --profile work
+# 1. Reads source file
+# 2. Encrypts in memory
+# 3. Saves only encrypted version to repository
+# 4. Tracks encrypted file in config
+# 5. Never stores plaintext
+```
+
+**Tests:**
+- [ ] `ordinator secrets add` never stores plaintext in repository
+- [ ] Encrypted files are properly tracked in configuration
+- [ ] Commit scanning detects plaintext secrets effectively
+- [ ] Interactive prompts guide users through secure workflow
+- [ ] Error messages are clear about security implications
+- [ ] Backward compatibility maintained for existing workflows
+- [ ] Integration tests verify secure file handling
+
+**Acceptance Criteria:**
+```bash
+# New secure workflow
+ordinator secrets add ~/.ssh/config --profile work
+# Result: Only encrypted file stored in repository
+
+# Validation
+ordinator commit -m "Add sensitive files"
+# Blocks commit if plaintext secrets detected
+# Provides clear guidance on how to fix
+```
+
+**Completion Statement:** This completes Phase 4.7 (Secrets Workflow Review and Enhancement) and prepares for Phase 4.8 (Enhanced README with Homebrew Packages Section).
+
+### 4.8 Enhanced README with Homebrew Packages Section
 **Priority:** Medium  
 **Dependencies:** 4.4  
 **Estimated Time:** 1 day  
@@ -579,7 +642,7 @@ ordinator readme default
 # README automatically updates to reflect new packages in work profile
 ```
 
-**Completion Statement:** This completes Phase 4.7 (Enhanced README with Homebrew Packages Section) and prepares for Phase 4.8 (Additional README Enhancements).
+**Completion Statement:** This completes Phase 4.8 (Enhanced README with Homebrew Packages Section) and prepares for Phase 5 (System Commands & Script Generation).
 
 ---
 

@@ -484,6 +484,51 @@ ls -la ~/.ssh/config
 
 ---
 
+## Repository Structure
+
+When you initialize an Ordinator dotfiles repository, it creates the following structure:
+
+```
+dotfiles-repo/
+├── .git/                   # Git repository
+├── .gitignore             # Security-focused ignore rules
+├── ordinator.toml         # Configuration file
+├── README.md              # Auto-generated documentation
+├── files/                 # Profile-specific file storage
+│   ├── default/           # Files for default profile
+│   │   ├── .zshrc
+│   │   └── .gitconfig
+│   ├── work/              # Files for work profile
+│   │   ├── .zshrc
+│   │   └── .ssh/config
+│   └── personal/          # Files for personal profile
+│       ├── .zshrc
+│       └── .config/alacritty/alacritty.yml
+└── scripts/               # Bootstrap scripts
+    ├── bootstrap-default.sh
+    ├── bootstrap-work.sh
+    └── bootstrap-personal.sh
+```
+
+### Profile-Specific File Storage
+
+**New Structure (Phase 4.5+):**
+- Files are stored in `files/<profile>/` subdirectories
+- Each profile has its own directory for file storage
+- Same file can exist in multiple profiles with different content
+- Backward compatibility with flat `files/` structure
+
+**File Resolution Order:**
+1. Look for file in `files/<profile>/` (profile-specific)
+2. Fall back to `files/` (flat structure for backward compatibility)
+3. If neither exists, use profile-specific path for new files
+
+**Benefits:**
+- **Profile isolation**: Each profile can have different versions of the same file
+- **Clear organization**: Easy to see which files belong to which profile
+- **Conflict prevention**: No accidental overwrites between profiles
+- **Backward compatibility**: Existing repositories continue to work
+
 ## Best Practices
 
 - Keep your `ordinator.toml` up-to-date with your current configuration
