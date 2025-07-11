@@ -1,8 +1,10 @@
+use std::io::{self, Write};
+use std::path::PathBuf;
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use colored::*;
-use std::io::{self, Write};
-use std::path::{Path, PathBuf};
+use is_terminal::IsTerminal;
 use tracing::{info, warn};
 
 use crate::config::Config;
@@ -326,7 +328,7 @@ fn prompt_for_conflict_resolution(
     }
     eprintln!("   This will create separate copies for each profile.");
 
-    if atty::is(atty::Stream::Stdin) {
+    if io::stdin().is_terminal() {
         eprint!("Continue? [y/N]: ");
         io::stdout().flush().unwrap();
         let mut input = String::new();
@@ -348,7 +350,7 @@ fn prompt_for_profile(profiles: &[&String], default_profile: &str) -> String {
         return profiles[0].clone();
     }
     // Check if stdin is a tty
-    if atty::is(atty::Stream::Stdin) {
+    if io::stdin().is_terminal() {
         eprintln!("Select a profile to add this file to:");
         for (i, profile) in profiles.iter().enumerate() {
             eprintln!("  {}. {}", i + 1, profile);
@@ -375,10 +377,14 @@ fn prompt_for_profile(profiles: &[&String], default_profile: &str) -> String {
 }
 
 fn color_enabled() -> bool {
-    atty::is(atty::Stream::Stdout)
+    io::stdout().is_terminal()
 }
 
-fn handle_missing_source_file(_file: &str, source_path: &Path, dest: &Path) -> anyhow::Result<()> {
+fn handle_missing_source_file(
+    _file: &str,
+    source_path: &std::path::Path,
+    dest: &std::path::Path,
+) -> anyhow::Result<()> {
     let msg = format!("Source file not found: {}", source_path.display());
     if color_enabled() {
         eprintln!("{}", msg.red());
@@ -606,7 +612,7 @@ pub async fn run(args: Args) -> Result<()> {
                 println!("DRY-RUN: Would add '{path}' to profile '{profile_name}'");
                 return Ok(());
             }
-            let path_obj = Path::new(&path);
+            let path_obj = std::path::Path::new(&path);
             if !path_obj.exists() {
                 return Err(anyhow::anyhow!("Path '{}' does not exist on disk.", path));
             }

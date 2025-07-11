@@ -69,7 +69,7 @@ tar = "0.4"
 colored = "2.0"
 
 # Terminal detection
-atty = "0.2"
+is-terminal = "0.1"
 
 [dev-dependencies]
 # Testing frameworks
