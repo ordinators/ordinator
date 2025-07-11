@@ -37,3 +37,6 @@ cobertura.xml
 # Temporary files
 *.tmp
 *.temp
+
+# Ordinator backups
+backups/

@@ -123,6 +123,25 @@ Ordinator also scans tracked files for potential plaintext secrets and warns you
 > **Never commit your AGE key or other sensitive secrets to your repository.**
 > The AGE key (typically at `~/.config/ordinator/age/key.txt`) and SOPS configuration (typically at `~/.config/ordinator/sops/.sops.yaml`) should be kept secure and backed up separately.
 
+## Uninstall and Restore
+
+Ordinator makes it easy to safely remove your dotfiles and restore your original configuration:
+
+- Remove all symlinks for a profile or all profiles
+- Optionally restore original files from backups
+- Interactive confirmations for destructive actions (unless --force is set)
+- Dry-run mode previews all changes without making modifications
+- Colorized output and progress indicators for clear feedback
+
+**Example:**
+```bash
+# Uninstall and restore everything for the 'work' profile
+ordinator uninstall --profile work --restore-backups
+
+# Preview what would be removed/restored (no changes made)
+ordinator uninstall --profile work --restore-backups --dry-run
+```
+
 ## Documentation
 
 - [Commands Reference](COMMANDS.md) - Complete CLI command documentation
@@ -133,6 +152,13 @@ Ordinator also scans tracked files for potential plaintext secrets and warns you
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Contributing
+## Issues and Suggestions
 
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on how to submit issues, feature requests, and pull requests.
+Found a bug or have a feature request? We'd love to hear from you! Please visit our [Issues page](https://github.com/ordinators/ordinator/issues) to:
+
+- Report bugs or unexpected behavior
+- Suggest new features or improvements
+- Ask questions about usage or configuration
+- Share feedback on your experience with Ordinator
+
+Your feedback helps make Ordinator better for everyone!
