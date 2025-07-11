@@ -466,6 +466,121 @@ ordinator uninstall --profile work --restore-backups
 # Colorized output previews actions
 ```
 
+### 4.7 Enhanced README with Homebrew Packages Section
+**Priority:** Medium  
+**Dependencies:** 4.4  
+**Estimated Time:** 1 day  
+**Testable:** ✅
+
+**Tasks:**
+- [ ] Add Homebrew packages section to README generator
+- [ ] Create profile-specific collapsible HTML sections with package links to formulae.brew.sh
+- [ ] Read `homebrew_packages` from each profile in config
+- [ ] Generate separate sections for each profile that has packages
+- [ ] Sort packages alphabetically within each profile
+- [ ] Link each package to `https://formulae.brew.sh/formula/{package_name}`
+- [ ] Use profile-appropriate emojis (💼 work, 🏠 personal, 💻 laptop, ⚙️ default)
+- [ ] Enhance profiles section with detailed profile information (files, directories, bootstrap scripts only)
+- [ ] Use collapsible sections for both profiles and Homebrew packages sections
+- [ ] Keep profiles and Homebrew packages as separate, focused sections
+- [ ] Update README generator to accept config parameter
+- [ ] Update state tracking to include Homebrew packages changes
+- [ ] Add tests for profile-specific Homebrew packages README generation
+- [ ] Add tests for enhanced profile display
+- [ ] Update documentation to mention new feature
+- [ ] Ensure backward compatibility with existing READMEs
+
+**HTML Structure:**
+
+**Homebrew Packages Section:**
+```html
+## Homebrew Packages
+
+<details>
+  <summary><strong>💼 Work Profile Packages</strong></summary>
+  <div style="margin-top:10px; padding:10px; border:1px solid #ddd; border-radius:8px;">
+    <p>
+      <a href="https://formulae.brew.sh/formula/git" target="_blank">git</a> •
+      <a href="https://formulae.brew.sh/formula/neovim" target="_blank">neovim</a> •
+      <a href="https://formulae.brew.sh/formula/ripgrep" target="_blank">ripgrep</a> •
+      <a href="https://formulae.brew.sh/formula/sops" target="_blank">sops</a> •
+      <a href="https://formulae.brew.sh/formula/age" target="_blank">age</a>
+    </p>
+  </div>
+</details>
+
+<details>
+  <summary><strong>🏠 Personal Profile Packages</strong></summary>
+  <div style="margin-top:10px; padding:10px; border:1px solid #ddd; border-radius:8px;">
+    <p>
+      <a href="https://formulae.brew.sh/formula/git" target="_blank">git</a> •
+      <a href="https://formulae.brew.sh/formula/alacritty" target="_blank">alacritty</a> •
+      <a href="https://formulae.brew.sh/formula/karabiner-elements" target="_blank">karabiner-elements</a>
+    </p>
+  </div>
+</details>
+```
+
+**Enhanced Profiles Section:**
+```html
+## Profiles
+
+This repository contains the following profiles:
+
+<details>
+  <summary><strong>💼 Work Profile</strong> - Work environment configuration</summary>
+  <div style="margin-top:10px; padding:10px; border:1px solid #ddd; border-radius:8px;">
+    <p><strong>Files:</strong> <code>.zshrc</code>, <code>.gitconfig</code>, <code>.ssh/config</code></p>
+    <p><strong>Directories:</strong> <code>.config/nvim/</code>, <code>.config/company/</code></p>
+    <p><strong>Bootstrap Script:</strong> <code>scripts/bootstrap-work.sh</code></p>
+  </div>
+</details>
+
+<details>
+  <summary><strong>🏠 Personal Profile</strong> - Personal environment configuration</summary>
+  <div style="margin-top:10px; padding:10px; border:1px solid #ddd; border-radius:8px;">
+    <p><strong>Files:</strong> <code>.zshrc</code>, <code>.gitconfig</code></p>
+    <p><strong>Directories:</strong> <code>.config/alacritty/</code>, <code>.config/karabiner/</code></p>
+  </div>
+</details>
+```
+
+**Tests:**
+- [ ] README generation includes Homebrew packages when present in config
+- [ ] Each profile with packages gets its own collapsible section
+- [ ] Packages are sorted alphabetically within each profile
+- [ ] Each package links to correct formulae.brew.sh URL
+- [ ] Profile-appropriate emojis are used (💼 work, 🏠 personal, 💻 laptop, ⚙️ default)
+- [ ] Collapsible sections render correctly in GitHub
+- [ ] README generation works without Homebrew packages (no section)
+- [ ] Enhanced profiles section shows files, directories, and bootstrap scripts only
+- [ ] Both profiles and Homebrew packages sections use collapsible sections
+- [ ] Profiles and Homebrew packages are separate, focused sections
+- [ ] State tracking updates when Homebrew packages change
+- [ ] Backward compatibility maintained for existing READMEs
+
+**Acceptance Criteria:**
+```bash
+# With comprehensive profile information
+ordinator readme default
+# Generates README with:
+# - Enhanced profiles section (files, directories, bootstrap scripts only)
+# - Separate Homebrew packages section with formulae links
+# - Both sections use collapsible sections for clean organization
+
+# Without Homebrew packages in config
+ordinator readme default
+# Generates README without Homebrew packages section
+# Enhanced profiles section still shows files and directories
+
+# When Homebrew packages are added/removed from profiles
+ordinator brew export --profile work
+ordinator readme default
+# README automatically updates to reflect new packages in work profile
+```
+
+**Completion Statement:** This completes Phase 4.7 (Enhanced README with Homebrew Packages Section) and prepares for Phase 4.8 (Additional README Enhancements).
+
 ---
 
 ## Phase 5: System Commands & Script Generation ⚙️
