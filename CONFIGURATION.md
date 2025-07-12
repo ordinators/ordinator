@@ -67,7 +67,17 @@ exclude_patterns = ["*.bak"]
 
 ### `[profiles.<name>]`
 - `files` (array of strings): List of files tracked by this profile.
+  - Managed by `ordinator watch` and `ordinator unwatch` commands
+  - Files are stored in `files/<profile>/` subdirectories
+  - Updated by `ordinator add` command
+- `secrets` (array of strings): List of encrypted files tracked by this profile.
+  - Managed by `ordinator secrets watch` and `ordinator secrets unwatch` commands
+  - Files are stored encrypted in `files/<profile>/` subdirectories
+  - Updated by `ordinator secrets add` command (secure workflow)
 - `directories` (array of strings): List of directories tracked by this profile.
+  - Managed by `ordinator watch` and `ordinator unwatch` commands
+  - Directories are stored in `files/<profile>/` subdirectories
+  - Updated by `ordinator add` command
 - `homebrew_packages` (array of strings, optional): List of Homebrew packages to install for this profile.
   - Can include both formulae and casks
   - Packages are installed using `brew install` for formulae and `brew install --cask` for casks
@@ -190,6 +200,27 @@ description = "Laptop setup with minimal tools"
   - Default: "age"
   - Supported values: "age", "gpg", "kms"
   - Must match available encryption keys in SOPS configuration
+
+### `[age]`
+- `key_file` (string, optional): Path to the age key file.
+  - Profile-specific keys stored as `~/.config/age/{profile}.key`
+  - Used for encryption and decryption operations
+  - Generated automatically by `ordinator age setup`
+
+- `sops_config` (string, optional): Path to the SOPS configuration file.
+  - Profile-specific configs stored as `~/.config/ordinator/.sops.{profile}.yaml`
+  - Configures age encryption method
+  - Generated automatically by `ordinator age setup`
+
+- `rotation_backup` (bool, optional): Whether to backup old keys during rotation.
+  - Default: `false`
+  - When `true`, old keys are preserved as `.backup` files
+  - Useful for recovery during key rotation
+
+- `auto_validate` (bool, optional): Whether to validate setup after operations.
+  - Default: `true`
+  - When `true`, automatically validates age setup after key generation
+  - Ensures encryption/decryption works correctly
 
 ### `[readme]`
 - `auto_update` (bool): Whether to automatically update README.md when configuration changes.

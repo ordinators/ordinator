@@ -5,18 +5,18 @@
 
 **Ordinator** is a CLI tool written in Rust for managing macOS dotfiles, system settings, and secrets, allowing users to replicate their environment across machines in a secure, repeatable, and non-interactive way.
 
+> **You've spent a lot of time customizing your setup—don't do it twice!** Ordinator helps you capture, version, and replicate your carefully crafted environment across any machine in minutes.
+
 ## Features
 
 - **Profile-based dotfiles management** - Organize your dotfiles by environment (work, personal, laptop)
-- **Profile-specific file storage** - Each profile has its own directory for file storage, preventing conflicts
-- **Interactive profile selection** - Choose which profile to add files to with a simple prompt
-- **Enhanced error handling** - Colorized output and clear guidance for resolving conflicts
-- **Automatic secrets scanning** - Detects potential plaintext secrets in tracked files
-- **SOPS and age integration** - Encrypt sensitive files with industry-standard tools
+- **Secure secrets workflow** - Encrypt sensitive files with automatic plaintext prevention
+- **Intuitive command structure** - `watch` to start tracking, `add` to update, `unwatch` to stop tracking
 - **Homebrew package management** - Track and install packages per profile
-- **Bootstrap script generation** - Create setup scripts for new environments
 - **Git integration** - Seamless commit, push, and sync operations
-- **Auto-generated README** - Professional documentation with installation instructions
+- **Automatic secrets scanning** - Detects potential plaintext secrets in tracked files
+- **Bootstrap script generation** - Create setup scripts for new environments
+- ...and more!
 
 ## Quick Start
 
@@ -32,18 +32,16 @@ brew install ordinators/ordinator/ordinator
 # Initialize a new repository with remote URL
 ordinator init https://github.com/username/dotfiles.git
 
-# Add your first file
-ordinator add ~/.zshrc --profile work
+# Start watching your files
+ordinator watch ~/.zshrc --profile work
+ordinator watch ~/.gitconfig --profile work
 
-# Set up secrets management for sensitive files
-ordinator secrets setup --profile work
+# Set up age encryption for secure secrets
+ordinator age setup --profile work
 
-# Add a sensitive file securely (encrypts before storing)
-# TODO: This should be: ordinator secrets add ~/.ssh/config --profile work
-# For now, we need to manually handle the encryption workflow:
-ordinator add ~/.ssh/config --profile work
-ordinator secrets encrypt files/work/.ssh/config
-rm files/work/.ssh/config  # Remove plaintext version
+# Start watching sensitive files (secure workflow)
+ordinator secrets watch ~/.ssh/config --profile work
+ordinator secrets watch ~/.aws/credentials --profile work
 
 # Export your Homebrew packages for reproducible environments
 ordinator brew export --profile work
@@ -79,73 +77,30 @@ When you run `ordinator apply`, Ordinator:
 5. **Performs safety checks** to avoid overwriting important files unless you use the `--force` flag.
 6. **Supports dry-run mode** so you can preview all changes without making modifications by adding the `--dry-run` flag.
 
-## Bootstrap
 
-Ordinator generates a profile-specific bootstrap script (e.g., `scripts/bootstrap-work.sh`) after applying your profile. This script automates extra setup steps (like installing packages or configuring system settings) and may require elevated privileges.
 
-**You must review and run the script manually** for safety:
-```bash
-chmod +x scripts/bootstrap-work.sh
-./scripts/bootstrap-work.sh
-```
-Manual execution ensures you control any privileged or system-altering commands.
+
 
 ## Profiles
 
-Profiles in Ordinator are independent sets of tracked files, directories, and bootstrap scripts. When you apply a profile, only the files listed in that profile are symlinked; files can be included in multiple profiles if desired. Applying a new profile does not remove files from previous profiles—those files remain unless you manually clean them up or they are overwritten by the new profile.
-
-Ordinator supports multiple environment profiles (e.g., work, personal, laptop). Each profile can have its own set of tracked files, directories, and bootstrap script.
-
-- List available profiles:
-  ```bash
-  ordinator profiles
-  ```
-- Apply a specific profile:
-  ```bash
-  ordinator apply --profile work
-  ```
+Ordinator supports multiple environment profiles (work, personal, laptop) that allow you to organize your dotfiles by context. Each profile contains its own set of tracked files, directories, and bootstrap scripts. When you apply a profile, only the files for that profile are symlinked, and files can be included in multiple profiles without conflicts. This enables you to maintain separate configurations for different environments while sharing common files across profiles.
 
 ## Secrets Management
 
-Ordinator integrates with Mozilla SOPS and age for secure secrets management. This enables you to encrypt your secrets and safely commit them to your GitHub repository without fear of compromise—only those with your private AGE key can decrypt them.
-
-Ordinator also scans tracked files for potential plaintext secrets and warns you if any are detected, helping prevent accidental exposure of sensitive information.
-
-- Encrypt a file:
-  ```bash
-  ordinator secrets encrypt secrets.yaml
-  ```
-- Decrypt a file:
-  ```bash
-  ordinator secrets decrypt secrets.enc.yaml
-  ```
+Ordinator provides secure secrets management using Mozilla SOPS and age encryption. The workflow automatically encrypts sensitive files and stores only encrypted versions in your repository, eliminating the risk of accidentally committing plaintext secrets. The system includes automatic plaintext detection, profile-specific encryption keys, and key rotation capabilities for enhanced security.
 
 > **Never commit your AGE key or other sensitive secrets to your repository.**
-> The AGE key (typically at `~/.config/ordinator/age/key.txt`) and SOPS configuration (typically at `~/.config/ordinator/sops/.sops.yaml`) should be kept secure and backed up separately.
+> The AGE key (typically at `~/.config/age/{profile}.key`) and SOPS configuration (typically at `~/.config/ordinator/.sops.{profile}.yaml`) should be kept secure and backed up separately.
 
 ## Uninstall and Restore
 
-Ordinator makes it easy to safely remove your dotfiles and restore your original configuration:
-
-- Remove all symlinks for a profile or all profiles
-- Optionally restore original files from backups
-- Interactive confirmations for destructive actions (unless --force is set)
-- Dry-run mode previews all changes without making modifications
-- Colorized output and progress indicators for clear feedback
-
-**Example:**
-```bash
-# Uninstall and restore everything for the 'work' profile
-ordinator uninstall --profile work --restore-backups
-
-# Preview what would be removed/restored (no changes made)
-ordinator uninstall --profile work --restore-backups --dry-run
-```
+Ordinator provides a safe way to remove your dotfiles and restore your original configuration. The uninstall process removes all symlinks and optionally restores original files from backups, with interactive confirmations and dry-run mode to prevent accidental data loss.
 
 ## Documentation
 
 - [Commands Reference](COMMANDS.md) - Complete CLI command documentation
 - [Configuration Guide](CONFIGURATION.md) - Configuration file format and options
+- [Examples Guide](EXAMPLES.md) - Common workflows and usage examples
 - [Development Roadmap](DEVELOPMENT_ROADMAP.md) - Project development phases and progress
 
 ## License

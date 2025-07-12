@@ -82,34 +82,34 @@ ordinator init --profile work
 2. Apply your configuration: `ordinator apply --profile work`
 3. Commit and push: `ordinator commit -m "Initial setup" && ordinator push`
 
-### `ordinator add`
+### `ordinator watch`
 
-Add a file to the dotfiles repository.
+Start tracking a file in the dotfiles repository.
 
 ```bash
-ordinator add <PATH> [OPTIONS]
+ordinator watch <PATH> [OPTIONS]
 ```
 
 **Arguments:**
-- `PATH` - File or directory to add (required)
+- `PATH` - File or directory to start tracking (required)
 
 **Options:**
 - `--profile <PROFILE>` - Profile to associate with this file
 
 **Examples:**
 ```bash
-# Add file to default profile
-ordinator add ~/.zshrc
+# Start watching file in default profile
+ordinator watch ~/.zshrc
 
-# Add file to specific profile
-ordinator add ~/.gitconfig --profile work
+# Start watching file in specific profile
+ordinator watch ~/.gitconfig --profile work
 
-# Add directory
-ordinator add ~/.config/nvim
+# Start watching directory
+ordinator watch ~/.config/nvim
 
 # Interactive profile selection (if --profile not specified)
-ordinator add ~/.bashrc
-# Prompts: "Select a profile to add this file to:"
+ordinator watch ~/.bashrc
+# Prompts: "Select a profile to watch this file:"
 #          1. default
 #          2. work
 #          3. personal
@@ -123,6 +123,7 @@ ordinator add ~/.bashrc
 - **Conflict detection**: Warns if the same file exists in other profiles and prompts for confirmation
 - **Colorized output**: Uses colors for success (green), warnings (yellow), and info (cyan)
 - **Automatically scans for plaintext secrets** and warns if found (does not block the operation)
+- **Adds file to tracking**: Updates the profile's `files` array in configuration
 
 **File Storage Structure:**
 ```
@@ -143,6 +144,94 @@ dotfiles-repo/
 - If the same file exists in multiple profiles, separate copies are created
 - User is prompted to confirm when conflicts are detected
 - Non-interactive mode defaults to creating separate copies
+
+### `ordinator unwatch`
+
+Stop tracking a file in the dotfiles repository.
+
+```bash
+ordinator unwatch <PATH> [OPTIONS]
+```
+
+**Arguments:**
+- `PATH` - File or directory to stop tracking (required)
+
+**Options:**
+- `--profile <PROFILE>` - Profile to remove this file from
+
+**Examples:**
+```bash
+# Stop watching file in default profile
+ordinator unwatch ~/.zshrc
+
+# Stop watching file in specific profile
+ordinator unwatch ~/.gitconfig --profile work
+
+# Stop watching directory
+ordinator unwatch ~/.config/nvim --profile work
+```
+
+**What it does:**
+- **Removes from tracking**: Removes the file from the profile's `files` array
+- **Removes from repository**: Deletes the file from `files/<profile>/` directory
+- **Removes symlink**: If a symlink exists, it will be removed
+- **Does not delete original**: The original file on disk is not affected
+- **Confirmation prompts**: Asks for confirmation before removing files
+
+### `ordinator add`
+
+Update tracked files with current content.
+
+```bash
+ordinator add <PATH> [OPTIONS]
+```
+
+**Arguments:**
+- `PATH` - File or directory to update (required)
+
+**Options:**
+- `--profile <PROFILE>` - Profile to update this file for
+- `--all` - Update all tracked files for the profile
+
+**Examples:**
+```bash
+# Update a specific file
+ordinator add ~/.zshrc --profile work
+
+# Update all tracked files for a profile
+ordinator add --all --profile work
+
+# Interactive profile selection (if --profile not specified)
+ordinator add ~/.bashrc
+# Prompts: "Select a profile to update this file:"
+#          1. default
+#          2. work
+#          3. personal
+#          Enter number (default: default):
+```
+
+**What it does:**
+- **Updates tracked files**: Copies current file content to the repository
+- **Requires tracking**: File must already be tracked (use `watch` first)
+- **Profile-specific**: Updates files in the specified profile
+- **Bulk operations**: Can update all tracked files with `--all` flag
+- **Progress indicators**: Shows progress when copying files
+- **Error handling**: Clear error if file is not being tracked
+
+**Workflow:**
+```bash
+# 1. Start tracking a file
+ordinator watch ~/.zshrc --profile work
+
+# 2. Make changes to the file
+echo "new_alias" >> ~/.zshrc
+
+# 3. Update the tracked file
+ordinator add ~/.zshrc --profile work
+
+# 4. Commit changes
+ordinator commit -m "Update zsh configuration"
+```
 
 ### `ordinator apply`
 
@@ -458,75 +547,139 @@ ordinator sync --no-rebase
 
 ## Secrets Management Commands
 
-### `ordinator secrets encrypt`
+### `ordinator secrets watch`
 
-Encrypt a file using SOPS and age.
+Start tracking an encrypted file in the dotfiles repository.
 
 ```bash
-ordinator secrets encrypt <PATH>
+ordinator secrets watch <PATH> [OPTIONS]
 ```
 
 **Arguments:**
-- `PATH` - File or directory to encrypt (required)
+- `PATH` - File or directory to start tracking (required)
 
 **Options:**
 - `--profile <PROFILE>` - Profile to associate with this file
-- `--dry-run` - Simulate encryption without making changes
 
 **Examples:**
 ```bash
-# Encrypt a single file
-ordinator secrets encrypt ~/.ssh/config
+# Start watching encrypted file in default profile
+ordinator secrets watch ~/.ssh/config
 
-# Encrypt a directory
-ordinator secrets encrypt ~/.aws
+# Start watching encrypted file in specific profile
+ordinator secrets watch ~/.aws/credentials --profile work
 
-# Encrypt with specific profile
-ordinator secrets encrypt ~/.ssh/config --profile work
+# Interactive profile selection (if --profile not specified)
+ordinator secrets watch ~/.ssh/config
+# Prompts: "Select a profile to watch this file:"
+#          1. default
+#          2. work
+#          3. personal
+#          Enter number (default: default):
 ```
 
 **What it does:**
-- Uses SOPS and age for encryption
-- Preserves file extensions (e.g., `config.yaml` becomes `config.enc.yaml`)
-- Adds `.enc` suffix to encrypted files
-- Uses encryption patterns from configuration
-- Respects exclusion patterns from configuration
-- Creates encrypted files in the same directory as original
+- **Adds to tracking**: Adds the file to the profile's `secrets` array in configuration
+- **Does not encrypt yet**: File is only tracked, not encrypted until `secrets add` is used
+- **Profile-specific**: Associates the file with the specified profile
+- **Interactive selection**: Prompts for profile if not specified
+- **Validation**: Checks that the file exists and is accessible
 
-### `ordinator secrets decrypt`
+### `ordinator secrets unwatch`
 
-Decrypt a file using SOPS.
+Stop tracking an encrypted file in the dotfiles repository.
 
 ```bash
-ordinator secrets decrypt <PATH>
+ordinator secrets unwatch <PATH> [OPTIONS]
 ```
 
 **Arguments:**
-- `PATH` - File or directory to decrypt (required)
+- `PATH` - File or directory to stop tracking (required)
 
 **Options:**
-- `--profile <PROFILE>` - Profile to associate with this file
-- `--dry-run` - Simulate decryption without making changes
+- `--profile <PROFILE>` - Profile to remove this file from
 
 **Examples:**
 ```bash
-# Decrypt a single file
-ordinator secrets decrypt ~/.ssh/config.enc
+# Stop watching encrypted file in default profile
+ordinator secrets unwatch ~/.ssh/config
 
-# Decrypt a directory
-ordinator secrets decrypt ~/.aws
-
-# Decrypt with specific profile
-ordinator secrets decrypt ~/.ssh/config.enc --profile work
+# Stop watching encrypted file in specific profile
+ordinator secrets unwatch ~/.aws/credentials --profile work
 ```
 
 **What it does:**
-- Uses SOPS for decryption
-- Restores original file extensions
-- Removes `.enc` suffix from decrypted files
-- Uses decryption patterns from configuration
-- Respects exclusion patterns from configuration
-- Creates decrypted files in the same directory as original
+- **Removes from tracking**: Removes the file from the profile's `secrets` array
+- **Removes from repository**: Deletes the encrypted file from `files/<profile>/` directory
+- **Removes symlink**: If a symlink exists, it will be removed
+- **Does not delete original**: The original file on disk is not affected
+- **Confirmation prompts**: Asks for confirmation before removing files
+
+### `ordinator secrets add`
+
+Update tracked encrypted files with current content (secure workflow).
+
+```bash
+ordinator secrets add <PATH> [OPTIONS]
+```
+
+**Arguments:**
+- `PATH` - File or directory to update (required)
+
+**Options:**
+- `--profile <PROFILE>` - Profile to update this file for
+- `--all` - Update all tracked encrypted files for the profile
+
+**Examples:**
+```bash
+# Update a specific encrypted file
+ordinator secrets add ~/.ssh/config --profile work
+
+# Update all tracked encrypted files for a profile
+ordinator secrets add --all --profile work
+
+# Interactive profile selection (if --profile not specified)
+ordinator secrets add ~/.ssh/config
+# Prompts: "Select a profile to update this file:"
+#          1. default
+#          2. work
+#          3. personal
+#          Enter number (default: default):
+```
+
+**What it does:**
+- **Secure workflow**: Reads source file, encrypts in memory, saves only encrypted version
+- **Never stores plaintext**: Only encrypted files are stored in the repository
+- **Requires tracking**: File must already be tracked (use `secrets watch` first)
+- **Profile-specific**: Updates files in the specified profile
+- **Bulk operations**: Can update all tracked encrypted files with `--all` flag
+- **Progress indicators**: Shows progress when encrypting files
+- **Error handling**: Clear error if file is not being tracked
+
+**Secure Workflow:**
+```bash
+# 1. Start tracking an encrypted file
+ordinator secrets watch ~/.ssh/config --profile work
+
+# 2. Make changes to the original file
+echo "Host new-server" >> ~/.ssh/config
+echo "  HostName 192.168.1.100" >> ~/.ssh/config
+
+# 3. Update the encrypted file (automatically encrypts)
+ordinator secrets add ~/.ssh/config --profile work
+
+# 4. Commit the encrypted file
+ordinator commit -m "Update SSH configuration"
+
+# 5. Push to remote
+ordinator push
+```
+
+**Security Benefits:**
+- **No plaintext in repository**: Only encrypted files are stored
+- **Automatic encryption**: No manual encryption/decryption steps
+- **Clear workflow**: Watch → Add → Commit → Push
+- **No cleanup required**: No risk of accidentally committing plaintext
 
 ### `ordinator secrets setup`
 
@@ -658,6 +811,170 @@ ordinator secrets check
 - Checks if age is installed and in PATH
 - Shows installation paths if found
 - Provides installation instructions if missing
+
+## Age Encryption Commands
+
+### `ordinator age encrypt`
+
+Manually encrypt a file using age encryption.
+
+```bash
+ordinator age encrypt <PATH>
+```
+
+**Arguments:**
+- `PATH` - File to encrypt (required)
+
+**Options:**
+- `--dry-run` - Simulate encryption without making changes
+
+**Examples:**
+```bash
+# Encrypt a single file
+ordinator age encrypt ~/temp-secret.yaml
+
+# Encrypt with dry-run to preview
+ordinator age encrypt ~/temp-secret.yaml --dry-run
+```
+
+**What it does:**
+- **Utility operation**: For files not managed by Ordinator repository
+- **Uses age encryption**: Leverages age encryption for security
+- **Preserves extensions**: Adds `.enc` suffix to encrypted files
+- **No repository integration**: Does not affect tracking or configuration
+- **Manual operation**: For one-off encryption needs
+
+### `ordinator age decrypt`
+
+Manually decrypt a file using age encryption.
+
+```bash
+ordinator age decrypt <PATH>
+```
+
+**Arguments:**
+- `PATH` - File to decrypt (required)
+
+**Options:**
+- `--dry-run` - Simulate decryption without making changes
+
+**Examples:**
+```bash
+# Decrypt a single file
+ordinator age decrypt ~/temp-secret.enc.yaml
+
+# Decrypt with dry-run to preview
+ordinator age decrypt ~/temp-secret.enc.yaml --dry-run
+```
+
+**What it does:**
+- **Utility operation**: For files not managed by Ordinator repository
+- **Uses age decryption**: Leverages age decryption for security
+- **Restores extensions**: Removes `.enc` suffix from decrypted files
+- **No repository integration**: Does not affect tracking or configuration
+- **Manual operation**: For one-off decryption needs
+
+### `ordinator age setup`
+
+Set up age encryption for a profile.
+
+```bash
+ordinator age setup [OPTIONS]
+```
+
+**Options:**
+- `--profile <PROFILE>` - Profile to set up (default: "default")
+- `--force` - Force overwrite existing configuration
+- `--dry-run` - Simulate setup without making changes
+
+**Examples:**
+```bash
+# Set up age for default profile
+ordinator age setup
+
+# Set up age for specific profile
+ordinator age setup --profile work
+
+# Force overwrite existing configuration
+ordinator age setup --profile work --force
+```
+
+**What it does:**
+- **Generates age key**: Creates age encryption key for the profile
+- **Creates SOPS config**: Sets up SOPS configuration file
+- **Updates configuration**: Updates `ordinator.toml` with age settings
+- **Profile-specific**: Each profile can have its own age key
+- **Validation**: Checks that setup was successful
+
+### `ordinator age validate`
+
+Validate age encryption setup for a profile.
+
+```bash
+ordinator age validate [OPTIONS]
+```
+
+**Options:**
+- `--profile <PROFILE>` - Profile to validate (default: "default")
+
+**Examples:**
+```bash
+# Validate age setup for default profile
+ordinator age validate
+
+# Validate age setup for specific profile
+ordinator age validate --profile work
+```
+
+**What it does:**
+- **Checks age key**: Validates that age key exists and is valid
+- **Checks SOPS config**: Validates SOPS configuration
+- **Tests encryption**: Performs test encryption/decryption
+- **Shows status**: Displays detailed validation results
+- **Error reporting**: Clear error messages for issues
+
+### `ordinator age rotate-keys`
+
+Rotate age encryption keys for a profile.
+
+```bash
+ordinator age rotate-keys [OPTIONS]
+```
+
+**Options:**
+- `--profile <PROFILE>` - Profile to rotate keys for (defaults to all profiles)
+- `--backup-old-key` - Keep the old key as backup
+- `--force` - Skip confirmations
+- `--dry-run` - Show what would be done without making changes
+
+**Examples:**
+```bash
+# Rotate keys for a specific profile
+ordinator age rotate-keys --profile work
+
+# Rotate keys for all profiles
+ordinator age rotate-keys
+
+# Preview the rotation
+ordinator age rotate-keys --profile work --dry-run
+
+# Rotate with backup of old key
+ordinator age rotate-keys --profile work --backup-old-key
+```
+
+**What it does:**
+- **Generates new key**: Creates new age key for the profile
+- **Updates SOPS config**: Updates configuration to include new key
+- **Re-encrypts secrets**: Decrypts and re-encrypts all tracked secrets
+- **Updates configuration**: Updates `ordinator.toml` with new key path
+- **Cleanup**: Removes old key (unless `--backup-old-key` is used)
+- **Safety features**: Confirmation prompts and dry-run mode
+
+**Security Benefits:**
+- **Regular rotation**: Follows security best practices
+- **Seamless transition**: No downtime during rotation
+- **Audit trail**: Clear logging of rotation process
+- **Backup options**: Can preserve old keys for recovery
 
 ## Homebrew Package Management Commands
 
