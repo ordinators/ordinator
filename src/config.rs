@@ -24,6 +24,10 @@ pub struct Config {
     /// README configuration
     #[serde(default)]
     pub readme: ReadmeConfig,
+
+    /// Unique identifier for this configuration (used for debugging)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub identifier: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -65,6 +69,10 @@ pub struct ProfileConfig {
     /// Directories to track for this profile
     #[serde(default)]
     pub directories: Vec<String>,
+
+    /// Secret files to track for this profile (direct paths to source files)
+    #[serde(default)]
+    pub secrets: Vec<String>,
 
     /// Bootstrap script for this profile
     pub bootstrap_script: Option<String>,
@@ -111,13 +119,23 @@ impl Config {
         let config: Config = toml::from_str(&content)
             .with_context(|| format!("Failed to parse config file: {}", path.display()))?;
 
+        // Print identifier if present (for debugging)
+        if let Some(identifier) = &config.identifier {
+            eprintln!("[DEBUG] Loaded config: {identifier}");
+        }
+
         Ok(config)
     }
 
     /// Save configuration to a TOML file
     pub fn save_to_file(&self, path: &Path) -> Result<()> {
-        let content =
+        let mut content =
             toml::to_string_pretty(self).with_context(|| "Failed to serialize config to TOML")?;
+
+        // Add identifier as a comment if present
+        if let Some(identifier) = &self.identifier {
+            content = format!("# {identifier}\n{content}");
+        }
 
         // Ensure the directory exists
         if let Some(parent) = path.parent() {
@@ -180,6 +198,11 @@ impl Config {
 
     /// Create a default configuration
     pub fn create_default() -> Self {
+        Self::create_default_with_identifier(None)
+    }
+
+    /// Create a default configuration with a test identifier
+    pub fn create_default_with_identifier(test_name: Option<&str>) -> Self {
         let mut profiles = HashMap::new();
 
         // Add default profile
@@ -193,6 +216,7 @@ impl Config {
                 description: Some("Default profile for basic dotfiles".to_string()),
                 exclude: Vec::new(),
                 homebrew_packages: Vec::new(),
+                secrets: Vec::new(),
             },
         );
 
@@ -207,6 +231,7 @@ impl Config {
                 description: Some("Work environment profile".to_string()),
                 exclude: Vec::new(),
                 homebrew_packages: Vec::new(),
+                secrets: Vec::new(),
             },
         );
 
@@ -221,6 +246,7 @@ impl Config {
                 description: Some("Personal environment profile".to_string()),
                 exclude: Vec::new(),
                 homebrew_packages: Vec::new(),
+                secrets: Vec::new(),
             },
         );
 
@@ -229,11 +255,18 @@ impl Config {
             profiles,
             secrets: SecretsConfig::default(),
             readme: ReadmeConfig::default(),
+            identifier: test_name.map(|name| format!("test: {name}")),
         }
     }
 
     /// Initialize a new configuration in the dotfiles directory
+    #[allow(dead_code)]
     pub fn init_dotfiles_repository() -> Result<PathBuf> {
+        Self::init_dotfiles_repository_with_test_name(None)
+    }
+
+    /// Initialize a new configuration in the dotfiles directory with test identifier
+    pub fn init_dotfiles_repository_with_test_name(test_name: Option<&str>) -> Result<PathBuf> {
         if let Ok(path) = env::var("ORDINATOR_CONFIG") {
             let config_path = PathBuf::from(&path);
             let repo_dir = config_path.parent().unwrap();
@@ -245,7 +278,7 @@ impl Config {
                 )
             })?;
             // Create config file
-            let config = Self::create_default();
+            let config = Self::create_default_with_identifier(test_name);
             config.save_to_file(&config_path)?;
             // Create subdirectories
             let scripts_dir = repo_dir.join("scripts");
@@ -277,7 +310,7 @@ impl Config {
 
         // Create config file
         let config_path = dotfiles_dir.join("ordinator.toml");
-        let config = Self::create_default();
+        let config = Self::create_default_with_identifier(test_name);
         config.save_to_file(&config_path)?;
 
         // Create subdirectories
@@ -345,16 +378,32 @@ impl Config {
         self.global.default_profile = profile;
     }
 
-    /// Add a file to a profile
+    /// Add a file to a profile's tracked files
     pub fn add_file_to_profile(&mut self, profile_name: &str, file_path: String) -> Result<()> {
-        if let Some(profile) = self.get_profile_mut(profile_name) {
-            if !profile.files.contains(&file_path) {
-                profile.files.push(file_path);
-            }
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!("Profile '{}' not found", profile_name))
+        let profile = self
+            .profiles
+            .get_mut(profile_name)
+            .ok_or_else(|| anyhow::anyhow!("Profile '{}' does not exist", profile_name))?;
+
+        if !profile.files.contains(&file_path) {
+            profile.files.push(file_path);
         }
+
+        Ok(())
+    }
+
+    /// Add a secret file to a profile's tracked secrets
+    pub fn add_secret_to_profile(&mut self, profile_name: &str, secret_path: String) -> Result<()> {
+        let profile = self
+            .profiles
+            .get_mut(profile_name)
+            .ok_or_else(|| anyhow::anyhow!("Profile '{}' does not exist", profile_name))?;
+
+        if !profile.secrets.contains(&secret_path) {
+            profile.secrets.push(secret_path);
+        }
+
+        Ok(())
     }
 
     /// Get the profile-specific file path for a tracked file
@@ -395,10 +444,23 @@ impl Config {
     }
 
     /// Remove a file from a profile
-    #[allow(dead_code)]
     pub fn remove_file_from_profile(&mut self, profile_name: &str, file_path: &str) -> Result<()> {
         if let Some(profile) = self.get_profile_mut(profile_name) {
             profile.files.retain(|f| f != file_path);
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Profile '{}' not found", profile_name))
+        }
+    }
+
+    /// Remove a secret file from a profile
+    pub fn remove_secret_from_profile(
+        &mut self,
+        profile_name: &str,
+        secret_path: &str,
+    ) -> Result<()> {
+        if let Some(profile) = self.get_profile_mut(profile_name) {
+            profile.secrets.retain(|s| s != secret_path);
             Ok(())
         } else {
             Err(anyhow::anyhow!("Profile '{}' not found", profile_name))
@@ -532,9 +594,20 @@ fn default_enabled() -> bool {
 
 /// Get the dotfiles directory path
 fn get_dotfiles_dir() -> Result<PathBuf> {
+    // Check if we're in test mode
+    let is_test_mode = std::env::var("ORDINATOR_TEST_MODE").unwrap_or_default() == "1";
+
     if let Ok(ordinator_home) = std::env::var("ORDINATOR_HOME") {
         return Ok(PathBuf::from(ordinator_home));
     }
+
+    // In test mode, require explicit configuration to prevent accidental use of real directories
+    if is_test_mode {
+        return Err(anyhow::anyhow!(
+            "Test mode requires ORDINATOR_HOME or ORDINATOR_CONFIG to be set for proper isolation"
+        ));
+    }
+
     let home_dir =
         dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?;
     Ok(home_dir.join(".dotfiles"))
@@ -583,6 +656,7 @@ mod tests {
             description: Some("Test profile".to_string()),
             exclude: Vec::new(),
             homebrew_packages: Vec::new(),
+            secrets: Vec::new(),
         };
 
         config.add_profile("test".to_string(), new_profile);
@@ -616,6 +690,33 @@ mod tests {
             .unwrap();
         let profile = config.get_profile("default").unwrap();
         assert!(!profile.files.contains(&"~/.zshrc".to_string()));
+    }
+
+    #[test]
+    fn test_secret_management() {
+        let mut config = Config::create_default();
+
+        // Add secret to default profile
+        config
+            .add_secret_to_profile("default", "~/.ssh/id_rsa".to_string())
+            .unwrap();
+        let profile = config.get_profile("default").unwrap();
+        assert!(profile.secrets.contains(&"~/.ssh/id_rsa".to_string()));
+
+        // Add another secret to the same profile
+        config
+            .add_secret_to_profile("default", "~/.ssh/id_rsa".to_string())
+            .unwrap();
+        let profile = config.get_profile("default").unwrap();
+        assert!(profile.secrets.contains(&"~/.ssh/id_rsa".to_string()));
+        assert_eq!(profile.secrets.len(), 1); // Should be unique
+
+        // Remove secret from default profile
+        config
+            .remove_secret_from_profile("default", "~/.ssh/id_rsa")
+            .unwrap();
+        let profile = config.get_profile("default").unwrap();
+        assert!(!profile.secrets.contains(&"~/.ssh/id_rsa".to_string()));
     }
 
     #[test]

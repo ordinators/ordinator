@@ -1,4 +1,5 @@
 use std::io::{self, Write};
+use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
@@ -6,6 +7,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use colored::*;
 use is_terminal::IsTerminal;
+
 use tracing::{info, warn};
 
 use crate::config::Config;
@@ -53,9 +55,9 @@ pub enum Commands {
         force: bool,
     },
 
-    /// Add a file to the dotfiles repository
-    Add {
-        /// File or directory to add
+    /// Start tracking a file in the dotfiles repository
+    Watch {
+        /// File or directory to start tracking
         #[arg(required = true)]
         path: String,
 
@@ -64,11 +66,30 @@ pub enum Commands {
         profile: Option<String>,
     },
 
-    /// Remove a file from the dotfiles repository
-    Remove {
-        /// File or directory to remove
+    /// Stop tracking a file in the dotfiles repository
+    Unwatch {
+        /// File or directory to stop tracking
         #[arg(required = true)]
         path: String,
+
+        /// Profile to remove this file from
+        #[arg(long)]
+        profile: Option<String>,
+    },
+
+    /// Update tracked files with current content
+    Add {
+        /// File or directory to update (required unless --all is used)
+        #[arg(required_unless_present = "all")]
+        path: Option<String>,
+
+        /// Profile to update this file for
+        #[arg(long)]
+        profile: Option<String>,
+
+        /// Update all tracked files for the profile
+        #[arg(long)]
+        all: bool,
     },
 
     /// Commit changes to the repository
@@ -209,22 +230,55 @@ pub enum Commands {
         #[command(subcommand)]
         subcommand: ReadmeCommands,
     },
+
+    /// Age encryption utilities
+    Age {
+        #[command(subcommand)]
+        subcommand: AgeCommands,
+    },
 }
 
 #[derive(Subcommand)]
 pub enum SecretCommands {
-    /// Encrypt a file with SOPS
-    Encrypt {
-        /// File to encrypt
+    /// Start tracking a file for encryption
+    Watch {
+        /// File to start tracking for encryption
         #[arg(required = true)]
         file: String,
+
+        /// Profile to associate with this file
+        #[arg(long)]
+        profile: Option<String>,
     },
 
-    /// Decrypt a file with SOPS
-    Decrypt {
-        /// File to decrypt
+    /// Stop tracking a file for encryption
+    Unwatch {
+        /// File to stop tracking for encryption
         #[arg(required = true)]
         file: String,
+
+        /// Profile to remove this file from
+        #[arg(long)]
+        profile: Option<String>,
+    },
+
+    /// Add a file to secrets tracking (encrypts and stores securely)
+    Add {
+        /// File to add to secrets tracking (required unless --all is used)
+        #[arg(required_unless_present = "all")]
+        file: Option<String>,
+
+        /// Profile to associate with this file
+        #[arg(long)]
+        profile: Option<String>,
+
+        /// Update all tracked secret files for the profile
+        #[arg(long)]
+        all: bool,
+
+        /// Skip interactive prompts
+        #[arg(long)]
+        force: bool,
     },
 
     /// List encrypted files
@@ -232,6 +286,17 @@ pub enum SecretCommands {
         /// Show file paths only
         #[arg(long)]
         paths_only: bool,
+    },
+
+    /// Scan for plaintext secrets in tracked files
+    Scan {
+        /// Profile to scan (defaults to all profiles)
+        #[arg(long)]
+        profile: Option<String>,
+
+        /// Show detailed information about found secrets
+        #[arg(long)]
+        verbose: bool,
     },
 
     /// Check for SOPS and age installation
@@ -246,17 +311,6 @@ pub enum SecretCommands {
         /// Force overwrite existing configuration
         #[arg(long)]
         force: bool,
-    },
-
-    /// Scan for plaintext secrets in tracked files
-    Scan {
-        /// Profile to scan (defaults to all profiles)
-        #[arg(long)]
-        profile: Option<String>,
-
-        /// Show detailed information about found secrets
-        #[arg(long)]
-        verbose: bool,
     },
 }
 
@@ -319,6 +373,72 @@ pub enum ReadmeCommands {
     Edit,
 }
 
+#[derive(Subcommand)]
+pub enum AgeCommands {
+    /// Manually encrypt a file using age encryption
+    Encrypt {
+        /// File to encrypt
+        #[arg(required = true)]
+        file: String,
+
+        /// Simulate encryption without making changes
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Manually decrypt a file using age decryption
+    Decrypt {
+        /// File to decrypt
+        #[arg(required = true)]
+        file: String,
+
+        /// Simulate decryption without making changes
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Set up age encryption for a profile
+    Setup {
+        /// Profile to set up (default: "default")
+        #[arg(long, default_value = "default")]
+        profile: String,
+
+        /// Force overwrite existing configuration
+        #[arg(long)]
+        force: bool,
+
+        /// Simulate setup without making changes
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Validate age encryption setup for a profile
+    Validate {
+        /// Profile to validate (default: "default")
+        #[arg(long, default_value = "default")]
+        profile: String,
+    },
+
+    /// Rotate age encryption keys for a profile
+    RotateKeys {
+        /// Profile to rotate keys for (defaults to all profiles)
+        #[arg(long)]
+        profile: Option<String>,
+
+        /// Keep the old key as backup
+        #[arg(long)]
+        backup_old_key: bool,
+
+        /// Skip confirmations
+        #[arg(long)]
+        force: bool,
+
+        /// Show what would be done without making changes
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
 fn check_file_conflicts(config: &Config, file_path: &str, target_profile: &str) -> Vec<String> {
     let mut conflicts = Vec::new();
     for (profile_name, profile_config) in &config.profiles {
@@ -369,7 +489,7 @@ fn prompt_for_profile(profiles: &[&String], default_profile: &str) -> String {
     if io::stdin().is_terminal() {
         eprintln!("Select a profile to add this file to:");
         for (i, profile) in profiles.iter().enumerate() {
-            eprintln!("  {}. {}", i + 1, profile);
+            eprintln!("  {}. {profile}", i + 1);
         }
         eprint!("Enter number (default: {default_profile}): ");
         io::stdout().flush().unwrap();
@@ -403,16 +523,13 @@ fn handle_missing_source_file(
 ) -> anyhow::Result<()> {
     let msg = format!("Source file not found: {}", source_path.display());
     if color_enabled() {
-        eprintln!("{}", msg.red());
+        eprintln!("{msg}", msg = msg.red());
         eprintln!(
             "{}",
             "This file may have been moved or deleted from the dotfiles repository.".yellow()
         );
-        eprintln!(
-            "{}",
-            format!("Expected location: {}", source_path.display()).cyan()
-        );
-        eprintln!("{}", format!("Target location: {}", dest.display()).cyan());
+        eprintln!("Expected location: {}", source_path.display());
+        eprintln!("Target location: {}", dest.display());
         eprintln!(
             "{}",
             "Run 'ordinator add <file> --profile <profile>' to re-add the file.".yellow()
@@ -464,8 +581,14 @@ pub async fn run(args: Args) -> Result<()> {
         } => {
             if let Some(url) = &repo_url {
                 // Validate the repository URL format first
+                let is_test_mode = std::env::var("ORDINATOR_TEST_MODE").unwrap_or_default() == "1";
                 let target_path = if let Some(dir) = &target_dir {
                     PathBuf::from(dir)
+                } else if is_test_mode && repo_url.is_none() {
+                    // In test mode, require explicit target directory only when not cloning from URL
+                    return Err(anyhow::anyhow!(
+                        "Test mode requires explicit target directory to be specified"
+                    ));
                 } else {
                     std::env::current_dir()?
                 };
@@ -506,7 +629,9 @@ pub async fn run(args: Args) -> Result<()> {
                         }
 
                         // Initialize new repository
-                        let config_path = Config::init_dotfiles_repository()?;
+                        let test_name = std::env::var("ORDINATOR_TEST_NAME").ok();
+                        let config_path =
+                            Config::init_dotfiles_repository_with_test_name(test_name.as_deref())?;
                         info!("Created configuration file: {}", config_path.display());
                         eprintln!("Created configuration file: {}", config_path.display());
 
@@ -572,7 +697,9 @@ pub async fn run(args: Args) -> Result<()> {
                 }
 
                 // Initialize the dotfiles repository
-                let config_path = Config::init_dotfiles_repository()?;
+                let test_name = std::env::var("ORDINATOR_TEST_NAME").ok();
+                let config_path =
+                    Config::init_dotfiles_repository_with_test_name(test_name.as_deref())?;
                 info!("Created configuration file: {}", config_path.display());
                 eprintln!("Created configuration file: {}", config_path.display());
 
@@ -600,7 +727,7 @@ pub async fn run(args: Args) -> Result<()> {
                 Ok(())
             }
         }
-        Commands::Add { path, profile } => {
+        Commands::Watch { path, profile } => {
             let (mut config, config_path) = Config::load()?;
             let profile_name = match profile {
                 Some(p) => p,
@@ -609,6 +736,7 @@ pub async fn run(args: Args) -> Result<()> {
                     prompt_for_profile(&profiles, &config.global.default_profile)
                 }
             };
+
             if !config.profiles.contains_key(&profile_name) {
                 return Err(anyhow::anyhow!(
                     "Profile '{}' does not exist. To create it, run: ordinator profile add {}",
@@ -616,6 +744,7 @@ pub async fn run(args: Args) -> Result<()> {
                     profile_name
                 ));
             }
+
             // Exclusion check
             let exclusion_set = config.exclusion_set_for_profile(&profile_name)?;
             if exclusion_set.is_match(&path) {
@@ -624,10 +753,12 @@ pub async fn run(args: Args) -> Result<()> {
                     path
                 ));
             }
+
             if args.dry_run {
-                println!("DRY-RUN: Would add '{path}' to profile '{profile_name}'");
+                println!("DRY-RUN: Would start watching '{path}' for profile '{profile_name}'");
                 return Ok(());
             }
+
             let path_obj = std::path::Path::new(&path);
             if !path_obj.exists() {
                 return Err(anyhow::anyhow!("Path '{}' does not exist on disk.", path));
@@ -654,7 +785,8 @@ pub async fn run(args: Args) -> Result<()> {
             if path_obj.is_file() {
                 std::fs::copy(path_obj, &profile_file_path)?;
                 if !args.quiet {
-                    let msg = format!("[1/1] Copied '{path}' to profile '{profile_name}' storage");
+                    let msg =
+                        format!("[1/1] Started watching '{path}' for profile '{profile_name}'");
                     if color_enabled() {
                         println!("{}", msg.green());
                     } else {
@@ -695,7 +827,7 @@ pub async fn run(args: Args) -> Result<()> {
                 }
                 if !args.quiet {
                     let msg =
-                        format!("Copied directory '{path}' to profile '{profile_name}' storage");
+                        format!("Started watching directory '{path}' for profile '{profile_name}'");
                     if color_enabled() {
                         println!("{}", msg.green());
                     } else {
@@ -730,7 +862,7 @@ pub async fn run(args: Args) -> Result<()> {
                                 }
                             }
                             eprintln!(
-                                "   Consider encrypting with: ordinator secrets encrypt {path}"
+                                "   Consider using: ordinator secrets watch {path} --profile {profile_name}"
                             );
                             eprintln!("   Use 'ordinator commit --force' to commit anyway");
                         }
@@ -743,7 +875,7 @@ pub async fn run(args: Args) -> Result<()> {
                 }
             }
 
-            println!("Added '{path}' to profile '{profile_name}'");
+            println!("Started watching '{path}' for profile '{profile_name}'");
 
             // Auto-update README if needed
             if !args.dry_run {
@@ -769,21 +901,163 @@ pub async fn run(args: Args) -> Result<()> {
 
             Ok(())
         }
-        Commands::Remove { path } => {
-            info!("Removing file: {}", path);
-            eprintln!("Removing file: {path}");
+        Commands::Unwatch { path, profile } => {
+            let (mut config, config_path) = Config::load()?;
+            let profile_name = match profile {
+                Some(p) => p,
+                None => {
+                    let profiles = config.list_profiles();
+                    prompt_for_profile(&profiles, &config.global.default_profile)
+                }
+            };
+
+            if !config.profiles.contains_key(&profile_name) {
+                return Err(anyhow::anyhow!(
+                    "Profile '{}' does not exist.",
+                    profile_name
+                ));
+            }
 
             if args.dry_run {
-                info!("[DRY RUN] Would remove file: {}", path);
-                eprintln!("DRY-RUN: Would remove file: {path}");
+                println!("DRY-RUN: Would stop watching '{path}' for profile '{profile_name}'");
                 return Ok(());
             }
 
-            // TODO: Implement actual remove logic
-            info!("File removal not yet implemented");
-            eprintln!("File removal not yet implemented");
+            // Remove from tracking
+            config.remove_file_from_profile(&profile_name, &path)?;
+
+            // Remove from filesystem
+            let profile_file_path = config.get_profile_file_path(&profile_name, &path)?;
+            if profile_file_path.exists() {
+                if profile_file_path.is_file() {
+                    std::fs::remove_file(&profile_file_path)?;
+                } else if profile_file_path.is_dir() {
+                    std::fs::remove_dir_all(&profile_file_path)?;
+                }
+            }
+
+            config.save_to_file(&config_path)?;
+
+            if !args.quiet {
+                let msg = format!("Stopped watching '{path}' for profile '{profile_name}'");
+                if color_enabled() {
+                    println!("{}", msg.green());
+                } else {
+                    println!("{msg}");
+                }
+            }
+
             Ok(())
         }
+        Commands::Add { path, profile, all } => {
+            let (config, _config_path) = Config::load()?;
+            let profile_name = match profile {
+                Some(p) => p,
+                None => {
+                    let profiles = config.list_profiles();
+                    prompt_for_profile(&profiles, &config.global.default_profile)
+                }
+            };
+
+            if !config.profiles.contains_key(&profile_name) {
+                return Err(anyhow::anyhow!(
+                    "Profile '{}' does not exist. To create it, run: ordinator profile add {}",
+                    profile_name,
+                    profile_name
+                ));
+            }
+
+            if args.dry_run {
+                if all {
+                    println!(
+                        "DRY-RUN: Would update all tracked files for profile '{profile_name}'"
+                    );
+                } else {
+                    let path_str = path.as_ref().ok_or_else(|| {
+                        anyhow::anyhow!("Path is required when not using --all flag")
+                    })?;
+                    println!("DRY-RUN: Would update '{path_str}' for profile '{profile_name}'");
+                }
+                return Ok(());
+            }
+
+            if all {
+                // Update all tracked files for the profile
+                let profile = config.get_profile(&profile_name).unwrap();
+                let mut updated_count = 0;
+                let total_files = profile.files.len();
+
+                for file_path in &profile.files {
+                    let source_path = std::path::Path::new(file_path);
+                    if source_path.exists() {
+                        let profile_file_path =
+                            config.get_profile_file_path(&profile_name, file_path)?;
+                        if let Some(parent) = profile_file_path.parent() {
+                            std::fs::create_dir_all(parent)?;
+                        }
+                        std::fs::copy(source_path, &profile_file_path)?;
+                        updated_count += 1;
+                        if !args.quiet {
+                            let msg =
+                                format!("[{updated_count}/{total_files}] Updated '{file_path}'");
+                            if color_enabled() {
+                                println!("{}", msg.green());
+                            } else {
+                                println!("{msg}");
+                            }
+                        }
+                    } else if !args.quiet {
+                        eprintln!("Warning: Source file '{file_path}' does not exist");
+                    }
+                }
+
+                if !args.quiet {
+                    let msg = format!("Updated {updated_count} files for profile '{profile_name}'");
+                    if color_enabled() {
+                        println!("{}", msg.green());
+                    } else {
+                        println!("{msg}");
+                    }
+                }
+            } else {
+                // Update a specific tracked file
+                let path_str = path
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!("Path is required when not using --all flag"))?;
+
+                let profile = config.get_profile(&profile_name).unwrap();
+                if !profile.files.contains(path_str) {
+                    return Err(anyhow::anyhow!(
+                        "File '{}' is not tracked for profile '{}'. Use 'ordinator watch {} --profile {}' to start tracking it.",
+                        path_str, profile_name, path_str, profile_name
+                    ));
+                }
+
+                let path_obj = std::path::Path::new(path_str);
+                if !path_obj.exists() {
+                    return Err(anyhow::anyhow!("Source file '{path_str}' does not exist."));
+                }
+
+                let profile_file_path = config.get_profile_file_path(&profile_name, path_str)?;
+                if let Some(parent) = profile_file_path.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+
+                std::fs::copy(path_obj, &profile_file_path)?;
+
+                if !args.quiet {
+                    let msg = format!("Updated '{path_str}' for profile '{profile_name}'");
+                    if color_enabled() {
+                        println!("{}", msg.green());
+                    } else {
+                        println!("{msg}");
+                    }
+                }
+            }
+
+            Ok(())
+        }
+
         Commands::Commit { message, force } => {
             info!("Committing with message: {}", message);
             eprintln!("Committing with message: {message}");
@@ -1381,6 +1655,101 @@ pub async fn run(args: Args) -> Result<()> {
                 info!("Skipped bootstrap script generation");
             }
 
+            // Handle secrets decryption if not skipped
+            if !skip_secrets {
+                use crate::secrets::{decrypt_file_with_sops, is_file_encrypted};
+                use std::fs;
+
+                let profile_config = config.get_profile(&profile).unwrap();
+                if !profile_config.secrets.is_empty() {
+                    if !args.quiet {
+                        eprintln!("Decrypting secrets for profile '{profile}'");
+                    }
+
+                    for secret_path in &profile_config.secrets {
+                        // Get the encrypted file path in the repository
+                        let encrypted_file_path =
+                            config.get_source_file_path(&profile, secret_path)?;
+
+                        if !encrypted_file_path.exists() {
+                            if !args.quiet {
+                                eprintln!(
+                                    "Warning: Encrypted secret file not found: {}",
+                                    encrypted_file_path.display()
+                                );
+                            }
+                            continue;
+                        }
+
+                        // Check if the file is actually encrypted
+                        if !is_file_encrypted(&encrypted_file_path) {
+                            if !args.quiet {
+                                eprintln!(
+                                    "Warning: File does not appear to be encrypted: {}",
+                                    encrypted_file_path.display()
+                                );
+                            }
+                            continue;
+                        }
+
+                        // Determine the target path where the decrypted file should be placed
+                        let home_dir = crate::utils::get_home_dir()?;
+                        let target_path = home_dir.join(secret_path);
+
+                        if args.dry_run {
+                            if !args.quiet {
+                                eprintln!(
+                                    "DRY-RUN: Would decrypt {} to {}",
+                                    encrypted_file_path.display(),
+                                    target_path.display()
+                                );
+                            }
+                        } else {
+                            // Create a temporary file for decryption
+                            let temp_dir = tempfile::tempdir()?;
+                            let temp_decrypted = temp_dir.path().join("decrypted_secret");
+
+                            // Copy the encrypted file to temp location
+                            fs::copy(&encrypted_file_path, &temp_decrypted)?;
+
+                            // Decrypt the temporary file
+                            decrypt_file_with_sops(temp_decrypted.to_str().unwrap())?;
+
+                            // Read the decrypted content
+                            let decrypted_content = fs::read_to_string(&temp_decrypted)?;
+
+                            // Ensure the target directory exists
+                            if let Some(parent) = target_path.parent() {
+                                fs::create_dir_all(parent)?;
+                            }
+
+                            // Copy the decrypted content to the target location
+                            fs::write(&target_path, decrypted_content)?;
+
+                            // Set appropriate permissions (600 for secrets)
+                            let mut perms = fs::metadata(&target_path)?.permissions();
+                            perms.set_mode(0o600);
+                            fs::set_permissions(&target_path, perms)?;
+
+                            if !args.quiet {
+                                eprintln!(
+                                    "Decrypted: {} -> {}",
+                                    encrypted_file_path.display(),
+                                    target_path.display()
+                                );
+                            }
+                        }
+                    }
+                } else if !args.quiet {
+                    eprintln!("No secrets configured for profile '{profile}'");
+                }
+            } else {
+                info!("Skipped secrets decryption");
+                if !args.quiet {
+                    eprintln!("Skipped secrets decryption");
+                }
+            }
+
             // Install Homebrew packages if not skipped
             if !skip_brew {
                 use crate::brew::BrewManager;
@@ -1739,6 +2108,9 @@ pub async fn run(args: Args) -> Result<()> {
             let _dotfiles_dir = config_path.parent().unwrap();
 
             let profiles_to_repair = if let Some(profile_name) = profile {
+                if !config.profiles.contains_key(&profile_name) {
+                    return Err(anyhow::anyhow!("Profile '{profile_name}' does not exist."));
+                }
                 vec![profile_name]
             } else {
                 config
@@ -1893,46 +2265,274 @@ pub async fn run(args: Args) -> Result<()> {
             Ok(())
         }
         Commands::Secrets { subcommand } => match subcommand {
-            SecretCommands::Encrypt { file } => {
-                let (config, config_path) = Config::load()?;
-                let base_dir = config_path.parent().unwrap().to_path_buf();
-                let mut manager = crate::secrets::SecretsManager::new(None, None, config, base_dir);
+            SecretCommands::Watch { file, profile } => {
+                let (mut config, config_path) = Config::load()?;
+                let profile_name = match profile {
+                    Some(p) => p,
+                    None => {
+                        let profiles = config.list_profiles();
+                        prompt_for_profile(&profiles, &config.global.default_profile)
+                    }
+                };
+
+                if !config.profiles.contains_key(&profile_name) {
+                    return Err(anyhow::anyhow!(
+                        "Profile '{}' does not exist. To create it, run: ordinator profile add {}",
+                        profile_name,
+                        profile_name
+                    ));
+                }
+
                 let file_path = std::path::Path::new(&file);
                 if !file_path.exists() {
-                    eprintln!("Encryption failed: File '{file}' does not exist.");
-                    std::process::exit(1);
+                    return Err(anyhow::anyhow!("File '{}' does not exist.", file));
                 }
-                match manager.encrypt_file(file_path) {
-                    Ok(()) => {
-                        println!("File encrypted successfully: {file}");
-                    }
-                    Err(e) => {
-                        eprintln!("Encryption failed: {e}");
-                        std::process::exit(1);
-                    }
+
+                if !file_path.is_file() {
+                    return Err(anyhow::anyhow!(
+                        "Path '{}' is not a file. Only files can be added to secrets tracking.",
+                        file
+                    ));
                 }
-                Ok(())
-            }
-            SecretCommands::Decrypt { file } => {
-                let (config, config_path) = Config::load()?;
+
+                if args.dry_run {
+                    println!("DRY-RUN: Would start watching '{file}' for secrets in profile '{profile_name}'");
+                    return Ok(());
+                }
+
+                // Check if file should be encrypted based on patterns
                 let base_dir = config_path.parent().unwrap().to_path_buf();
-                let mut manager = crate::secrets::SecretsManager::new(None, None, config, base_dir);
-                let file_path = std::path::Path::new(&file);
-                if !file_path.exists() {
-                    eprintln!("Decryption failed: File '{file}' does not exist.");
-                    std::process::exit(1);
-                }
-                match manager.decrypt_file(file_path) {
-                    Ok(()) => {
-                        println!("File decrypted successfully: {file}");
+                let _manager = crate::secrets::SecretsManager::new(
+                    None,
+                    None,
+                    config.clone(),
+                    base_dir.clone(),
+                );
+
+                // User explicitly marked this as a secret, so treat it as such regardless of patterns
+
+                // Add to secrets tracking (but don't encrypt yet)
+                config.add_secret_to_profile(&profile_name, file.clone())?;
+                config.save_to_file(&config_path)?;
+
+                if !args.quiet {
+                    let msg = format!(
+                        "Started watching '{file}' for secrets in profile '{profile_name}'"
+                    );
+                    if color_enabled() {
+                        println!("{}", msg.green());
+                    } else {
+                        println!("{msg}");
                     }
-                    Err(e) => {
-                        eprintln!("Decryption failed: {e}");
-                        std::process::exit(1);
-                    }
+                    println!(
+                        "   Use 'ordinator secrets add {file} --profile {profile_name}' to encrypt and store"
+                    );
                 }
+
                 Ok(())
             }
+            SecretCommands::Unwatch { file, profile } => {
+                let (mut config, config_path) = Config::load()?;
+                let profile_name = match profile {
+                    Some(p) => p,
+                    None => {
+                        let profiles = config.list_profiles();
+                        prompt_for_profile(&profiles, &config.global.default_profile)
+                    }
+                };
+
+                if !config.profiles.contains_key(&profile_name) {
+                    return Err(anyhow::anyhow!(
+                        "Profile '{}' does not exist. To create it, run: ordinator profile add {}",
+                        profile_name,
+                        profile_name
+                    ));
+                }
+
+                if args.dry_run {
+                    println!("DRY-RUN: Would stop watching '{file}' for secrets in profile '{profile_name}'");
+                    return Ok(());
+                }
+
+                // Remove from secrets tracking
+                config.remove_secret_from_profile(&profile_name, &file)?;
+                config.save_to_file(&config_path)?;
+
+                if !args.quiet {
+                    let msg = format!(
+                        "Stopped watching '{file}' for secrets in profile '{profile_name}'"
+                    );
+                    if color_enabled() {
+                        println!("{}", msg.green());
+                    } else {
+                        println!("{msg}");
+                    }
+                }
+
+                Ok(())
+            }
+            SecretCommands::Add {
+                file,
+                profile,
+                all,
+                force: _,
+            } => {
+                let (mut config, config_path) = Config::load()?;
+                let profile_name = match profile {
+                    Some(p) => p,
+                    None => {
+                        let profiles = config.list_profiles();
+                        prompt_for_profile(&profiles, &config.global.default_profile)
+                    }
+                };
+
+                if !config.profiles.contains_key(&profile_name) {
+                    return Err(anyhow::anyhow!(
+                        "Profile '{}' does not exist. To create it, run: ordinator profile add {}",
+                        profile_name,
+                        profile_name
+                    ));
+                }
+
+                if args.dry_run {
+                    if all {
+                        println!("DRY-RUN: Would update all tracked secret files for profile '{profile_name}'");
+                    } else {
+                        let file_str = file.as_ref().ok_or_else(|| {
+                            anyhow::anyhow!("File is required when not using --all flag")
+                        })?;
+                        println!("DRY-RUN: Would add '{file_str}' to secrets tracking for profile '{profile_name}'");
+                    }
+                    return Ok(());
+                }
+
+                if all {
+                    // Update all tracked secret files for the profile
+                    let profile = config.get_profile(&profile_name).unwrap();
+                    let mut updated_count = 0;
+                    let total_secrets = profile.secrets.len();
+
+                    for secret_path in &profile.secrets {
+                        // Find the actual source file using the direct path
+                        let source_path = std::path::Path::new(secret_path);
+
+                        if source_path.exists() {
+                            // Read the source file content
+                            let file_content = std::fs::read_to_string(source_path)?;
+
+                            // Encrypt the content in memory
+                            let encrypted_content =
+                                crate::secrets::encrypt_content_with_sops(&file_content)?;
+
+                            // Determine the encrypted file path in the repository
+                            let encrypted_file_name = format!(
+                                "{}.enc",
+                                source_path.file_name().unwrap().to_string_lossy()
+                            );
+                            let base_dir = config_path.parent().unwrap().to_path_buf();
+                            let secrets_dir = base_dir.join("secrets").join(&profile_name);
+                            std::fs::create_dir_all(&secrets_dir)?;
+                            let encrypted_file_path = secrets_dir.join(&encrypted_file_name);
+
+                            // Write the encrypted content to the repository
+                            std::fs::write(&encrypted_file_path, encrypted_content)?;
+
+                            updated_count += 1;
+                            if !args.quiet {
+                                let msg = format!("[{updated_count}/{total_secrets}] Re-encrypted '{secret_path}'");
+                                if color_enabled() {
+                                    println!("{}", msg.green());
+                                } else {
+                                    println!("{msg}");
+                                }
+                            }
+                        } else if !args.quiet {
+                            eprintln!("Warning: Source file '{secret_path}' does not exist");
+                        }
+                    }
+
+                    if !args.quiet {
+                        let msg = format!(
+                            "Re-encrypted {updated_count} secret files for profile '{profile_name}'"
+                        );
+                        if color_enabled() {
+                            println!("{}", msg.green());
+                        } else {
+                            println!("{msg}");
+                        }
+                    }
+                } else {
+                    // Add a specific file to secrets tracking
+                    let file_str = file.as_ref().ok_or_else(|| {
+                        anyhow::anyhow!("File is required when not using --all flag")
+                    })?;
+
+                    let file_path = std::path::Path::new(file_str);
+                    if !file_path.exists() {
+                        return Err(anyhow::anyhow!("File '{}' does not exist.", file_str));
+                    }
+
+                    if !file_path.is_file() {
+                        return Err(anyhow::anyhow!(
+                            "Path '{}' is not a file. Only files can be added to secrets tracking.",
+                            file_str
+                        ));
+                    }
+
+                    // Check if file should be encrypted based on patterns
+                    let base_dir = config_path.parent().unwrap().to_path_buf();
+                    let _manager = crate::secrets::SecretsManager::new(
+                        None,
+                        None,
+                        config.clone(),
+                        base_dir.clone(),
+                    );
+
+                    // User explicitly marked this as a secret, so treat it as such regardless of patterns
+
+                    // Add to secrets tracking if not already tracked
+                    config.add_secret_to_profile(&profile_name, file_str.clone())?;
+
+                    // Read the source file content
+                    let file_content = std::fs::read_to_string(file_path)?;
+
+                    // Encrypt the content in memory
+                    let encrypted_content =
+                        crate::secrets::encrypt_content_with_sops(&file_content)?;
+
+                    // Determine the encrypted file path in the repository
+                    let encrypted_file_name =
+                        format!("{}.enc", file_path.file_name().unwrap().to_string_lossy());
+                    let secrets_dir = base_dir.join("secrets").join(&profile_name);
+                    std::fs::create_dir_all(&secrets_dir)?;
+                    let encrypted_file_path = secrets_dir.join(&encrypted_file_name);
+
+                    // Write only the encrypted content to the repository
+                    std::fs::write(&encrypted_file_path, encrypted_content)?;
+
+                    // Save the configuration
+                    config.save_to_file(&config_path)?;
+
+                    if !args.quiet {
+                        let msg = format!(
+                            "✅ Added '{file_str}' to secrets tracking for profile '{profile_name}'"
+                        );
+                        if color_enabled() {
+                            println!("{}", msg.green());
+                        } else {
+                            println!("{msg}");
+                        }
+                        println!(
+                            "   Encrypted file stored at: {}",
+                            encrypted_file_path.display()
+                        );
+                        println!("   Original file remains unchanged");
+                    }
+                }
+
+                Ok(())
+            }
+
             SecretCommands::List { paths_only } => {
                 let (config, config_path) = Config::load()?;
                 let base_dir = config_path.parent().unwrap().to_path_buf();
@@ -2294,6 +2894,127 @@ pub async fn run(args: Args) -> Result<()> {
                 }
             }
         }
+        Commands::Age { subcommand } => match subcommand {
+            AgeCommands::Encrypt { file, dry_run } => {
+                let file_path = std::path::Path::new(&file);
+                if !file_path.exists() {
+                    return Err(anyhow::anyhow!("File '{}' does not exist.", file));
+                }
+
+                if args.dry_run || dry_run {
+                    println!("DRY-RUN: Would encrypt '{file}'");
+                    return Ok(());
+                }
+
+                // Use the existing encrypt_file_with_sops function
+                match crate::secrets::encrypt_file_with_sops(&file) {
+                    Ok(encrypted_file) => {
+                        println!("File encrypted successfully: {encrypted_file}");
+                    }
+                    Err(e) => {
+                        eprintln!("Encryption failed: {e}");
+                        std::process::exit(1);
+                    }
+                }
+                Ok(())
+            }
+            AgeCommands::Decrypt { file, dry_run } => {
+                let file_path = std::path::Path::new(&file);
+                if !file_path.exists() {
+                    return Err(anyhow::anyhow!("File '{}' does not exist.", file));
+                }
+
+                if args.dry_run || dry_run {
+                    println!("DRY-RUN: Would decrypt '{file}'");
+                    return Ok(());
+                }
+
+                // Use the existing decrypt_file_with_sops function
+                match crate::secrets::decrypt_file_with_sops(&file) {
+                    Ok(()) => {
+                        println!("File decrypted successfully: {file}");
+                    }
+                    Err(e) => {
+                        eprintln!("Decryption failed: {e}");
+                        std::process::exit(1);
+                    }
+                }
+                Ok(())
+            }
+            AgeCommands::Setup {
+                profile,
+                force,
+                dry_run,
+            } => {
+                if args.dry_run || dry_run {
+                    println!("DRY-RUN: Would set up age encryption for profile '{profile}'");
+                    return Ok(());
+                }
+
+                // Check for valid profile name (no slashes, etc.)
+                if profile.contains('/') || profile.contains('\\') {
+                    eprintln!("Setup failed: Invalid profile name '{profile}'");
+                    std::process::exit(1);
+                }
+
+                match crate::secrets::setup_sops_and_age(&profile, force) {
+                    Ok(()) => {
+                        println!(
+                            "✅ Age encryption setup completed successfully for profile: {profile}"
+                        );
+                    }
+                    Err(e) => {
+                        eprintln!("Setup failed: {e}");
+                        std::process::exit(1);
+                    }
+                }
+                Ok(())
+            }
+            AgeCommands::Validate { profile } => {
+                let (config, _) = Config::load()?;
+                let base_dir = std::path::PathBuf::from(".");
+                let manager = crate::secrets::SecretsManager::new(None, None, config, base_dir);
+
+                match manager.validate_installation() {
+                    Ok(()) => {
+                        println!("✅ Age encryption setup is valid for profile: {profile}");
+                    }
+                    Err(e) => {
+                        eprintln!("Validation failed: {e}");
+                        std::process::exit(1);
+                    }
+                }
+                Ok(())
+            }
+            AgeCommands::RotateKeys {
+                profile,
+                backup_old_key,
+                force,
+                dry_run,
+            } => {
+                if args.dry_run || dry_run {
+                    println!(
+                        "DRY-RUN: Would rotate age keys for profile '{}'",
+                        profile.as_deref().unwrap_or("all")
+                    );
+                    return Ok(());
+                }
+                let target_profiles: Vec<String> = if let Some(p) = profile {
+                    vec![p]
+                } else {
+                    let (config, _) = Config::load()?;
+                    config
+                        .list_profiles()
+                        .into_iter()
+                        .map(|s| s.to_string())
+                        .collect()
+                };
+                for prof in target_profiles {
+                    crate::secrets::rotate_age_keys(&prof, backup_old_key, force)?;
+                }
+                Ok(())
+            }
+        },
         Commands::Readme { subcommand } => {
             match subcommand {
                 ReadmeCommands::Default => {
