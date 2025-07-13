@@ -659,6 +659,18 @@ ordinator apply --profile work
 - [ ] Add tests for enhanced profile display
 - [ ] Update documentation to mention new feature
 - [ ] Ensure backward compatibility with existing READMEs
+- [ ] Update `ordinator brew export` to use `brew leaves -r` instead of `brew list` for formulas
+- [ ] Add `brew list --cask` support to export casks separately
+- [ ] Store formulas and casks separately in TOML configuration
+- [ ] Update `ordinator brew install` to install both formulas and casks on apply
+- [ ] Add separate `homebrew_formulas` and `homebrew_casks` fields to profile configuration
+- [ ] Update TOML structure to distinguish between formulas and casks
+- [ ] Modify export process to call both commands and merge results
+- [ ] Update install process to handle both formulas and casks installation
+- [ ] Add tests for separate formula and cask handling
+- [ ] Update documentation to reflect new formula/cask separation
+- [ ] Remove backward compatibility with existing `homebrew_packages` field
+- [ ] Update existing configurations to use new formula/cask structure
 
 **HTML Structure:**
 
@@ -728,6 +740,16 @@ This repository contains the following profiles:
 - [ ] Profiles and Homebrew packages are separate, focused sections
 - [ ] State tracking updates when Homebrew packages change
 - [ ] Backward compatibility maintained for existing READMEs
+- [ ] `brew export` correctly calls `brew leaves -r` for formulas
+- [ ] `brew export` correctly calls `brew list --cask` for casks
+- [ ] Formulas and casks are stored separately in TOML configuration
+- [ ] `brew install` installs both formulas and casks during apply
+- [ ] TOML structure properly distinguishes between formulas and casks
+- [ ] Export process handles both commands and merges results correctly
+- [ ] Install process handles both formulas and casks installation
+- [ ] Breaking change: `homebrew_packages` field replaced with separate formula/cask fields
+- [ ] Integration tests cover separate formula and cask workflows
+- [ ] Migration guide provided for existing configurations
 
 **Acceptance Criteria:**
 ```bash
@@ -742,6 +764,18 @@ ordinator readme default
 ordinator readme default
 # Generates README without Homebrew packages section
 # Enhanced profiles section still shows files and directories
+
+# Enhanced Homebrew export with separate formulas and casks
+ordinator brew export --profile work
+# Calls 'brew leaves -r' for formulas (user-installed only)
+# Calls 'brew list --cask' for casks
+# Stores formulas and casks separately in TOML
+# Breaking change: Replaces existing homebrew_packages field
+
+# Enhanced Homebrew install during apply
+ordinator apply --profile work
+# Installs both formulas and casks from profile
+# Uses separate installation commands for each type
 
 # When Homebrew packages are added/removed from profiles
 ordinator brew export --profile work
