@@ -556,9 +556,87 @@ ordinator commit -m "Add sensitive files"
 - ✅ **Test Coverage**: Added comprehensive tests for bulk operations and secrets array management
 - ✅ **Backward Compatibility**: Maintained existing workflows while adding new features
 
-**Completion Statement:** This completes Phase 4.7 (Secrets Workflow Review and Enhancement) and prepares for Phase 4.8 (Enhanced README with Homebrew Packages Section).
+**Completion Statement:** This completes Phase 4.7 (Secrets Workflow Review and Enhancement) and prepares for Phase 4.8 (AGE Key Prompting During Apply).
 
-### 4.8 Enhanced README with Homebrew Packages Section
+### 4.8 AGE Key Prompting During Apply
+**Priority:** High  
+**Dependencies:** 3.1, 4.7  
+**Estimated Time:** 2-3 days  
+**Testable:** ✅
+
+**Tasks:**
+- [ ] Detect missing AGE key during `ordinator apply --profile <name>`
+- [ ] Implement interactive prompting for AGE key setup
+- [ ] Support two scenarios:
+  - [ ] Scenario 1: Generate new AGE key (first-time setup)
+  - [ ] Scenario 2: Import existing AGE key (multi-machine replication)
+- [ ] Add key validation for imported keys
+- [ ] Implement secure key storage with proper permissions (600)
+- [ ] Generate corresponding SOPS config for imported keys
+- [ ] Update `ordinator.toml` with key and config paths
+- [ ] Add clear user guidance and error messages
+- [ ] Ensure backward compatibility with existing workflows
+- [ ] Add comprehensive test coverage for both scenarios
+- [ ] Update documentation to reflect new behavior
+- [ ] Update README quick start section to remove `ordinator secrets setup` requirement since apply will handle AGE key setup through prompts
+
+**Scenario 1 - New Key Generation:**
+```
+❌ AGE key not found for profile 'work'
+Would you like to generate a new AGE key? (y/N): y
+✅ AGE key generated successfully
+   Key stored at: ~/.config/ordinator/age/work.txt
+   SOPS config created at: ~/.config/ordinator/.sops.work.yaml
+```
+
+**Scenario 2 - Import Existing Key:**
+```
+❌ AGE key not found for profile 'work'
+Do you have an existing AGE key to import? (y/N): y
+Please paste your AGE private key (it will be stored securely):
+AGE-SECRET-KEY-1abc123...
+✅ AGE key imported successfully
+   Key stored at: ~/.config/ordinator/age/work.txt
+   SOPS config created at: ~/.config/ordinator/.sops.work.yaml
+```
+
+**Tests:**
+- [ ] Missing AGE key is detected during apply
+- [ ] Interactive prompts work for both scenarios
+- [ ] New key generation works correctly
+- [ ] Existing key import validates key format
+- [ ] Imported keys are stored securely with proper permissions
+- [ ] SOPS config is generated correctly for imported keys
+- [ ] `ordinator.toml` is updated with correct paths
+- [ ] Apply continues successfully after key setup
+- [ ] Error handling works for invalid keys
+- [ ] Backward compatibility maintained for existing workflows
+- [ ] Integration tests cover both scenarios
+- [ ] CLI tests verify prompting behavior
+
+**Acceptance Criteria:**
+```bash
+# Scenario 1: First-time setup
+ordinator apply --profile work
+# Prompts for new key generation
+# Generates key and continues with apply
+
+# Scenario 2: Multi-machine replication
+ordinator apply --profile work
+# Prompts for existing key import
+# Validates and stores imported key
+# Continues with apply
+
+# Error handling
+ordinator apply --profile work
+# Handles invalid key format gracefully
+# Provides clear error messages
+# Allows retry or fallback to new key generation
+```
+
+**Completion Statement:** This completes Phase 4.8 (AGE Key Prompting During Apply) and prepares for Phase 4.9 (Enhanced README with Homebrew Packages Section).
+
+### 4.9 Enhanced README with Homebrew Packages Section
 **Priority:** Medium  
 **Dependencies:** 4.4  
 **Estimated Time:** 1 day  
@@ -671,7 +749,113 @@ ordinator readme default
 # README automatically updates to reflect new packages in work profile
 ```
 
-**Completion Statement:** This completes Phase 4.8 (Enhanced README with Homebrew Packages Section) and prepares for Phase 5 (System Commands & Script Generation).
+**Completion Statement:** This completes Phase 4.9 (Enhanced README with Homebrew Packages Section) and prepares for Phase 4.10 (Hash-Based Filename Mapping).
+
+### 4.10 Hash-Based Filename Mapping
+**Priority:** Medium  
+**Dependencies:** 2.1, 3.1, 4.7  
+**Estimated Time:** 2-3 days  
+**Testable:** ✅
+
+**Tasks:**
+- [ ] Implement hash-based filename generation for file collision prevention
+- [ ] Add hash generation function using SHA-256 truncated to 6 characters
+- [ ] Implement file mapping system in TOML configuration
+- [ ] Update `ordinator watch` to use hash-based filenames
+- [ ] Update `ordinator secrets watch` to use hash-based filenames
+- [ ] Modify file storage to use `files/<profile>/<hash>_<filename>` pattern
+- [ ] Add `file_mappings` field to `ProfileConfig` structure
+- [ ] Update `ordinator add` to work with hash-based filenames
+- [ ] Update `ordinator secrets add` to work with hash-based filenames
+- [ ] Modify apply command to use mappings for correct symlink creation
+- [ ] Implement backward compatibility for existing files without hashes
+- [ ] Add migration logic for existing repositories
+- [ ] Update bulk operations (`--all` flags) to work with mappings
+- [ ] Add comprehensive test coverage for hash-based file management
+- [ ] Update documentation to reflect new file naming system
+
+**Hash Generation:**
+```rust
+fn generate_file_hash(path: &str) -> String {
+    use sha2::{Sha256, Digest};
+    let mut hasher = Sha256::new();
+    hasher.update(path.as_bytes());
+    let result = hasher.finalize();
+    format!("{:x}", result)[0..6].to_string()
+}
+```
+
+**Example Workflow:**
+```bash
+# Regular files
+ordinator watch ~/.config/app/config.txt --profile work
+# Hash: "a1b2c3" -> stores as: files/work/a1b2c3_config.txt
+# Mapping: "a1b2c3_config.txt" -> "~/.config/app/config.txt"
+
+ordinator watch ~/Documents/config.txt --profile work
+# Hash: "d4e5f6" -> stores as: files/work/d4e5f6_config.txt
+# Mapping: "d4e5f6_config.txt" -> "~/Documents/config.txt"
+
+# Secrets
+ordinator secrets watch ~/.ssh/config --profile work
+# Hash: "9f8e7d" -> stores as: files/work/9f8e7d_config.enc
+# Mapping: "9f8e7d_config.enc" -> "~/.ssh/config"
+```
+
+**TOML Structure:**
+```toml
+[profiles.work]
+files = ["~/.config/app/config.txt", "~/Documents/config.txt"]
+secrets = ["~/.ssh/config", "~/.aws/credentials"]
+file_mappings = {
+  "a1b2c3_config.txt" = "~/.config/app/config.txt",
+  "d4e5f6_config.txt" = "~/Documents/config.txt",
+  "9f8e7d_config.enc" = "~/.ssh/config",
+  "1a2b3c_credentials.enc" = "~/.aws/credentials"
+}
+```
+
+**Tests:**
+- [ ] Hash generation produces consistent results for same path
+- [ ] Different paths produce different hashes
+- [ ] File collisions are prevented with hash-based naming
+- [ ] `ordinator watch` creates correct hash-based filenames
+- [ ] `ordinator secrets watch` creates correct hash-based filenames
+- [ ] `ordinator add` updates files with hash-based names
+- [ ] `ordinator secrets add` updates encrypted files with hash-based names
+- [ ] Apply command creates correct symlinks using mappings
+- [ ] Bulk operations work with hash-based file system
+- [ ] Backward compatibility maintained for existing files
+- [ ] Migration handles existing repositories gracefully
+- [ ] Error handling works for hash collisions (extremely unlikely)
+- [ ] Integration tests cover complete workflow
+
+**Acceptance Criteria:**
+```bash
+# No more filename collisions
+ordinator watch ~/.config/app/config.txt --profile work
+ordinator watch ~/Documents/config.txt --profile work
+# Result: files/work/a1b2c3_config.txt and files/work/d4e5f6_config.txt
+
+# Secrets work with hash-based naming
+ordinator secrets watch ~/.ssh/config --profile work
+ordinator secrets add --all --profile work
+# Result: files/work/9f8e7d_config.enc
+
+# Apply uses mappings correctly
+ordinator apply --profile work
+# Result: Correct symlinks created using TOML mappings
+```
+
+**Benefits:**
+- ✅ **No filename collisions**: Hash ensures unique filenames
+- ✅ **Deterministic**: Same path always generates same hash
+- ✅ **Consistent across machines**: Hash is path-based, not random
+- ✅ **Backward compatible**: Existing files continue to work
+- ✅ **Works for both files and secrets**: Unified approach
+- ✅ **Collision resistant**: SHA-256 truncated to 6 chars = 16.7M combinations
+
+**Completion Statement:** This completes Phase 4.10 (Hash-Based Filename Mapping) and prepares for Phase 5 (System Commands & Script Generation).
 
 ---
 
