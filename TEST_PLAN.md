@@ -65,6 +65,7 @@ This document outlines the testing strategy for **Ordinator**, a Rust-based CLI 
 - Target: Secrets decryption, config parsing, memory safety
 - Tools: `cargo-fuzz`
 - Prevent crashes, memory bugs, and secret leakage
+- **Security Note:** Decrypted secrets are only present in memory or at their destination after `ordinator apply`. They are never stored in the repository.
 
 ---
 

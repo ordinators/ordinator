@@ -183,11 +183,11 @@ ordinator unwatch ~/.config/nvim --profile work
 Update tracked files with current content.
 
 ```bash
-ordinator add <PATH> [OPTIONS]
+ordinator add [PATH] [OPTIONS]
 ```
 
 **Arguments:**
-- `PATH` - File or directory to update (required)
+- `PATH` - File or directory to update (optional when using `--all`)
 
 **Options:**
 - `--profile <PROFILE>` - Profile to update this file for
@@ -214,7 +214,7 @@ ordinator add ~/.bashrc
 - **Updates tracked files**: Copies current file content to the repository
 - **Requires tracking**: File must already be tracked (use `watch` first)
 - **Profile-specific**: Updates files in the specified profile
-- **Bulk operations**: Can update all tracked files with `--all` flag
+- **Bulk operations**: Can update all tracked files with `--all` flag (no path required)
 - **Progress indicators**: Shows progress when copying files
 - **Error handling**: Clear error if file is not being tracked
 
@@ -268,7 +268,7 @@ ordinator apply --profile work --skip-brew
 
 **What it does:**
 1. **Generates bootstrap script** for the selected profile (unless `--skip-bootstrap`)
-2. **Decrypts secrets** using SOPS and age (unless `--skip-secrets`)
+2. **Decrypts and copies secrets** using SOPS and age (unless `--skip-secrets`) - secrets are decrypted in memory and copied to target locations with secure permissions
 3. **Installs Homebrew packages** for the profile (unless `--skip-brew`)
 4. **Creates symlinks** from profile-specific storage to home directory
 5. **Enhanced error handling** with colorized output and clear guidance
@@ -580,7 +580,6 @@ ordinator secrets watch ~/.ssh/config
 
 **What it does:**
 - **Adds to tracking**: Adds the file to the profile's `secrets` array in configuration
-- **Does not encrypt yet**: File is only tracked, not encrypted until `secrets add` is used
 - **Profile-specific**: Associates the file with the specified profile
 - **Interactive selection**: Prompts for profile if not specified
 - **Validation**: Checks that the file exists and is accessible
@@ -620,11 +619,11 @@ ordinator secrets unwatch ~/.aws/credentials --profile work
 Update tracked encrypted files with current content (secure workflow).
 
 ```bash
-ordinator secrets add <PATH> [OPTIONS]
+ordinator secrets add [PATH] [OPTIONS]
 ```
 
 **Arguments:**
-- `PATH` - File or directory to update (required)
+- `PATH` - File or directory to update (optional when using `--all`)
 
 **Options:**
 - `--profile <PROFILE>` - Profile to update this file for
@@ -652,7 +651,7 @@ ordinator secrets add ~/.ssh/config
 - **Never stores plaintext**: Only encrypted files are stored in the repository
 - **Requires tracking**: File must already be tracked (use `secrets watch` first)
 - **Profile-specific**: Updates files in the specified profile
-- **Bulk operations**: Can update all tracked encrypted files with `--all` flag
+- **Bulk operations**: Can update all tracked encrypted files with `--all` flag (no path required)
 - **Progress indicators**: Shows progress when encrypting files
 - **Error handling**: Clear error if file is not being tracked
 
@@ -1250,30 +1249,7 @@ ordinator uninstall --force
 
 ## Management Commands
 
-### `ordinator remove`
 
-Remove a file from the dotfiles repository.
-
-```bash
-ordinator remove <PATH>
-```
-
-**Arguments:**
-- `PATH` - File or directory to remove (required)
-
-**Examples:**
-```bash
-# Remove file from tracking
-ordinator remove ~/.zshrc
-
-# Remove directory
-ordinator remove ~/.config/nvim
-```
-
-**What it does:**
-- Removes file from configuration tracking
-- Optionally removes file from `files/` directory
-- Updates all profiles that reference the file
 
 ### `ordinator profiles`
 

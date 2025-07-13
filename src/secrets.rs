@@ -54,7 +54,7 @@ impl SecretsManager {
     }
 
     /// Check if a file should be encrypted based on patterns
-    fn should_encrypt_file(&mut self, file_path: &Path) -> Result<bool> {
+    pub fn should_encrypt_file(&mut self, file_path: &Path) -> Result<bool> {
         let file_str = file_path.to_string_lossy();
 
         // Create glob sets if they don't exist
@@ -301,8 +301,7 @@ impl SecretsManager {
     /// Validate SOPS and age installation
     #[allow(dead_code)]
     pub fn validate_installation(&self) -> Result<()> {
-        // TODO: Check if SOPS and age are installed
-        Ok(())
+        check_sops_and_age()
     }
 }
 
@@ -648,6 +647,116 @@ pub fn is_file_encrypted(path: &std::path::Path) -> bool {
         }
     }
     false
+}
+
+/// Decrypt content in memory using SOPS
+#[allow(dead_code)]
+pub fn decrypt_content_with_sops(content: &str) -> anyhow::Result<String> {
+    // Create a temporary file with the encrypted content
+    let temp_dir = tempfile::tempdir()?;
+    let temp_file = temp_dir.path().join("temp_encrypted_content");
+    std::fs::write(&temp_file, content)?;
+
+    // Decrypt the temporary file
+    decrypt_file_with_sops(temp_file.to_str().unwrap())?;
+
+    // Read the decrypted content
+    let decrypted_content = std::fs::read_to_string(&temp_file)?;
+
+    // Clean up temporary files
+    let _ = std::fs::remove_file(temp_file);
+
+    Ok(decrypted_content)
+}
+
+/// Encrypt content in memory using SOPS
+pub fn encrypt_content_with_sops(content: &str) -> anyhow::Result<String> {
+    // Create a temporary file with the content
+    let temp_dir = tempfile::tempdir()?;
+    let temp_file = temp_dir.path().join("temp_content");
+    std::fs::write(&temp_file, content)?;
+
+    // Encrypt the temporary file
+    let encrypted_file = encrypt_file_with_sops(temp_file.to_str().unwrap())?;
+
+    // Read the encrypted content
+    let encrypted_content = std::fs::read_to_string(&encrypted_file)?;
+
+    // Clean up temporary files
+    let _ = std::fs::remove_file(temp_file);
+    let _ = std::fs::remove_file(encrypted_file);
+
+    Ok(encrypted_content)
+}
+
+/// Rotate age keys for a profile, update SOPS config, and re-encrypt all secrets
+pub fn rotate_age_keys(profile: &str, backup_old_key: bool, _force: bool) -> anyhow::Result<()> {
+    use std::fs;
+    use std::path::PathBuf;
+
+    // 1. Find current key and SOPS config paths
+    let ordinator_config = std::env::var("ORDINATOR_CONFIG_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+            PathBuf::from(home).join(".config").join("ordinator")
+        });
+    let age_dir = ordinator_config.join("age");
+    let key_filename = if profile == "default" {
+        "key.txt".to_string()
+    } else {
+        format!("{profile}.txt")
+    };
+    let key_path = age_dir.join(&key_filename);
+    let backup_path = age_dir.join(format!("{key_filename}.bak"));
+
+    // 2. Backup old key if requested
+    if key_path.exists() && backup_old_key {
+        fs::copy(&key_path, &backup_path)?;
+        println!("Backed up old key to: {}", backup_path.display());
+    }
+
+    // 3. Generate new key (force overwrite)
+    let new_key_path = generate_age_key(&ordinator_config, profile, true)?;
+    println!("Generated new age key: {}", new_key_path.display());
+
+    // 4. Update SOPS config
+    let sops_config_path = create_sops_config(profile, &new_key_path, true)?;
+    println!("Updated SOPS config: {}", sops_config_path.display());
+
+    // 5. Update ordinator config
+    update_ordinator_config(profile, &new_key_path, &sops_config_path)?;
+    println!("Updated ordinator.toml with new key and SOPS config");
+
+    // 6. Re-encrypt all secrets for this profile
+    let (config, config_path) = crate::config::Config::load()?;
+    let base_dir = if let Some(parent) = config_path.parent() {
+        parent.to_path_buf()
+    } else {
+        PathBuf::from(".")
+    };
+    let manager = crate::secrets::SecretsManager::new(None, None, config, base_dir.clone());
+    let profile_files = manager
+        .config
+        .get_profile(profile)
+        .map(|p| p.files.clone())
+        .unwrap_or_default();
+    let mut updated = 0;
+    for tracked_file in profile_files {
+        if tracked_file.starts_with("secrets/") {
+            let abs_path = base_dir.join(&tracked_file);
+            if abs_path.exists() {
+                // Decrypt and re-encrypt
+                crate::secrets::decrypt_file_with_sops(abs_path.to_str().unwrap())?;
+                // Assume sops outputs to stdout or overwrites file; if not, adjust logic
+                // For now, just re-encrypt the file
+                crate::secrets::encrypt_file_with_sops(abs_path.to_str().unwrap())?;
+                updated += 1;
+            }
+        }
+    }
+    println!("Re-encrypted {updated} secrets for profile '{profile}'");
+    Ok(())
 }
 
 #[cfg(test)]

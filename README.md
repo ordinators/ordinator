@@ -71,7 +71,7 @@ ordinator apply --profile work
 When you run `ordinator apply`, Ordinator:
 
 1. **Generates the profile's bootstrap script** (if defined), which contains additional setup steps such as installing tools or configuring system settings.
-2. **Decrypts secrets** (if secrets management is configured and not skipped), making encrypted files available for use.
+2. **Decrypts and copies secrets** (if secrets management is configured and not skipped) - secrets are decrypted in memory and copied to target locations with secure permissions (600).
 3. **Installs Homebrew packages** defined in the profile (if package management is configured and not skipped).
 4. **Symlinks all tracked files** for the selected profile from your dotfiles repository into their correct locations in your home directory, backing up any existing files if configured.
 5. **Performs safety checks** to avoid overwriting important files unless you use the `--force` flag.
@@ -88,6 +88,13 @@ Ordinator supports multiple environment profiles (work, personal, laptop) that a
 ## Secrets Management
 
 Ordinator provides secure secrets management using Mozilla SOPS and age encryption. The workflow automatically encrypts sensitive files and stores only encrypted versions in your repository, eliminating the risk of accidentally committing plaintext secrets. The system includes automatic plaintext detection, profile-specific encryption keys, and key rotation capabilities for enhanced security.
+
+### Security Features
+
+- **Encrypted Storage**: All secrets are stored encrypted in the repository using SOPS and age
+- **Secure Decryption**: During `apply`, secrets are decrypted in memory and copied to target locations with secure permissions (600)
+- **No Plaintext in Repository**: Decrypted files are never stored in the repository
+- **Temporary Processing**: Decryption happens in temporary files that are automatically cleaned up
 
 > **Never commit your AGE key or other sensitive secrets to your repository.**
 > The AGE key (typically at `~/.config/age/{profile}.key`) and SOPS configuration (typically at `~/.config/ordinator/.sops.{profile}.yaml`) should be kept secure and backed up separately.

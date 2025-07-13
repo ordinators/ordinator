@@ -71,6 +71,9 @@ colored = "2.0"
 # Terminal detection
 is-terminal = "0.1"
 
+# Shell expansion for tilde expansion
+shellexpand = "3.1"
+
 [dev-dependencies]
 # Testing frameworks
 tempfile = "3.8"

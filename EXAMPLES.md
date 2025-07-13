@@ -80,8 +80,23 @@ ordinator watch ~/.zshrc --profile work
 # Update tracked files with current content
 ordinator add ~/.zshrc --profile work
 
-# Update all tracked files for a profile
+# Update all tracked files for a profile (bulk operation)
 ordinator add --all --profile work
+```
+
+### Bulk Operations
+
+Both `add` and `secrets add` support bulk operations with the `--all` flag:
+
+```bash
+# Update all regular files for a profile
+ordinator add --all --profile work
+
+# Update all encrypted files for a profile
+ordinator secrets add --all --profile work
+
+# No manual file path specification required
+# Commands loop through files/secrets arrays automatically
 ```
 
 ### Managing Multiple Profiles
@@ -106,6 +121,8 @@ ordinator unwatch ~/.zshrc --profile work
 
 ## Secrets Management
 
+> **Security Note:** Decrypted secrets are never stored in the repository. They are only copied to their target locations during `ordinator apply` and are written with secure permissions (0600).
+
 ### Adding Encrypted Files
 
 ```bash
@@ -115,7 +132,7 @@ ordinator secrets watch ~/.ssh/config --profile work
 # Update encrypted files with current content (secure workflow)
 ordinator secrets add ~/.ssh/config --profile work
 
-# Update all encrypted files for a profile
+# Update all encrypted files for a profile (bulk operation)
 ordinator secrets add --all --profile work
 ```
 
@@ -134,23 +151,43 @@ ordinator secrets scan
 
 ### Secure Workflow Example
 
-```bash
-# 1. Start tracking a sensitive file
-ordinator secrets watch ~/.ssh/config --profile work
+> **Security Note:** Decrypted secrets are never stored in the repository. They are only present in memory or at their destination after `ordinator apply`.
 
-# 2. Make changes to the original file
+```bash
+# 1. Start tracking sensitive files
+ordinator secrets watch ~/.ssh/config --profile work
+ordinator secrets watch ~/.aws/credentials --profile work
+
+# 2. Make changes to the original files
 echo "Host new-server" >> ~/.ssh/config
 echo "  HostName 192.168.1.100" >> ~/.ssh/config
 
-# 3. Update the encrypted file (automatically encrypts)
-ordinator secrets add ~/.ssh/config --profile work
+# 3. Bulk update all encrypted files (automatically encrypts)
+ordinator secrets add --all --profile work
 
-# 4. Commit the encrypted file
-ordinator commit -m "Update SSH configuration"
+# 4. Commit the encrypted files
+ordinator commit -m "Update encrypted configuration files"
 
 # 5. Push to remote
 ordinator push
 ```
+
+### Secrets Array Management
+
+The `secrets` array in your configuration tracks direct paths to source files:
+
+```toml
+[profiles.work]
+files = ["~/.gitconfig"]
+secrets = ["~/.ssh/config", "~/.aws/credentials", "~/.config/api_keys.json"]
+enabled = true
+description = "Work environment with encrypted secrets"
+```
+
+**Bulk Operations:**
+- `ordinator secrets add --all` loops through all files in the `secrets` array
+- Each source file is read directly, re-encrypted, and updated in the repository
+- No manual file path specification required for bulk operations
 
 ## Profile Management
 
@@ -161,6 +198,7 @@ ordinator push
 ordinator watch ~/.zshrc --profile work
 ordinator watch ~/.gitconfig --profile work
 ordinator secrets watch ~/.ssh/config --profile work
+ordinator secrets watch ~/.aws/credentials --profile work
 
 # Personal profile
 ordinator watch ~/.zshrc --profile personal
@@ -170,6 +208,26 @@ ordinator secrets watch ~/.aws/credentials --profile personal
 # Laptop profile
 ordinator watch ~/.zshrc --profile laptop
 ordinator watch ~/.config/karabiner --profile laptop
+```
+
+### Profile Configuration Structure
+
+Your `ordinator.toml` will contain separate arrays for different file types:
+
+```toml
+[profiles.work]
+files = ["~/.zshrc", "~/.gitconfig"]
+secrets = ["~/.ssh/config", "~/.aws/credentials"]
+directories = ["~/.config/nvim"]
+enabled = true
+description = "Work environment with encrypted secrets"
+
+[profiles.personal]
+files = ["~/.zshrc"]
+secrets = ["~/.config/api_keys.json"]
+directories = ["~/.config/alacritty"]
+enabled = true
+description = "Personal environment configuration"
 ```
 
 ### Applying Profiles
@@ -188,17 +246,53 @@ ordinator apply --profile work --bootstrap
 ordinator apply --profile work --skip-bootstrap
 ```
 
+### Secrets Decryption During Apply
+
+When you run `ordinator apply`, secrets are securely decrypted and copied to their target locations:
+
+```bash
+# Before apply - encrypted files in repository
+ls ~/.dotfiles/files/work/
+# .ssh/config (encrypted)
+# .aws/credentials (encrypted)
+
+# Run apply to decrypt and copy secrets
+ordinator apply --profile work
+
+# After apply - decrypted files at target locations
+ls ~/.ssh/
+# config (decrypted, readable by SSH)
+
+ls ~/.aws/
+# credentials (decrypted, readable by AWS CLI)
+
+# Repository still contains only encrypted files
+ls ~/.dotfiles/files/work/
+# .ssh/config (encrypted)
+# .aws/credentials (encrypted)
+```
+
+**Security Note:** Decrypted secrets are never stored in the repository. They are only present in memory during decryption and at their destination after `ordinator apply`.
+
 ### Profile-Specific File Organization
 
 ```bash
 # Files are organized by profile in the repository:
 # files/work/.zshrc
 # files/work/.gitconfig
+# files/work/.ssh/config (encrypted)
+# files/work/.aws/credentials (encrypted)
 # files/personal/.zshrc
 # files/personal/.config/alacritty/
+# files/personal/.config/api_keys.json (encrypted)
 # files/laptop/.zshrc
 # files/laptop/.config/karabiner/
 ```
+
+**File Types:**
+- **Regular files**: Stored in `files/<profile>/` (managed by `files` array)
+- **Encrypted files**: Stored encrypted in `files/<profile>/` (managed by `secrets` array)
+- **Directories**: Stored in `files/<profile>/` (managed by `directories` array)
 
 ## Bootstrap Scripts
 
@@ -293,12 +387,14 @@ ordinator apply --profile work
 
 # 3. Make your changes
 echo "new_config" >> ~/.zshrc
+echo "Host new-server" >> ~/.ssh/config
 
-# 4. Update tracked files
-ordinator add ~/.zshrc --profile work
+# 4. Update all tracked files (bulk operation)
+ordinator add --all --profile work
+ordinator secrets add --all --profile work
 
 # 5. Commit and push
-ordinator commit -m "Add new configuration"
+ordinator commit -m "Update configuration files"
 ordinator push
 ```
 

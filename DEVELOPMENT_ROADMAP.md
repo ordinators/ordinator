@@ -477,18 +477,23 @@ ordinator uninstall --profile work --restore-backups
 **Testable:** ✅
 
 **Tasks:**
-- [ ] Review current secrets workflow for security issues
-- [ ] Identify problems with current `add` + `encrypt` workflow
-- [ ] Design new `ordinator secrets add` command for secure file handling
-- [ ] Implement `ordinator secrets add <file> --profile <profile>` command
-- [ ] Ensure encrypted files are never stored in plaintext in repository
-- [ ] Update documentation to reflect secure workflow
-- [ ] Add tests for new secure secrets workflow
-- [ ] Update Quick Start guide with correct workflow
-- [ ] Add validation to prevent plaintext secrets in repository
-- [ ] Update commit scanning to detect plaintext secrets more effectively
-- [ ] Add interactive prompts for secrets workflow decisions
-- [ ] Enhance error messages for secrets-related operations
+- [x] Review current secrets workflow for security issues
+- [x] Identify problems with current `add` + `encrypt` workflow
+- [x] Design new `ordinator secrets add` command for secure file handling
+- [x] Implement `ordinator secrets add <file> --profile <profile>` command
+- [x] Ensure encrypted files are never stored in plaintext in repository
+- [x] Update documentation to reflect secure workflow
+- [x] Add tests for new secure secrets workflow
+- [x] Update Quick Start guide with correct workflow
+- [x] Add validation to prevent plaintext secrets in repository
+- [x] Update commit scanning to detect plaintext secrets more effectively
+- [x] Add interactive prompts for secrets workflow decisions
+- [x] Enhance error messages for secrets-related operations
+- [x] Add `secrets` array to profile configuration for direct source paths
+- [x] Implement `ordinator secrets add --all` for bulk re-encryption
+- [x] Add `ordinator add --all` for bulk file updates
+- [x] Update CLI to make path optional when using `--all` flag
+- [x] Update documentation for both `add` and `secrets add` commands
 
 **Current Issues:**
 - `ordinator add` stores plaintext files in repository
@@ -506,16 +511,24 @@ ordinator secrets add ~/.ssh/config --profile work
 # 3. Saves only encrypted version to repository
 # 4. Tracks encrypted file in config
 # 5. Never stores plaintext
+
+# Bulk operations for efficiency
+ordinator secrets add --all --profile work
+# Loops through all files in secrets array and re-encrypts them
 ```
 
 **Tests:**
-- [ ] `ordinator secrets add` never stores plaintext in repository
-- [ ] Encrypted files are properly tracked in configuration
-- [ ] Commit scanning detects plaintext secrets effectively
-- [ ] Interactive prompts guide users through secure workflow
-- [ ] Error messages are clear about security implications
-- [ ] Backward compatibility maintained for existing workflows
-- [ ] Integration tests verify secure file handling
+- [x] `ordinator secrets add` never stores plaintext in repository
+- [x] Encrypted files are properly tracked in configuration
+- [x] Commit scanning detects plaintext secrets effectively
+- [x] Interactive prompts guide users through secure workflow
+- [x] Error messages are clear about security implications
+- [x] Backward compatibility maintained for existing workflows
+- [x] Integration tests verify secure file handling
+- [x] `secrets add --all` loops through secrets array correctly
+- [x] `add --all` loops through files array correctly
+- [x] Path argument is optional when using `--all` flag
+- [x] Bulk operations work without manual file path specification
 
 **Acceptance Criteria:**
 ```bash
@@ -523,11 +536,25 @@ ordinator secrets add ~/.ssh/config --profile work
 ordinator secrets add ~/.ssh/config --profile work
 # Result: Only encrypted file stored in repository
 
+# Bulk operations
+ordinator add --all --profile work
+ordinator secrets add --all --profile work
+# Result: All tracked files updated without manual path specification
+
 # Validation
 ordinator commit -m "Add sensitive files"
 # Blocks commit if plaintext secrets detected
 # Provides clear guidance on how to fix
 ```
+
+**Major Improvements Completed:**
+- ✅ **Secrets Array Management**: Added dedicated `secrets` array in profile configuration for direct source paths
+- ✅ **Bulk Operations**: Implemented `--all` flag for both `add` and `secrets add` commands
+- ✅ **CLI Enhancement**: Made path argument optional when using `--all` flag
+- ✅ **Secure Workflow**: `secrets add` reads source files directly and encrypts in memory
+- ✅ **Documentation Updates**: Updated COMMANDS.md and CONFIGURATION.md to reflect new features
+- ✅ **Test Coverage**: Added comprehensive tests for bulk operations and secrets array management
+- ✅ **Backward Compatibility**: Maintained existing workflows while adding new features
 
 **Completion Statement:** This completes Phase 4.7 (Secrets Workflow Review and Enhancement) and prepares for Phase 4.8 (Enhanced README with Homebrew Packages Section).
 
