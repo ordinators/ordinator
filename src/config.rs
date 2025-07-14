@@ -91,6 +91,10 @@ pub struct ProfileConfig {
     /// Homebrew packages for this profile
     #[serde(default)]
     pub homebrew_packages: Vec<String>,
+
+    /// Date/time when the age key was created (ISO 8601 string)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_on: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -108,6 +112,10 @@ pub struct SecretsConfig {
     /// Patterns for files that should not be encrypted
     #[serde(default)]
     pub exclude_patterns: Vec<String>,
+
+    /// Key rotation interval in days (e.g., 90 = 3 months)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key_rotation_interval_days: Option<u32>,
 }
 
 impl Config {
@@ -217,6 +225,7 @@ impl Config {
                 exclude: Vec::new(),
                 homebrew_packages: Vec::new(),
                 secrets: Vec::new(),
+                created_on: None,
             },
         );
 
@@ -232,6 +241,7 @@ impl Config {
                 exclude: Vec::new(),
                 homebrew_packages: Vec::new(),
                 secrets: Vec::new(),
+                created_on: None,
             },
         );
 
@@ -247,6 +257,7 @@ impl Config {
                 exclude: Vec::new(),
                 homebrew_packages: Vec::new(),
                 secrets: Vec::new(),
+                created_on: None,
             },
         );
 
@@ -657,6 +668,7 @@ mod tests {
             exclude: Vec::new(),
             homebrew_packages: Vec::new(),
             secrets: Vec::new(),
+            created_on: None,
         };
 
         config.add_profile("test".to_string(), new_profile);

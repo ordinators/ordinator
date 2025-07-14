@@ -913,7 +913,8 @@ pub async fn run(args: Args) -> Result<()> {
 
             if !config.profiles.contains_key(&profile_name) {
                 return Err(anyhow::anyhow!(
-                    "Profile '{}' does not exist.",
+                    "Profile '{}' does not exist. To create it, run: ordinator profile add {}",
+                    profile_name,
                     profile_name
                 ));
             }
@@ -1657,86 +1658,147 @@ pub async fn run(args: Args) -> Result<()> {
 
             // Handle secrets decryption if not skipped
             if !skip_secrets {
-                use crate::secrets::{decrypt_file_with_sops, is_file_encrypted};
+                use crate::secrets::{
+                    age_key_exists, decrypt_file_with_sops, handle_interactive_age_key_setup,
+                    is_file_encrypted,
+                };
                 use std::fs;
 
                 let profile_config = config.get_profile(&profile).unwrap();
+                let mut skip_secrets_decryption = false;
                 if !profile_config.secrets.is_empty() {
-                    if !args.quiet {
-                        eprintln!("Decrypting secrets for profile '{profile}'");
-                    }
-
-                    for secret_path in &profile_config.secrets {
-                        // Get the encrypted file path in the repository
-                        let encrypted_file_path =
-                            config.get_source_file_path(&profile, secret_path)?;
-
-                        if !encrypted_file_path.exists() {
-                            if !args.quiet {
-                                eprintln!(
-                                    "Warning: Encrypted secret file not found: {}",
-                                    encrypted_file_path.display()
-                                );
-                            }
-                            continue;
+                    // Check if age key exists before attempting decryption
+                    if !age_key_exists(&profile) {
+                        if !args.quiet {
+                            eprintln!("AGE key not found for profile '{profile}'");
                         }
-
-                        // Check if the file is actually encrypted
-                        if !is_file_encrypted(&encrypted_file_path) {
-                            if !args.quiet {
-                                eprintln!(
-                                    "Warning: File does not appear to be encrypted: {}",
-                                    encrypted_file_path.display()
-                                );
-                            }
-                            continue;
-                        }
-
-                        // Determine the target path where the decrypted file should be placed
-                        let home_dir = crate::utils::get_home_dir()?;
-                        let target_path = home_dir.join(secret_path);
 
                         if args.dry_run {
-                            if !args.quiet {
-                                eprintln!(
-                                    "DRY-RUN: Would decrypt {} to {}",
-                                    encrypted_file_path.display(),
-                                    target_path.display()
-                                );
-                            }
+                            eprintln!("DRY-RUN: Would prompt for age key setup");
                         } else {
-                            // Create a temporary file for decryption
-                            let temp_dir = tempfile::tempdir()?;
-                            let temp_decrypted = temp_dir.path().join("decrypted_secret");
+                            // Handle interactive age key setup
+                            match handle_interactive_age_key_setup(&profile) {
+                                Ok(()) => {
+                                    if !args.quiet {
+                                        eprintln!("AGE key setup completed successfully");
+                                    }
+                                }
+                                Err(e) => {
+                                    if !args.quiet {
+                                        eprintln!("AGE key setup failed: {e}");
+                                        eprintln!(
+                                            "Continuing with apply without secrets decryption"
+                                        );
+                                    }
+                                    // Set flag to skip secrets decryption
+                                    skip_secrets_decryption = true;
+                                }
+                            }
+                        }
+                    }
 
-                            // Copy the encrypted file to temp location
-                            fs::copy(&encrypted_file_path, &temp_decrypted)?;
+                    if !skip_secrets_decryption {
+                        if !args.quiet {
+                            eprintln!("Decrypting secrets for profile '{profile}'");
+                        }
 
-                            // Decrypt the temporary file
-                            decrypt_file_with_sops(temp_decrypted.to_str().unwrap())?;
+                        for secret_path in &profile_config.secrets {
+                            // Get the encrypted file path in the repository
+                            let encrypted_file_path =
+                                config.get_source_file_path(&profile, secret_path)?;
 
-                            // Read the decrypted content
-                            let decrypted_content = fs::read_to_string(&temp_decrypted)?;
-
-                            // Ensure the target directory exists
-                            if let Some(parent) = target_path.parent() {
-                                fs::create_dir_all(parent)?;
+                            if !encrypted_file_path.exists() {
+                                if !args.quiet {
+                                    eprintln!(
+                                        "Warning: Encrypted secret file not found: {}",
+                                        encrypted_file_path.display()
+                                    );
+                                }
+                                continue;
                             }
 
-                            // Copy the decrypted content to the target location
-                            fs::write(&target_path, decrypted_content)?;
+                            // Check if the file is actually encrypted
+                            if !is_file_encrypted(&encrypted_file_path) {
+                                if !args.quiet {
+                                    eprintln!(
+                                        "Warning: File does not appear to be encrypted: {}",
+                                        encrypted_file_path.display()
+                                    );
+                                }
+                                continue;
+                            }
 
-                            // Set appropriate permissions (600 for secrets)
-                            let mut perms = fs::metadata(&target_path)?.permissions();
-                            perms.set_mode(0o600);
-                            fs::set_permissions(&target_path, perms)?;
+                            // Determine the target path where the decrypted file should be placed
+                            let home_dir = crate::utils::get_home_dir()?;
+                            let target_path = home_dir.join(secret_path);
 
-                            if !args.quiet {
-                                eprintln!(
-                                    "Decrypted: {} -> {}",
-                                    encrypted_file_path.display(),
-                                    target_path.display()
-                                );
+                            if args.dry_run {
+                                if !args.quiet {
+                                    eprintln!(
+                                        "DRY-RUN: Would decrypt {} to {}",
+                                        encrypted_file_path.display(),
+                                        target_path.display()
+                                    );
+                                }
+                            } else {
+                                // Create a temporary file for decryption
+                                let temp_dir = tempfile::tempdir()?;
+                                let temp_decrypted = temp_dir.path().join("decrypted_secret");
+
+                                // Copy the encrypted file to temp location
+                                fs::copy(&encrypted_file_path, &temp_decrypted)?;
+
+                                // Decrypt the temporary file
+                                let decryption_result = match decrypt_file_with_sops(
+                                    temp_decrypted.to_str().unwrap(),
+                                ) {
+                                    Ok(()) => Ok(()),
+                                    Err(e) => {
+                                        // Check if this is a key mismatch error
+                                        use crate::secrets::handle_key_mismatch_error;
+                                        match handle_key_mismatch_error(&encrypted_file_path, &e) {
+                                            Ok(true) => {
+                                                // Skip this file
+                                                continue;
+                                            }
+                                            Ok(false) => {
+                                                // Retry decryption with new key
+                                                decrypt_file_with_sops(
+                                                    temp_decrypted.to_str().unwrap(),
+                                                )
+                                            }
+                                            Err(e) => {
+                                                return Err(e);
+                                            }
+                                        }
+                                    }
+                                };
+
+                                decryption_result?;
+
+                                // Read the decrypted content
+                                let decrypted_content = fs::read_to_string(&temp_decrypted)?;
+
+                                // Ensure the target directory exists
+                                if let Some(parent) = target_path.parent() {
+                                    fs::create_dir_all(parent)?;
+                                }
+
+                                // Copy the decrypted content to the target location
+                                fs::write(&target_path, decrypted_content)?;
+
+                                // Set appropriate permissions (600 for secrets)
+                                let mut perms = fs::metadata(&target_path)?.permissions();
+                                perms.set_mode(0o600);
+                                fs::set_permissions(&target_path, perms)?;
+
+                                if !args.quiet {
+                                    eprintln!(
+                                        "Decrypted: {} -> {}",
+                                        encrypted_file_path.display(),
+                                        target_path.display()
+                                    );
+                                }
                             }
                         }
                     }
@@ -2394,6 +2456,12 @@ pub async fn run(args: Args) -> Result<()> {
                     ));
                 }
 
+                // Check if key rotation is needed
+                if let Ok(Some(warning)) = crate::secrets::check_key_rotation_needed(&profile_name)
+                {
+                    eprintln!("{warning}");
+                }
+
                 if args.dry_run {
                     if all {
                         println!("DRY-RUN: Would update all tracked secret files for profile '{profile_name}'");
@@ -2901,6 +2969,16 @@ pub async fn run(args: Args) -> Result<()> {
                     return Err(anyhow::anyhow!("File '{}' does not exist.", file));
                 }
 
+                // Check all profiles for key rotation needs
+                let (config, _) = Config::load()?;
+                for profile_name in config.list_profiles() {
+                    if let Ok(Some(warning)) =
+                        crate::secrets::check_key_rotation_needed(profile_name)
+                    {
+                        eprintln!("{warning}");
+                    }
+                }
+
                 if args.dry_run || dry_run {
                     println!("DRY-RUN: Would encrypt '{file}'");
                     return Ok(());
@@ -2922,6 +3000,16 @@ pub async fn run(args: Args) -> Result<()> {
                 let file_path = std::path::Path::new(&file);
                 if !file_path.exists() {
                     return Err(anyhow::anyhow!("File '{}' does not exist.", file));
+                }
+
+                // Check all profiles for key rotation needs
+                let (config, _) = Config::load()?;
+                for profile_name in config.list_profiles() {
+                    if let Ok(Some(warning)) =
+                        crate::secrets::check_key_rotation_needed(profile_name)
+                    {
+                        eprintln!("{warning}");
+                    }
                 }
 
                 if args.dry_run || dry_run {
@@ -2955,6 +3043,11 @@ pub async fn run(args: Args) -> Result<()> {
                 if profile.contains('/') || profile.contains('\\') {
                     eprintln!("Setup failed: Invalid profile name '{profile}'");
                     std::process::exit(1);
+                }
+
+                // Check if key rotation is needed for this profile
+                if let Ok(Some(warning)) = crate::secrets::check_key_rotation_needed(&profile) {
+                    eprintln!("{warning}");
                 }
 
                 match crate::secrets::setup_sops_and_age(&profile, force) {

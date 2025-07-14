@@ -15,6 +15,7 @@
 - **Homebrew package management** - Track and install packages per profile
 - **Git integration** - Seamless commit, push, and sync operations
 - **Automatic secrets scanning** - Detects potential plaintext secrets in tracked files
+- **Age key rotation tracking and reminders** - Ordinator tracks when your encryption key was created and will automatically warn you when it's time to rotate your key for better security
 - **Bootstrap script generation** - Create setup scripts for new environments
 - ...and more!
 
@@ -76,9 +77,6 @@ When you run `ordinator apply`, Ordinator:
 4. **Symlinks all tracked files** for the selected profile from your dotfiles repository into their correct locations in your home directory, backing up any existing files if configured.
 5. **Performs safety checks** to avoid overwriting important files unless you use the `--force` flag.
 6. **Supports dry-run mode** so you can preview all changes without making modifications by adding the `--dry-run` flag.
-
-
-
 
 
 ## Profiles

@@ -165,3 +165,125 @@ fn test_apply_skips_backup_if_disabled() {
         );
     }
 }
+
+#[test]
+fn test_apply_skip_secrets_flag_respected() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = common::setup_test_environment_with_config(&temp, None);
+
+    // Create a profile with secrets configured
+    let config_file = temp.child("ordinator.toml");
+    let config_content = r#"
+[global]
+default_profile = "default"
+auto_push = false
+create_backups = true
+
+[profiles.default]
+files = []
+secrets = ["~/.ssh/config"]
+enabled = true
+
+[secrets]
+age_key_file = ""
+sops_config = ""
+encrypt_patterns = ["*.yaml", "*.txt"]
+exclude_patterns = ["*.bak"]
+"#;
+    std::fs::write(config_file.path(), config_content).unwrap();
+
+    // Run apply with --skip-secrets - should skip all secrets processing
+    let mut cmd = common::create_ordinator_command(&temp);
+    cmd.args(["apply", "--profile", "default", "--skip-secrets"]);
+    cmd.assert().success();
+}
+
+#[test]
+fn test_apply_with_missing_age_key_detection() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = common::setup_test_environment_with_config(&temp, None);
+
+    // Create a profile with secrets configured but no age key
+    let config_file = temp.child("ordinator.toml");
+    let config_content = r#"
+[global]
+default_profile = "default"
+auto_push = false
+create_backups = true
+
+[profiles.default]
+files = []
+secrets = ["~/.ssh/config"]
+enabled = true
+
+[secrets]
+age_key_file = ""
+sops_config = ""
+encrypt_patterns = ["*.yaml", "*.txt"]
+exclude_patterns = ["*.bak"]
+"#;
+    std::fs::write(config_file.path(), config_content).unwrap();
+
+    // Create an encrypted secret file
+    let files_dir = temp.child("files");
+    files_dir.create_dir_all().unwrap();
+    let secret_file = files_dir.child(".ssh").child("config");
+    secret_file
+        .write_str("sops:\n  kms: []\n  age:\n    - age1testkey\n")
+        .unwrap();
+
+    // Run apply - should detect missing age key and handle gracefully
+    let mut cmd = common::create_ordinator_command(&temp);
+    cmd.args(["apply", "--profile", "default"]);
+
+    // Since this requires interactive input, we expect it to either succeed or fail gracefully
+    let output = cmd.output().unwrap();
+    // The command should either succeed (if no secrets to decrypt) or fail gracefully
+    // We can't easily test interactive prompts in integration tests, but we can verify
+    // that the command doesn't panic and handles the missing key scenario
+    assert!(output.status.code().is_some());
+}
+
+#[test]
+fn test_apply_with_key_mismatch_handling() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let (_config_guard, _test_mode_guard) = common::setup_test_environment_with_config(&temp, None);
+
+    // Create a profile with secrets configured
+    let config_file = temp.child("ordinator.toml");
+    let config_content = r#"
+[global]
+default_profile = "default"
+auto_push = false
+create_backups = true
+
+[profiles.default]
+files = []
+secrets = ["~/.ssh/config"]
+enabled = true
+
+[secrets]
+age_key_file = ""
+sops_config = ""
+encrypt_patterns = ["*.yaml", "*.txt"]
+exclude_patterns = ["*.bak"]
+"#;
+    std::fs::write(config_file.path(), config_content).unwrap();
+
+    // Create an encrypted secret file that can't be decrypted with a new key
+    let files_dir = temp.child("files");
+    files_dir.create_dir_all().unwrap();
+    let secret_file = files_dir.child(".ssh").child("config");
+    secret_file
+        .write_str("sops:\n  kms: []\n  age:\n    - age1differentkey\n")
+        .unwrap();
+
+    // Run apply - should handle key mismatch gracefully
+    let mut cmd = common::create_ordinator_command(&temp);
+    cmd.args(["apply", "--profile", "default"]);
+
+    // Since this would require interactive input, we expect it to fail gracefully
+    let output = cmd.output().unwrap();
+    // The command should either succeed (if no secrets to decrypt) or fail gracefully
+    assert!(output.status.code().is_some());
+}

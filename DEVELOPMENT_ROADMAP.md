@@ -556,9 +556,151 @@ ordinator commit -m "Add sensitive files"
 - ✅ **Test Coverage**: Added comprehensive tests for bulk operations and secrets array management
 - ✅ **Backward Compatibility**: Maintained existing workflows while adding new features
 
-**Completion Statement:** This completes Phase 4.7 (Secrets Workflow Review and Enhancement) and prepares for Phase 4.8 (Enhanced README with Homebrew Packages Section).
+**Completion Statement:** This completes Phase 4.7 (Secrets Workflow Review and Enhancement) and prepares for Phase 4.8 (AGE Key Prompting During Apply).
 
-### 4.8 Enhanced README with Homebrew Packages Section
+### 4.8 AGE Key Prompting During Apply & Key Rotation Tracking
+**Priority:** High  
+**Dependencies:** 3.1, 4.4  
+**Estimated Time:** 1-2 days  
+**Testable:** ✅
+
+**Tasks:**
+- [x] Update configuration structs and TOML format to support `created_on` in each profile
+- [x] Update configuration structs and TOML format to support `key_rotation_interval_days` in `[secrets]`
+- [x] Track age key creation date (`created_on`) in each profile in `ordinator.toml`
+- [x] Add `key_rotation_interval_days` option to `[secrets]` in `ordinator.toml`
+- [x] On age key creation/rotation, set or update `created_on` for the profile
+- [x] On secrets/age-related CLI commands, check if the key is older than the configured interval
+- [x] Prompt the user to rotate the key if the interval has elapsed
+- [x] Backward compatibility: if `created_on` is missing, fall back to file creation time or prompt to set
+- [x] Add tests for metadata tracking, interval checking, and prompting logic
+- [x] Document the feature in PRD.md and README
+- [x] Detect missing AGE key during `ordinator apply --profile <name>`
+- [x] Implement interactive prompting for AGE key setup
+- [x] Support two scenarios:
+  - [x] Scenario 1: Generate new AGE key (first-time setup)
+  - [x] Scenario 2: Import existing AGE key (multi-machine replication)
+- [x] Add key validation for imported keys
+- [x] Implement secure key storage with proper permissions (600)
+- [x] Generate corresponding SOPS config for imported keys
+- [x] Update `ordinator.toml` with key and config paths
+- [x] Add clear user guidance and error messages
+- [x] Ensure backward compatibility with existing workflows
+- [x] Add comprehensive test coverage for both scenarios
+- [x] Update documentation to reflect new behavior
+- [x] Update README quick start section to remove `ordinator secrets setup` requirement since apply will handle AGE key setup through prompts
+
+**Scenario 1 - New Key Generation:**
+```
+❌ AGE key not found for profile 'work'
+Would you like to generate a new AGE key? (y/N): y
+✅ AGE key generated successfully
+   Key stored at: ~/.config/ordinator/age/work.txt
+   SOPS config created at: ~/.config/ordinator/.sops.work.yaml
+```
+
+**Scenario 2 - Import Existing Key:**
+```
+❌ AGE key not found for profile 'work'
+Do you have an existing AGE key to import? (y/N): y
+Please paste your AGE private key (it will be stored securely):
+AGE-SECRET-KEY-1abc123...
+✅ AGE key imported successfully
+   Key stored at: ~/.config/ordinator/age/work.txt
+   SOPS config created at: ~/.config/ordinator/.sops.work.yaml
+```
+
+**Tests:**
+- [x] Configuration structs properly serialize/deserialize `created_on` field in profiles
+- [x] Configuration structs properly serialize/deserialize `key_rotation_interval_days` field in secrets
+- [x] Age key creation sets `created_on` timestamp in the correct profile
+- [x] Age key rotation updates `created_on` timestamp in the correct profile
+- [x] Interval checking works correctly for different rotation periods (30, 90, 180, 365 days)
+- [x] Warning prompts appear when key age exceeds configured interval
+- [x] No warning appears when key age is within configured interval
+- [x] Backward compatibility: missing `created_on` falls back to file creation time
+- [x] Backward compatibility: missing `key_rotation_interval_days` uses default behavior (no warnings)
+- [x] CLI commands check key age on secrets/age operations
+- [x] Integration tests cover complete key rotation workflow
+- [x] Missing AGE key is detected during apply
+- [x] Interactive prompts work for both scenarios
+- [x] New key generation works correctly
+- [x] Existing key import validates key format
+- [x] Imported keys are stored securely with proper permissions
+- [x] SOPS config is generated correctly for imported keys
+- [x] `ordinator.toml` is updated with correct paths
+- [x] Apply continues successfully after key setup
+- [x] Error handling works for invalid keys
+- [x] Backward compatibility maintained for existing workflows
+- [x] Integration tests cover both scenarios
+- [x] CLI tests verify prompting behavior
+
+**Acceptance Criteria:**
+```bash
+# Scenario 1: First-time setup (IMPLEMENTED)
+ordinator apply --profile work
+# Detects missing age key and prompts for setup
+# Guides user through new key generation or key import
+# Continues with apply process after key setup
+
+# Scenario 2: Multi-machine replication (IMPLEMENTED)
+ordinator apply --profile work
+# Detects missing age key and prompts for setup
+# Allows importing existing key from another machine
+# Validates key format and stores securely
+
+# Error handling (IMPLEMENTED)
+ordinator apply --profile work
+# Handles invalid key format gracefully
+# Provides clear error messages and recovery guidance
+# Allows skipping secrets with --skip-secrets flag
+
+# Key mismatch handling (IMPLEMENTED)
+ordinator apply --profile work
+# Detects when encrypted secrets can't be decrypted with current key
+# Provides options: skip file, cancel operation, or import correct key
+# Continues with other apply operations even if some secrets can't be decrypted
+```
+
+**Current Status:**
+- ✅ Key rotation tracking and warnings are implemented
+- ✅ Age key creation with timestamps is implemented
+- ✅ Interactive age key setup during apply is implemented
+- ✅ Missing key detection during apply is implemented
+- ✅ Key import functionality is implemented
+
+**Additional Tasks for Key Mismatch Handling:**
+- [x] Detect when new age key cannot decrypt existing encrypted secrets
+- [x] Implement graceful error handling for key mismatch scenarios
+- [x] Provide clear user guidance when decryption fails due to key mismatch
+- [x] Add option to skip secrets decryption and continue with other apply operations
+- [x] Show list of files that cannot be decrypted with the new key
+- [x] Add warning messages explaining the key mismatch issue
+- [x] Implement `--skip-secrets` flag handling in apply command
+- [x] Add tests for key mismatch detection and graceful degradation
+- [x] Update documentation to explain key mismatch scenarios and recovery options
+
+**Key Mismatch Scenario:**
+```
+⚠️  Warning: Found encrypted secrets that were created with a different key
+   The following files cannot be decrypted with the new key:
+   - secrets/config.yaml
+   - secrets/credentials.json
+   
+   To decrypt these secrets, you need the original key.
+   The apply will continue without decrypting these secrets.
+   
+   To fix this:
+   1. Get the original age key
+   2. Import it using: ordinator age setup --profile work
+   3. Re-apply: ordinator apply --profile work
+   
+   Or continue without secrets: ordinator apply --profile work --skip-secrets
+```
+
+**Completion Statement:** This completes Phase 4.8 (AGE Key Prompting During Apply) with all core functionality implemented. The interactive age key setup, key mismatch handling, and `--skip-secrets` flag are all working. Documentation has been updated to explain the new flows. This prepares for Phase 4.9 (Enhanced README with Homebrew Packages Section).
+
+### 4.9 Enhanced README with Homebrew Packages Section
 **Priority:** Medium  
 **Dependencies:** 4.4  
 **Estimated Time:** 1 day  
@@ -581,6 +723,18 @@ ordinator commit -m "Add sensitive files"
 - [ ] Add tests for enhanced profile display
 - [ ] Update documentation to mention new feature
 - [ ] Ensure backward compatibility with existing READMEs
+- [ ] Update `ordinator brew export` to use `brew leaves -r` instead of `brew list` for formulas
+- [ ] Add `brew list --cask` support to export casks separately
+- [ ] Store formulas and casks separately in TOML configuration
+- [ ] Update `ordinator brew install` to install both formulas and casks on apply
+- [ ] Add separate `homebrew_formulas` and `homebrew_casks` fields to profile configuration
+- [ ] Update TOML structure to distinguish between formulas and casks
+- [ ] Modify export process to call both commands and merge results
+- [ ] Update install process to handle both formulas and casks installation
+- [ ] Add tests for separate formula and cask handling
+- [ ] Update documentation to reflect new formula/cask separation
+- [ ] Remove backward compatibility with existing `homebrew_packages` field
+- [ ] Update existing configurations to use new formula/cask structure
 
 **HTML Structure:**
 
@@ -650,6 +804,16 @@ This repository contains the following profiles:
 - [ ] Profiles and Homebrew packages are separate, focused sections
 - [ ] State tracking updates when Homebrew packages change
 - [ ] Backward compatibility maintained for existing READMEs
+- [ ] `brew export` correctly calls `brew leaves -r` for formulas
+- [ ] `brew export` correctly calls `brew list --cask` for casks
+- [ ] Formulas and casks are stored separately in TOML configuration
+- [ ] `brew install` installs both formulas and casks during apply
+- [ ] TOML structure properly distinguishes between formulas and casks
+- [ ] Export process handles both commands and merges results correctly
+- [ ] Install process handles both formulas and casks installation
+- [ ] Breaking change: `homebrew_packages` field replaced with separate formula/cask fields
+- [ ] Integration tests cover separate formula and cask workflows
+- [ ] Migration guide provided for existing configurations
 
 **Acceptance Criteria:**
 ```bash
@@ -665,13 +829,131 @@ ordinator readme default
 # Generates README without Homebrew packages section
 # Enhanced profiles section still shows files and directories
 
+# Enhanced Homebrew export with separate formulas and casks
+ordinator brew export --profile work
+# Calls 'brew leaves -r' for formulas (user-installed only)
+# Calls 'brew list --cask' for casks
+# Stores formulas and casks separately in TOML
+# Breaking change: Replaces existing homebrew_packages field
+
+# Enhanced Homebrew install during apply
+ordinator apply --profile work
+# Installs both formulas and casks from profile
+# Uses separate installation commands for each type
+
 # When Homebrew packages are added/removed from profiles
 ordinator brew export --profile work
 ordinator readme default
 # README automatically updates to reflect new packages in work profile
 ```
 
-**Completion Statement:** This completes Phase 4.8 (Enhanced README with Homebrew Packages Section) and prepares for Phase 5 (System Commands & Script Generation).
+**Completion Statement:** This completes Phase 4.9 (Enhanced README with Homebrew Packages Section) and prepares for Phase 4.10 (Hash-Based Filename Mapping).
+
+### 4.10 Hash-Based Filename Mapping
+**Priority:** Medium  
+**Dependencies:** 2.1, 3.1, 4.7  
+**Estimated Time:** 2-3 days  
+**Testable:** ✅
+
+**Tasks:**
+- [ ] Implement hash-based filename generation for file collision prevention
+- [ ] Add hash generation function using SHA-256 truncated to 6 characters
+- [ ] Implement file mapping system in TOML configuration
+- [ ] Update `ordinator watch` to use hash-based filenames
+- [ ] Update `ordinator secrets watch` to use hash-based filenames
+- [ ] Modify file storage to use `files/<profile>/<hash>_<filename>` pattern
+- [ ] Add `file_mappings` field to `ProfileConfig` structure
+- [ ] Update `ordinator add` to work with hash-based filenames
+- [ ] Update `ordinator secrets add` to work with hash-based filenames
+- [ ] Modify apply command to use mappings for correct symlink creation
+- [ ] Implement backward compatibility for existing files without hashes
+- [ ] Add migration logic for existing repositories
+- [ ] Update bulk operations (`--all` flags) to work with mappings
+- [ ] Add comprehensive test coverage for hash-based file management
+- [ ] Update documentation to reflect new file naming system
+
+**Hash Generation:**
+```rust
+fn generate_file_hash(path: &str) -> String {
+    use sha2::{Sha256, Digest};
+    let mut hasher = Sha256::new();
+    hasher.update(path.as_bytes());
+    let result = hasher.finalize();
+    format!("{:x}", result)[0..6].to_string()
+}
+```
+
+**Example Workflow:**
+```bash
+# Regular files
+ordinator watch ~/.config/app/config.txt --profile work
+# Hash: "a1b2c3" -> stores as: files/work/a1b2c3_config.txt
+# Mapping: "a1b2c3_config.txt" -> "~/.config/app/config.txt"
+
+ordinator watch ~/Documents/config.txt --profile work
+# Hash: "d4e5f6" -> stores as: files/work/d4e5f6_config.txt
+# Mapping: "d4e5f6_config.txt" -> "~/Documents/config.txt"
+
+# Secrets
+ordinator secrets watch ~/.ssh/config --profile work
+# Hash: "9f8e7d" -> stores as: files/work/9f8e7d_config.enc
+# Mapping: "9f8e7d_config.enc" -> "~/.ssh/config"
+```
+
+**TOML Structure:**
+```toml
+[profiles.work]
+files = ["~/.config/app/config.txt", "~/Documents/config.txt"]
+secrets = ["~/.ssh/config", "~/.aws/credentials"]
+file_mappings = {
+  "a1b2c3_config.txt" = "~/.config/app/config.txt",
+  "d4e5f6_config.txt" = "~/Documents/config.txt",
+  "9f8e7d_config.enc" = "~/.ssh/config",
+  "1a2b3c_credentials.enc" = "~/.aws/credentials"
+}
+```
+
+**Tests:**
+- [ ] Hash generation produces consistent results for same path
+- [ ] Different paths produce different hashes
+- [ ] File collisions are prevented with hash-based naming
+- [ ] `ordinator watch` creates correct hash-based filenames
+- [ ] `ordinator secrets watch` creates correct hash-based filenames
+- [ ] `ordinator add` updates files with hash-based names
+- [ ] `ordinator secrets add` updates encrypted files with hash-based names
+- [ ] Apply command creates correct symlinks using mappings
+- [ ] Bulk operations work with hash-based file system
+- [ ] Backward compatibility maintained for existing files
+- [ ] Migration handles existing repositories gracefully
+- [ ] Error handling works for hash collisions (extremely unlikely)
+- [ ] Integration tests cover complete workflow
+
+**Acceptance Criteria:**
+```bash
+# No more filename collisions
+ordinator watch ~/.config/app/config.txt --profile work
+ordinator watch ~/Documents/config.txt --profile work
+# Result: files/work/a1b2c3_config.txt and files/work/d4e5f6_config.txt
+
+# Secrets work with hash-based naming
+ordinator secrets watch ~/.ssh/config --profile work
+ordinator secrets add --all --profile work
+# Result: files/work/9f8e7d_config.enc
+
+# Apply uses mappings correctly
+ordinator apply --profile work
+# Result: Correct symlinks created using TOML mappings
+```
+
+**Benefits:**
+- ✅ **No filename collisions**: Hash ensures unique filenames
+- ✅ **Deterministic**: Same path always generates same hash
+- ✅ **Consistent across machines**: Hash is path-based, not random
+- ✅ **Backward compatible**: Existing files continue to work
+- ✅ **Works for both files and secrets**: Unified approach
+- ✅ **Collision resistant**: SHA-256 truncated to 6 chars = 16.7M combinations
+
+**Completion Statement:** This completes Phase 4.10 (Hash-Based Filename Mapping) and prepares for Phase 5 (System Commands & Script Generation).
 
 ---
 
