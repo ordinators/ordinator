@@ -1577,6 +1577,11 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
 
     #[test]
     fn test_setup_sops_and_age_with_invalid_profile() {
+        let _guard = TestIsolationGuard::new();
+        // Create a minimal config file in the temp dir
+        let config_path = _guard.temp_dir().path().join("ordinator.toml");
+        std::fs::write(&config_path, "[global]\ndefault_profile = \"test\"\n").unwrap();
+        std::env::set_var("ORDINATOR_CONFIG", &config_path);
         let result = setup_sops_and_age("invalid/profile/name", false);
         assert!(result.is_err()); // Should fail with invalid profile name
     }
@@ -1584,6 +1589,10 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
     #[test]
     fn test_generate_age_key_with_invalid_path() {
         let _guard = TestIsolationGuard::new();
+        // Create a minimal config file in the temp dir
+        let config_path = _guard.temp_dir().path().join("ordinator.toml");
+        std::fs::write(&config_path, "[global]\ndefault_profile = \"test\"\n").unwrap();
+        std::env::set_var("ORDINATOR_CONFIG", &config_path);
         let invalid_path = std::path::PathBuf::from("/nonexistent/path");
         let result = generate_age_key(&invalid_path, "test", false);
         // The function now ignores the base_dir parameter and uses ~/.config/ordinator/age/
