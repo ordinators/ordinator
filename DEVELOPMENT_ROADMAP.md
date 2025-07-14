@@ -558,13 +558,23 @@ ordinator commit -m "Add sensitive files"
 
 **Completion Statement:** This completes Phase 4.7 (Secrets Workflow Review and Enhancement) and prepares for Phase 4.8 (AGE Key Prompting During Apply).
 
-### 4.8 AGE Key Prompting During Apply
+### 4.8 AGE Key Prompting During Apply & Key Rotation Tracking
 **Priority:** High  
-**Dependencies:** 3.1, 4.7  
-**Estimated Time:** 2-3 days  
+**Dependencies:** 3.1, 4.4  
+**Estimated Time:** 1-2 days  
 **Testable:** ✅
 
 **Tasks:**
+- [ ] Update configuration structs and TOML format to support `created_on` in each profile
+- [ ] Update configuration structs and TOML format to support `key_rotation_interval_days` in `[secrets]`
+- [ ] Track age key creation date (`created_on`) in each profile in `ordinator.toml`
+- [ ] Add `key_rotation_interval_days` option to `[secrets]` in `ordinator.toml`
+- [ ] On age key creation/rotation, set or update `created_on` for the profile
+- [ ] On secrets/age-related CLI commands, check if the key is older than the configured interval
+- [ ] Prompt the user to rotate the key if the interval has elapsed
+- [ ] Backward compatibility: if `created_on` is missing, fall back to file creation time or prompt to set
+- [ ] Add tests for metadata tracking, interval checking, and prompting logic
+- [ ] Document the feature in PRD.md and README
 - [ ] Detect missing AGE key during `ordinator apply --profile <name>`
 - [ ] Implement interactive prompting for AGE key setup
 - [ ] Support two scenarios:
@@ -601,6 +611,17 @@ AGE-SECRET-KEY-1abc123...
 ```
 
 **Tests:**
+- [ ] Configuration structs properly serialize/deserialize `created_on` field in profiles
+- [ ] Configuration structs properly serialize/deserialize `key_rotation_interval_days` field in secrets
+- [ ] Age key creation sets `created_on` timestamp in the correct profile
+- [ ] Age key rotation updates `created_on` timestamp in the correct profile
+- [ ] Interval checking works correctly for different rotation periods (30, 90, 180, 365 days)
+- [ ] Warning prompts appear when key age exceeds configured interval
+- [ ] No warning appears when key age is within configured interval
+- [ ] Backward compatibility: missing `created_on` falls back to file creation time
+- [ ] Backward compatibility: missing `key_rotation_interval_days` uses default behavior (no warnings)
+- [ ] CLI commands check key age on secrets/age operations
+- [ ] Integration tests cover complete key rotation workflow
 - [ ] Missing AGE key is detected during apply
 - [ ] Interactive prompts work for both scenarios
 - [ ] New key generation works correctly
