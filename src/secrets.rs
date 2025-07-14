@@ -1583,7 +1583,8 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
 
     #[test]
     fn test_generate_age_key_with_invalid_path() {
-        let invalid_path = PathBuf::from("/nonexistent/path");
+        let _guard = TestIsolationGuard::new();
+        let invalid_path = std::path::PathBuf::from("/nonexistent/path");
         let result = generate_age_key(&invalid_path, "test", false);
         // The function now ignores the base_dir parameter and uses ~/.config/ordinator/age/
         // So it should succeed even with an invalid path parameter
