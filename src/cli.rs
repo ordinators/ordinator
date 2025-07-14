@@ -913,7 +913,8 @@ pub async fn run(args: Args) -> Result<()> {
 
             if !config.profiles.contains_key(&profile_name) {
                 return Err(anyhow::anyhow!(
-                    "Profile '{}' does not exist.",
+                    "Profile '{}' does not exist. To create it, run: ordinator profile add {}",
+                    profile_name,
                     profile_name
                 ));
             }
@@ -2394,6 +2395,11 @@ pub async fn run(args: Args) -> Result<()> {
                     ));
                 }
 
+                // Check if key rotation is needed
+                if let Ok(Some(warning)) = crate::secrets::check_key_rotation_needed(&profile_name) {
+                    eprintln!("{warning}");
+                }
+
                 if args.dry_run {
                     if all {
                         println!("DRY-RUN: Would update all tracked secret files for profile '{profile_name}'");
@@ -2901,6 +2907,14 @@ pub async fn run(args: Args) -> Result<()> {
                     return Err(anyhow::anyhow!("File '{}' does not exist.", file));
                 }
 
+                // Check all profiles for key rotation needs
+                let (config, _) = Config::load()?;
+                for profile_name in config.list_profiles() {
+                    if let Ok(Some(warning)) = crate::secrets::check_key_rotation_needed(profile_name) {
+                        eprintln!("{warning}");
+                    }
+                }
+
                 if args.dry_run || dry_run {
                     println!("DRY-RUN: Would encrypt '{file}'");
                     return Ok(());
@@ -2922,6 +2936,14 @@ pub async fn run(args: Args) -> Result<()> {
                 let file_path = std::path::Path::new(&file);
                 if !file_path.exists() {
                     return Err(anyhow::anyhow!("File '{}' does not exist.", file));
+                }
+
+                // Check all profiles for key rotation needs
+                let (config, _) = Config::load()?;
+                for profile_name in config.list_profiles() {
+                    if let Ok(Some(warning)) = crate::secrets::check_key_rotation_needed(profile_name) {
+                        eprintln!("{warning}");
+                    }
                 }
 
                 if args.dry_run || dry_run {
@@ -2955,6 +2977,11 @@ pub async fn run(args: Args) -> Result<()> {
                 if profile.contains('/') || profile.contains('\\') {
                     eprintln!("Setup failed: Invalid profile name '{profile}'");
                     std::process::exit(1);
+                }
+
+                // Check if key rotation is needed for this profile
+                if let Ok(Some(warning)) = crate::secrets::check_key_rotation_needed(&profile) {
+                    eprintln!("{warning}");
                 }
 
                 match crate::secrets::setup_sops_and_age(&profile, force) {

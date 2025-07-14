@@ -565,16 +565,16 @@ ordinator commit -m "Add sensitive files"
 **Testable:** ✅
 
 **Tasks:**
-- [ ] Update configuration structs and TOML format to support `created_on` in each profile
-- [ ] Update configuration structs and TOML format to support `key_rotation_interval_days` in `[secrets]`
-- [ ] Track age key creation date (`created_on`) in each profile in `ordinator.toml`
-- [ ] Add `key_rotation_interval_days` option to `[secrets]` in `ordinator.toml`
-- [ ] On age key creation/rotation, set or update `created_on` for the profile
-- [ ] On secrets/age-related CLI commands, check if the key is older than the configured interval
-- [ ] Prompt the user to rotate the key if the interval has elapsed
-- [ ] Backward compatibility: if `created_on` is missing, fall back to file creation time or prompt to set
-- [ ] Add tests for metadata tracking, interval checking, and prompting logic
-- [ ] Document the feature in PRD.md and README
+- [x] Update configuration structs and TOML format to support `created_on` in each profile
+- [x] Update configuration structs and TOML format to support `key_rotation_interval_days` in `[secrets]`
+- [x] Track age key creation date (`created_on`) in each profile in `ordinator.toml`
+- [x] Add `key_rotation_interval_days` option to `[secrets]` in `ordinator.toml`
+- [x] On age key creation/rotation, set or update `created_on` for the profile
+- [x] On secrets/age-related CLI commands, check if the key is older than the configured interval
+- [x] Prompt the user to rotate the key if the interval has elapsed
+- [x] Backward compatibility: if `created_on` is missing, fall back to file creation time or prompt to set
+- [x] Add tests for metadata tracking, interval checking, and prompting logic
+- [x] Document the feature in PRD.md and README
 - [ ] Detect missing AGE key during `ordinator apply --profile <name>`
 - [ ] Implement interactive prompting for AGE key setup
 - [ ] Support two scenarios:
@@ -611,17 +611,17 @@ AGE-SECRET-KEY-1abc123...
 ```
 
 **Tests:**
-- [ ] Configuration structs properly serialize/deserialize `created_on` field in profiles
-- [ ] Configuration structs properly serialize/deserialize `key_rotation_interval_days` field in secrets
-- [ ] Age key creation sets `created_on` timestamp in the correct profile
-- [ ] Age key rotation updates `created_on` timestamp in the correct profile
-- [ ] Interval checking works correctly for different rotation periods (30, 90, 180, 365 days)
-- [ ] Warning prompts appear when key age exceeds configured interval
-- [ ] No warning appears when key age is within configured interval
-- [ ] Backward compatibility: missing `created_on` falls back to file creation time
-- [ ] Backward compatibility: missing `key_rotation_interval_days` uses default behavior (no warnings)
-- [ ] CLI commands check key age on secrets/age operations
-- [ ] Integration tests cover complete key rotation workflow
+- [x] Configuration structs properly serialize/deserialize `created_on` field in profiles
+- [x] Configuration structs properly serialize/deserialize `key_rotation_interval_days` field in secrets
+- [x] Age key creation sets `created_on` timestamp in the correct profile
+- [x] Age key rotation updates `created_on` timestamp in the correct profile
+- [x] Interval checking works correctly for different rotation periods (30, 90, 180, 365 days)
+- [x] Warning prompts appear when key age exceeds configured interval
+- [x] No warning appears when key age is within configured interval
+- [x] Backward compatibility: missing `created_on` falls back to file creation time
+- [x] Backward compatibility: missing `key_rotation_interval_days` uses default behavior (no warnings)
+- [x] CLI commands check key age on secrets/age operations
+- [x] Integration tests cover complete key rotation workflow
 - [ ] Missing AGE key is detected during apply
 - [ ] Interactive prompts work for both scenarios
 - [ ] New key generation works correctly
@@ -637,22 +637,56 @@ AGE-SECRET-KEY-1abc123...
 
 **Acceptance Criteria:**
 ```bash
-# Scenario 1: First-time setup
+# Scenario 1: First-time setup (NOT IMPLEMENTED)
 ordinator apply --profile work
-# Prompts for new key generation
-# Generates key and continues with apply
+# Currently fails with missing age key error
+# Should prompt for new key generation (not implemented)
 
-# Scenario 2: Multi-machine replication
+# Scenario 2: Multi-machine replication (NOT IMPLEMENTED)
 ordinator apply --profile work
-# Prompts for existing key import
-# Validates and stores imported key
-# Continues with apply
+# Currently fails with missing age key error
+# Should prompt for existing key import (not implemented)
 
-# Error handling
+# Error handling (NOT IMPLEMENTED)
 ordinator apply --profile work
-# Handles invalid key format gracefully
-# Provides clear error messages
-# Allows retry or fallback to new key generation
+# Currently fails with missing age key error
+# Should handle invalid key format gracefully (not implemented)
+```
+
+**Current Status:**
+- ✅ Key rotation tracking and warnings are implemented
+- ✅ Age key creation with timestamps is implemented
+- ❌ Interactive age key setup during apply is NOT implemented
+- ❌ Missing key detection during apply is NOT implemented
+- ❌ Key import functionality is NOT implemented
+
+**Additional Tasks for Key Mismatch Handling:**
+- [ ] Detect when new age key cannot decrypt existing encrypted secrets
+- [ ] Implement graceful error handling for key mismatch scenarios
+- [ ] Provide clear user guidance when decryption fails due to key mismatch
+- [ ] Add option to skip secrets decryption and continue with other apply operations
+- [ ] Show list of files that cannot be decrypted with the new key
+- [ ] Add warning messages explaining the key mismatch issue
+- [ ] Implement `--skip-secrets` flag handling in apply command
+- [ ] Add tests for key mismatch detection and graceful degradation
+- [ ] Update documentation to explain key mismatch scenarios and recovery options
+
+**Key Mismatch Scenario:**
+```
+⚠️  Warning: Found encrypted secrets that were created with a different key
+   The following files cannot be decrypted with the new key:
+   - secrets/config.yaml
+   - secrets/credentials.json
+   
+   To decrypt these secrets, you need the original key.
+   The apply will continue without decrypting these secrets.
+   
+   To fix this:
+   1. Get the original age key
+   2. Import it using: ordinator age setup --profile work
+   3. Re-apply: ordinator apply --profile work
+   
+   Or continue without secrets: ordinator apply --profile work --skip-secrets
 ```
 
 **Completion Statement:** This completes Phase 4.8 (AGE Key Prompting During Apply) and prepares for Phase 4.9 (Enhanced README with Homebrew Packages Section).

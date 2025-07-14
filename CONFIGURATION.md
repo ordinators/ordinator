@@ -42,6 +42,7 @@ secrets = ["~/.ssh/config", "~/.aws/credentials"]
 homebrew_packages = ["git", "neovim", "ripgrep", "sops", "age", "jq", "yq"]
 enabled = true
 description = "Work environment profile"
+created_on = "2024-06-10T15:23:00Z"
 
 [profiles.personal]
 files = ["~/.zshrc"]
@@ -56,6 +57,7 @@ age_key_file = "~/.config/ordinator/age/key.txt"
 sops_config = "~/.sops.yaml"
 encrypt_patterns = ["secrets/*.yaml"]
 exclude_patterns = ["*.bak"]
+key_rotation_interval_days = 90
 
 [readme]
 auto_update = false
@@ -101,6 +103,7 @@ update_on_changes = ["profiles", "bootstrap"]
   - You can edit the script using `ordinator bootstrap --edit --profile <name>`
 - `enabled` (bool): Whether this profile is active.
 - `description` (string, optional): Description of the profile.
+- `created_on` (string, optional): ISO 8601 timestamp of when the age key was created or last rotated. Used for key rotation reminders. Set automatically by Ordinator.
 - `exclude` (array of strings): Glob patterns for files or directories to exclude for this profile (overrides or adds to global exclusions).
 
 ## Bootstrap Scripts
@@ -197,6 +200,7 @@ description = "Laptop setup with minimal tools"
     - `*.bak` - Exclude backup files
     - `**/*.enc.yaml` - Exclude already encrypted YAML files
     - `secrets/excluded/**/*` - Exclude specific directory from encryption
+  - `key_rotation_interval_days` (integer, optional): Number of days before a rotation reminder is shown. Default is 90 if not set. If your age key is older than this interval, Ordinator will print a warning and suggest running `ordinator age rotate-keys`.
 
 - `encryption_format` (string, optional): Format for encrypted files.
   - Default: `"{stem}.enc.{ext}"` for YAML files, `"{stem}.enc"` for others

@@ -14,6 +14,7 @@ exclude = [
 [profiles.work]
 description = "Work environment configuration"
 bootstrap_script = "scripts/bootstrap-work.sh"
+created_on = "2024-06-10T15:23:00Z"
 files = [
     ".zshrc",
     ".gitconfig",
@@ -62,6 +63,7 @@ system_commands = [
 [secrets]
 age_key_file = "~/.config/ordinator/age/key.txt"
 sops_config = ".sops.yaml"
+key_rotation_interval_days = 90
 encrypted_patterns = [
     "*.enc.yaml",
     "*.enc.yml",

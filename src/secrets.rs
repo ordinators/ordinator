@@ -377,6 +377,8 @@ fn generate_age_key(
     profile: &str,
     force: bool,
 ) -> anyhow::Result<std::path::PathBuf> {
+    use chrono::Utc;
+    
     // Use the same config directory logic as create_sops_config
     let ordinator_config = std::env::var("ORDINATOR_CONFIG_DIR")
         .map(PathBuf::from)
@@ -415,6 +417,16 @@ fn generate_age_key(
     }
     fs::set_permissions(&key_path, fs::Permissions::from_mode(0o600))?;
     println!("✅ Age key generated: {}", key_path.display());
+    
+    // Set created_on timestamp in the profile config
+    let (mut config, config_path) = crate::config::Config::load()?;
+    if let Some(profile_config) = config.get_profile_mut(profile) {
+        let timestamp = Utc::now().to_rfc3339();
+        profile_config.created_on = Some(timestamp.clone());
+        config.save_to_file(&config_path)?;
+        println!("✅ Updated profile '{}' with created_on timestamp: {}", profile, timestamp);
+    }
+    
     Ok(key_path)
 }
 
@@ -689,6 +701,83 @@ pub fn encrypt_content_with_sops(content: &str) -> anyhow::Result<String> {
     Ok(encrypted_content)
 }
 
+/// Check if an age key needs rotation based on its creation date and configured interval
+pub fn check_key_rotation_needed(profile: &str) -> anyhow::Result<Option<String>> {
+    use std::time::UNIX_EPOCH;
+    use chrono::{DateTime, Utc};
+
+    // Load config to get rotation interval and created_on timestamp
+    let (config, _) = crate::config::Config::load()?;
+    
+    // Get rotation interval (default to 90 days if not configured)
+    let rotation_interval_days = config.secrets.key_rotation_interval_days.unwrap_or(90);
+    
+    // Get profile to check created_on timestamp
+    let profile_config = config.get_profile(profile)
+        .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found", profile))?;
+    
+    let created_on = match &profile_config.created_on {
+        Some(timestamp) => {
+            // Parse ISO 8601 timestamp
+            DateTime::parse_from_rfc3339(timestamp)
+                .map(|dt| dt.with_timezone(&Utc))
+                .map_err(|e| anyhow::anyhow!("Invalid created_on timestamp: {}", e))?
+        }
+        None => {
+            // Fall back to file creation time if created_on is missing
+            let ordinator_config = std::env::var("ORDINATOR_CONFIG_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| {
+                    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+                    PathBuf::from(home).join(".config").join("ordinator")
+                });
+            let age_dir = ordinator_config.join("age");
+            let key_filename = if profile == "default" {
+                "key.txt".to_string()
+            } else {
+                format!("{profile}.txt")
+            };
+            let key_path = age_dir.join(&key_filename);
+            
+            if key_path.exists() {
+                let metadata = fs::metadata(&key_path)?;
+                let created_time = metadata.created()
+                    .or_else(|_| metadata.modified())
+                    .map_err(|_| anyhow::anyhow!("Could not determine key file creation time"))?;
+                
+                let duration = created_time.duration_since(UNIX_EPOCH)
+                    .map_err(|_| anyhow::anyhow!("Invalid file timestamp"))?;
+                
+                DateTime::from_timestamp(duration.as_secs() as i64, 0)
+                    .ok_or_else(|| anyhow::anyhow!("Invalid timestamp conversion"))?
+            } else {
+                // No key file exists, no rotation needed
+                return Ok(None);
+            }
+        }
+    };
+    
+    // Calculate days since creation
+    let now = Utc::now();
+    let days_since_creation = (now - created_on).num_days();
+    
+    if days_since_creation >= rotation_interval_days as i64 {
+        let warning_message = format!(
+            "⚠️  Your age key for profile '{}' is {} days old (created {}). \
+            It is recommended to rotate your key every {} days. \
+            Run: ordinator age rotate-keys --profile {}",
+            profile,
+            days_since_creation,
+            created_on.format("%Y-%m-%d"),
+            rotation_interval_days,
+            profile
+        );
+        Ok(Some(warning_message))
+    } else {
+        Ok(None)
+    }
+}
+
 /// Rotate age keys for a profile, update SOPS config, and re-encrypt all secrets
 pub fn rotate_age_keys(profile: &str, backup_old_key: bool, _force: bool) -> anyhow::Result<()> {
     use std::fs;
@@ -727,6 +816,16 @@ pub fn rotate_age_keys(profile: &str, backup_old_key: bool, _force: bool) -> any
     // 5. Update ordinator config
     update_ordinator_config(profile, &new_key_path, &sops_config_path)?;
     println!("Updated ordinator.toml with new key and SOPS config");
+
+    // 5.5. Update created_on timestamp in profile config
+    let (mut config, config_path) = crate::config::Config::load()?;
+    if let Some(profile_config) = config.get_profile_mut(profile) {
+        use chrono::Utc;
+        let timestamp = Utc::now().to_rfc3339();
+        profile_config.created_on = Some(timestamp.clone());
+        config.save_to_file(&config_path)?;
+        println!("✅ Updated profile '{}' with new created_on timestamp: {}", profile, timestamp);
+    }
 
     // 6. Re-encrypt all secrets for this profile
     let (config, config_path) = crate::config::Config::load()?;
@@ -1505,5 +1604,103 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         println!("Result for special filename: {result:?}");
         assert!(result.is_ok());
         assert!(result.unwrap()); // Should detect secrets in special filename
+    }
+
+    #[test]
+    fn test_check_key_rotation_needed_recent_key() {
+        use crate::config::{Config, ProfileConfig, SecretsConfig};
+        use chrono::{Utc, Duration};
+        let mut config = Config::default();
+        let profile_name = "test".to_string();
+        let recent_time = (Utc::now() - Duration::days(10)).to_rfc3339();
+        let mut profile = ProfileConfig::default();
+        profile.created_on = Some(recent_time);
+        config.profiles.insert(profile_name.clone(), profile);
+        config.secrets.key_rotation_interval_days = Some(30);
+        // Save to temp file
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        config.save_to_file(temp_file.path()).unwrap();
+        std::env::set_var("ORDINATOR_CONFIG", temp_file.path());
+        let result = super::check_key_rotation_needed(&profile_name).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_check_key_rotation_needed_old_key() {
+        use crate::config::{Config, ProfileConfig, SecretsConfig};
+        use chrono::{Utc, Duration};
+        let mut config = Config::default();
+        let profile_name = "test".to_string();
+        let old_time = (Utc::now() - Duration::days(100)).to_rfc3339();
+        let mut profile = ProfileConfig::default();
+        profile.created_on = Some(old_time.clone());
+        config.profiles.insert(profile_name.clone(), profile);
+        config.secrets.key_rotation_interval_days = Some(30);
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        config.save_to_file(temp_file.path()).unwrap();
+        std::env::set_var("ORDINATOR_CONFIG", temp_file.path());
+        let result = super::check_key_rotation_needed(&profile_name).unwrap();
+        assert!(result.is_some());
+        let msg = result.unwrap();
+        assert!(msg.contains("is"));
+        assert!(msg.contains("days old"));
+        assert!(msg.contains("rotate"));
+    }
+
+    #[test]
+    fn test_check_key_rotation_needed_missing_created_on_defaults_to_file() {
+        use crate::config::{Config, ProfileConfig};
+        use std::fs;
+        let mut config = Config::default();
+        let profile_name = "test".to_string();
+        let profile = ProfileConfig::default();
+        config.profiles.insert(profile_name.clone(), profile);
+        config.secrets.key_rotation_interval_days = Some(30);
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        config.save_to_file(temp_file.path()).unwrap();
+        std::env::set_var("ORDINATOR_CONFIG", temp_file.path());
+        // Create a dummy key file with a recent mtime
+        let ordinator_config = std::env::temp_dir().join(".config").join("ordinator").join("age");
+        fs::create_dir_all(&ordinator_config).unwrap();
+        let key_path = ordinator_config.join("test.txt");
+        fs::write(&key_path, "dummy").unwrap();
+        let result = super::check_key_rotation_needed(&profile_name).unwrap();
+        // Should be None since file is new
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_check_key_rotation_needed_missing_interval_defaults_to_90() {
+        use crate::config::{Config, ProfileConfig};
+        use chrono::{Utc, Duration};
+        let mut config = Config::default();
+        let profile_name = "test".to_string();
+        let old_time = (Utc::now() - Duration::days(100)).to_rfc3339();
+        let mut profile = ProfileConfig::default();
+        profile.created_on = Some(old_time.clone());
+        config.profiles.insert(profile_name.clone(), profile);
+        // No interval set
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        config.save_to_file(temp_file.path()).unwrap();
+        std::env::set_var("ORDINATOR_CONFIG", temp_file.path());
+        let result = super::check_key_rotation_needed(&profile_name).unwrap();
+        // 100 > 90, so should warn
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_check_key_rotation_needed_nonexistent_key_file() {
+        use crate::config::{Config, ProfileConfig};
+        let mut config = Config::default();
+        let profile_name = "test".to_string();
+        let profile = ProfileConfig::default();
+        config.profiles.insert(profile_name.clone(), profile);
+        config.secrets.key_rotation_interval_days = Some(30);
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        config.save_to_file(temp_file.path()).unwrap();
+        std::env::set_var("ORDINATOR_CONFIG", temp_file.path());
+        // No key file exists
+        let result = super::check_key_rotation_needed(&profile_name).unwrap();
+        assert!(result.is_none());
     }
 }
