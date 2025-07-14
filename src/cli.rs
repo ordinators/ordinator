@@ -1658,7 +1658,10 @@ pub async fn run(args: Args) -> Result<()> {
 
             // Handle secrets decryption if not skipped
             if !skip_secrets {
-                use crate::secrets::{decrypt_file_with_sops, is_file_encrypted, age_key_exists, handle_interactive_age_key_setup};
+                use crate::secrets::{
+                    age_key_exists, decrypt_file_with_sops, handle_interactive_age_key_setup,
+                    is_file_encrypted,
+                };
                 use std::fs;
 
                 let profile_config = config.get_profile(&profile).unwrap();
@@ -1669,7 +1672,7 @@ pub async fn run(args: Args) -> Result<()> {
                         if !args.quiet {
                             eprintln!("AGE key not found for profile '{profile}'");
                         }
-                        
+
                         if args.dry_run {
                             eprintln!("DRY-RUN: Would prompt for age key setup");
                         } else {
@@ -1683,7 +1686,9 @@ pub async fn run(args: Args) -> Result<()> {
                                 Err(e) => {
                                     if !args.quiet {
                                         eprintln!("AGE key setup failed: {e}");
-                                        eprintln!("Continuing with apply without secrets decryption");
+                                        eprintln!(
+                                            "Continuing with apply without secrets decryption"
+                                        );
                                     }
                                     // Set flag to skip secrets decryption
                                     skip_secrets_decryption = true;
@@ -1744,7 +1749,9 @@ pub async fn run(args: Args) -> Result<()> {
                                 fs::copy(&encrypted_file_path, &temp_decrypted)?;
 
                                 // Decrypt the temporary file
-                                let decryption_result = match decrypt_file_with_sops(temp_decrypted.to_str().unwrap()) {
+                                let decryption_result = match decrypt_file_with_sops(
+                                    temp_decrypted.to_str().unwrap(),
+                                ) {
                                     Ok(()) => Ok(()),
                                     Err(e) => {
                                         // Check if this is a key mismatch error
@@ -1756,7 +1763,9 @@ pub async fn run(args: Args) -> Result<()> {
                                             }
                                             Ok(false) => {
                                                 // Retry decryption with new key
-                                                decrypt_file_with_sops(temp_decrypted.to_str().unwrap())
+                                                decrypt_file_with_sops(
+                                                    temp_decrypted.to_str().unwrap(),
+                                                )
                                             }
                                             Err(e) => {
                                                 return Err(e);
@@ -1765,9 +1774,7 @@ pub async fn run(args: Args) -> Result<()> {
                                     }
                                 };
 
-                                if let Err(e) = decryption_result {
-                                    return Err(e);
-                                }
+                                decryption_result?;
 
                                 // Read the decrypted content
                                 let decrypted_content = fs::read_to_string(&temp_decrypted)?;
@@ -2450,7 +2457,8 @@ pub async fn run(args: Args) -> Result<()> {
                 }
 
                 // Check if key rotation is needed
-                if let Ok(Some(warning)) = crate::secrets::check_key_rotation_needed(&profile_name) {
+                if let Ok(Some(warning)) = crate::secrets::check_key_rotation_needed(&profile_name)
+                {
                     eprintln!("{warning}");
                 }
 
@@ -2964,7 +2972,9 @@ pub async fn run(args: Args) -> Result<()> {
                 // Check all profiles for key rotation needs
                 let (config, _) = Config::load()?;
                 for profile_name in config.list_profiles() {
-                    if let Ok(Some(warning)) = crate::secrets::check_key_rotation_needed(profile_name) {
+                    if let Ok(Some(warning)) =
+                        crate::secrets::check_key_rotation_needed(profile_name)
+                    {
                         eprintln!("{warning}");
                     }
                 }
@@ -2995,7 +3005,9 @@ pub async fn run(args: Args) -> Result<()> {
                 // Check all profiles for key rotation needs
                 let (config, _) = Config::load()?;
                 for profile_name in config.list_profiles() {
-                    if let Ok(Some(warning)) = crate::secrets::check_key_rotation_needed(profile_name) {
+                    if let Ok(Some(warning)) =
+                        crate::secrets::check_key_rotation_needed(profile_name)
+                    {
                         eprintln!("{warning}");
                     }
                 }

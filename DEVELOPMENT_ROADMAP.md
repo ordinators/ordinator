@@ -575,20 +575,20 @@ ordinator commit -m "Add sensitive files"
 - [x] Backward compatibility: if `created_on` is missing, fall back to file creation time or prompt to set
 - [x] Add tests for metadata tracking, interval checking, and prompting logic
 - [x] Document the feature in PRD.md and README
-- [ ] Detect missing AGE key during `ordinator apply --profile <name>`
-- [ ] Implement interactive prompting for AGE key setup
-- [ ] Support two scenarios:
-  - [ ] Scenario 1: Generate new AGE key (first-time setup)
-  - [ ] Scenario 2: Import existing AGE key (multi-machine replication)
-- [ ] Add key validation for imported keys
-- [ ] Implement secure key storage with proper permissions (600)
-- [ ] Generate corresponding SOPS config for imported keys
-- [ ] Update `ordinator.toml` with key and config paths
-- [ ] Add clear user guidance and error messages
-- [ ] Ensure backward compatibility with existing workflows
-- [ ] Add comprehensive test coverage for both scenarios
-- [ ] Update documentation to reflect new behavior
-- [ ] Update README quick start section to remove `ordinator secrets setup` requirement since apply will handle AGE key setup through prompts
+- [x] Detect missing AGE key during `ordinator apply --profile <name>`
+- [x] Implement interactive prompting for AGE key setup
+- [x] Support two scenarios:
+  - [x] Scenario 1: Generate new AGE key (first-time setup)
+  - [x] Scenario 2: Import existing AGE key (multi-machine replication)
+- [x] Add key validation for imported keys
+- [x] Implement secure key storage with proper permissions (600)
+- [x] Generate corresponding SOPS config for imported keys
+- [x] Update `ordinator.toml` with key and config paths
+- [x] Add clear user guidance and error messages
+- [x] Ensure backward compatibility with existing workflows
+- [x] Add comprehensive test coverage for both scenarios
+- [x] Update documentation to reflect new behavior
+- [x] Update README quick start section to remove `ordinator secrets setup` requirement since apply will handle AGE key setup through prompts
 
 **Scenario 1 - New Key Generation:**
 ```
@@ -622,54 +622,63 @@ AGE-SECRET-KEY-1abc123...
 - [x] Backward compatibility: missing `key_rotation_interval_days` uses default behavior (no warnings)
 - [x] CLI commands check key age on secrets/age operations
 - [x] Integration tests cover complete key rotation workflow
-- [ ] Missing AGE key is detected during apply
-- [ ] Interactive prompts work for both scenarios
-- [ ] New key generation works correctly
-- [ ] Existing key import validates key format
-- [ ] Imported keys are stored securely with proper permissions
-- [ ] SOPS config is generated correctly for imported keys
-- [ ] `ordinator.toml` is updated with correct paths
-- [ ] Apply continues successfully after key setup
-- [ ] Error handling works for invalid keys
-- [ ] Backward compatibility maintained for existing workflows
-- [ ] Integration tests cover both scenarios
-- [ ] CLI tests verify prompting behavior
+- [x] Missing AGE key is detected during apply
+- [x] Interactive prompts work for both scenarios
+- [x] New key generation works correctly
+- [x] Existing key import validates key format
+- [x] Imported keys are stored securely with proper permissions
+- [x] SOPS config is generated correctly for imported keys
+- [x] `ordinator.toml` is updated with correct paths
+- [x] Apply continues successfully after key setup
+- [x] Error handling works for invalid keys
+- [x] Backward compatibility maintained for existing workflows
+- [x] Integration tests cover both scenarios
+- [x] CLI tests verify prompting behavior
 
 **Acceptance Criteria:**
 ```bash
-# Scenario 1: First-time setup (NOT IMPLEMENTED)
+# Scenario 1: First-time setup (IMPLEMENTED)
 ordinator apply --profile work
-# Currently fails with missing age key error
-# Should prompt for new key generation (not implemented)
+# Detects missing age key and prompts for setup
+# Guides user through new key generation or key import
+# Continues with apply process after key setup
 
-# Scenario 2: Multi-machine replication (NOT IMPLEMENTED)
+# Scenario 2: Multi-machine replication (IMPLEMENTED)
 ordinator apply --profile work
-# Currently fails with missing age key error
-# Should prompt for existing key import (not implemented)
+# Detects missing age key and prompts for setup
+# Allows importing existing key from another machine
+# Validates key format and stores securely
 
-# Error handling (NOT IMPLEMENTED)
+# Error handling (IMPLEMENTED)
 ordinator apply --profile work
-# Currently fails with missing age key error
-# Should handle invalid key format gracefully (not implemented)
+# Handles invalid key format gracefully
+# Provides clear error messages and recovery guidance
+# Allows skipping secrets with --skip-secrets flag
+
+# Key mismatch handling (IMPLEMENTED)
+ordinator apply --profile work
+# Detects when encrypted secrets can't be decrypted with current key
+# Provides options: skip file, cancel operation, or import correct key
+# Continues with other apply operations even if some secrets can't be decrypted
 ```
 
 **Current Status:**
 - ✅ Key rotation tracking and warnings are implemented
 - ✅ Age key creation with timestamps is implemented
-- ❌ Interactive age key setup during apply is NOT implemented
-- ❌ Missing key detection during apply is NOT implemented
-- ❌ Key import functionality is NOT implemented
+- ✅ Interactive age key setup during apply is implemented
+- ✅ Missing key detection during apply is implemented
+- ✅ Key import functionality is implemented
 
 **Additional Tasks for Key Mismatch Handling:**
-- [ ] Detect when new age key cannot decrypt existing encrypted secrets
-- [ ] Implement graceful error handling for key mismatch scenarios
-- [ ] Provide clear user guidance when decryption fails due to key mismatch
-- [ ] Add option to skip secrets decryption and continue with other apply operations
-- [ ] Show list of files that cannot be decrypted with the new key
-- [ ] Add warning messages explaining the key mismatch issue
-- [ ] Implement `--skip-secrets` flag handling in apply command
-- [ ] Add tests for key mismatch detection and graceful degradation
-- [ ] Update documentation to explain key mismatch scenarios and recovery options
+- [x] Detect when new age key cannot decrypt existing encrypted secrets
+- [x] Implement graceful error handling for key mismatch scenarios
+- [x] Provide clear user guidance when decryption fails due to key mismatch
+- [x] Add option to skip secrets decryption and continue with other apply operations
+- [x] Show list of files that cannot be decrypted with the new key
+- [x] Add warning messages explaining the key mismatch issue
+- [x] Implement `--skip-secrets` flag handling in apply command
+- [x] Add tests for key mismatch detection and graceful degradation
+- [x] Update documentation to explain key mismatch scenarios and recovery options
 
 **Key Mismatch Scenario:**
 ```
@@ -689,7 +698,7 @@ ordinator apply --profile work
    Or continue without secrets: ordinator apply --profile work --skip-secrets
 ```
 
-**Completion Statement:** This completes Phase 4.8 (AGE Key Prompting During Apply) and prepares for Phase 4.9 (Enhanced README with Homebrew Packages Section).
+**Completion Statement:** This completes Phase 4.8 (AGE Key Prompting During Apply) with all core functionality implemented. The interactive age key setup, key mismatch handling, and `--skip-secrets` flag are all working. Documentation has been updated to explain the new flows. This prepares for Phase 4.9 (Enhanced README with Homebrew Packages Section).
 
 ### 4.9 Enhanced README with Homebrew Packages Section
 **Priority:** Medium  

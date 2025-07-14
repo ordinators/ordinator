@@ -378,7 +378,7 @@ fn generate_age_key(
     force: bool,
 ) -> anyhow::Result<std::path::PathBuf> {
     use chrono::Utc;
-    
+
     // Use the same config directory logic as create_sops_config
     let ordinator_config = std::env::var("ORDINATOR_CONFIG_DIR")
         .map(PathBuf::from)
@@ -417,16 +417,16 @@ fn generate_age_key(
     }
     fs::set_permissions(&key_path, fs::Permissions::from_mode(0o600))?;
     println!("✅ Age key generated: {}", key_path.display());
-    
+
     // Set created_on timestamp in the profile config
     let (mut config, config_path) = crate::config::Config::load()?;
     if let Some(profile_config) = config.get_profile_mut(profile) {
         let timestamp = Utc::now().to_rfc3339();
         profile_config.created_on = Some(timestamp.clone());
         config.save_to_file(&config_path)?;
-        println!("✅ Updated profile '{}' with created_on timestamp: {}", profile, timestamp);
+        println!("✅ Updated profile '{profile}' with created_on timestamp: {timestamp}");
     }
-    
+
     Ok(key_path)
 }
 
@@ -709,7 +709,7 @@ pub fn age_key_exists(profile: &str) -> bool {
             let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
             PathBuf::from(home).join(".config").join("ordinator")
         });
-    
+
     let age_dir = ordinator_config.join("age");
     let key_filename = if profile == "default" {
         "key.txt".to_string()
@@ -717,7 +717,7 @@ pub fn age_key_exists(profile: &str) -> bool {
         format!("{profile}.txt")
     };
     let key_path = age_dir.join(key_filename);
-    
+
     key_path.exists()
 }
 
@@ -729,7 +729,7 @@ pub fn get_age_key_path(profile: &str) -> PathBuf {
             let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
             PathBuf::from(home).join(".config").join("ordinator")
         });
-    
+
     let age_dir = ordinator_config.join("age");
     let key_filename = if profile == "default" {
         "key.txt".to_string()
@@ -741,19 +741,20 @@ pub fn get_age_key_path(profile: &str) -> PathBuf {
 
 /// Check if an age key needs rotation based on its creation date and configured interval
 pub fn check_key_rotation_needed(profile: &str) -> anyhow::Result<Option<String>> {
-    use std::time::UNIX_EPOCH;
     use chrono::{DateTime, Utc};
+    use std::time::UNIX_EPOCH;
 
     // Load config to get rotation interval and created_on timestamp
     let (config, config_path) = crate::config::Config::load()?;
-    
+
     // Get rotation interval (default to 90 days if not configured)
     let rotation_interval_days = config.secrets.key_rotation_interval_days.unwrap_or(90);
-    
+
     // Get profile to check created_on timestamp
-    let profile_config = config.get_profile(profile)
+    let profile_config = config
+        .get_profile(profile)
         .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found", profile))?;
-    
+
     let created_on = match &profile_config.created_on {
         Some(timestamp) => {
             // Parse ISO 8601 timestamp
@@ -763,7 +764,9 @@ pub fn check_key_rotation_needed(profile: &str) -> anyhow::Result<Option<String>
         }
         None => {
             // Fall back to file creation time if created_on is missing
-            let base_dir = config_path.parent().unwrap_or_else(|| std::path::Path::new("."));
+            let base_dir = config_path
+                .parent()
+                .unwrap_or_else(|| std::path::Path::new("."));
             let age_dir = base_dir.join("age");
             let key_filename = if profile == "default" {
                 "key.txt".to_string()
@@ -771,13 +774,15 @@ pub fn check_key_rotation_needed(profile: &str) -> anyhow::Result<Option<String>
                 format!("{profile}.txt")
             };
             let key_path = age_dir.join(&key_filename);
-            
+
             if key_path.exists() {
                 let metadata = std::fs::metadata(&key_path)?;
-                let created_time = metadata.created()
+                let created_time = metadata
+                    .created()
                     .or_else(|_| metadata.modified())
                     .map_err(|_| anyhow::anyhow!("Could not determine key file creation time"))?;
-                let duration = created_time.duration_since(UNIX_EPOCH)
+                let duration = created_time
+                    .duration_since(UNIX_EPOCH)
                     .map_err(|_| anyhow::anyhow!("Invalid file timestamp"))?;
                 DateTime::from_timestamp(duration.as_secs() as i64, 0)
                     .ok_or_else(|| anyhow::anyhow!("Invalid timestamp conversion"))?
@@ -787,11 +792,11 @@ pub fn check_key_rotation_needed(profile: &str) -> anyhow::Result<Option<String>
             }
         }
     };
-    
+
     // Calculate days since creation
     let now = Utc::now();
     let days_since_creation = (now - created_on).num_days();
-    
+
     if days_since_creation >= rotation_interval_days as i64 {
         let warning_message = format!(
             "⚠️  Your age key for profile '{}' is {} days old (created {}). \
@@ -855,7 +860,7 @@ pub fn rotate_age_keys(profile: &str, backup_old_key: bool, _force: bool) -> any
         let timestamp = Utc::now().to_rfc3339();
         profile_config.created_on = Some(timestamp.clone());
         config.save_to_file(&config_path)?;
-        println!("✅ Updated profile '{}' with new created_on timestamp: {}", profile, timestamp);
+        println!("✅ Updated profile '{profile}' with new created_on timestamp: {timestamp}");
     }
 
     // 6. Re-encrypt all secrets for this profile
@@ -892,14 +897,14 @@ pub fn rotate_age_keys(profile: &str, backup_old_key: bool, _force: bool) -> any
 /// Handle interactive age key setup during apply
 pub fn handle_interactive_age_key_setup(profile: &str) -> anyhow::Result<()> {
     use std::io::{self, Write};
-    
+
     println!("❌ AGE key not found for profile '{profile}'");
     println!("Would you like to generate a new AGE key? (y/N): ");
     io::stdout().flush()?;
-    
+
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
-    
+
     match input.trim().to_lowercase().as_str() {
         "y" | "yes" => {
             // Generate new key
@@ -909,11 +914,11 @@ pub fn handle_interactive_age_key_setup(profile: &str) -> anyhow::Result<()> {
                     let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
                     PathBuf::from(home).join(".config").join("ordinator")
                 });
-            
+
             let age_key_path = generate_age_key(&ordinator_config, profile, false)?;
             let sops_config_path = create_sops_config(profile, &age_key_path, false)?;
             update_ordinator_config(profile, &age_key_path, &sops_config_path)?;
-            
+
             println!("✅ AGE key generated successfully");
             println!("   Key stored at: {}", age_key_path.display());
             println!("   SOPS config created at: {}", sops_config_path.display());
@@ -923,36 +928,38 @@ pub fn handle_interactive_age_key_setup(profile: &str) -> anyhow::Result<()> {
             // Ask if they want to import existing key
             println!("Do you have an existing AGE key to import? (y/N): ");
             io::stdout().flush()?;
-            
+
             let mut import_input = String::new();
             io::stdin().read_line(&mut import_input)?;
-            
+
             match import_input.trim().to_lowercase().as_str() {
                 "y" | "yes" => {
                     println!("Please paste your AGE private key (it will be stored securely):");
                     io::stdout().flush()?;
-                    
+
                     let mut key_input = String::new();
                     io::stdin().read_line(&mut key_input)?;
                     let key_content = key_input.trim();
-                    
+
                     // Validate key format (basic check)
                     if !key_content.starts_with("AGE-SECRET-KEY-") {
-                        println!("❌ Invalid AGE key format. The key must start with 'AGE-SECRET-KEY-'.");
+                        println!(
+                            "❌ Invalid AGE key format. The key must start with 'AGE-SECRET-KEY-'."
+                        );
                         return Err(anyhow::anyhow!("Invalid AGE key format"));
                     }
-                    
+
                     // Store the imported key
                     let key_path = get_age_key_path(profile);
                     let key_dir = key_path.parent().unwrap();
                     fs::create_dir_all(key_dir)?;
                     fs::write(&key_path, key_content)?;
                     fs::set_permissions(&key_path, fs::Permissions::from_mode(0o600))?;
-                    
+
                     // Create SOPS config
                     let sops_config_path = create_sops_config(profile, &key_path, false)?;
                     update_ordinator_config(profile, &key_path, &sops_config_path)?;
-                    
+
                     println!("✅ AGE key imported successfully");
                     println!("   Key stored at: {}", key_path.display());
                     println!("   SOPS config created at: {}", sops_config_path.display());
@@ -965,6 +972,94 @@ pub fn handle_interactive_age_key_setup(profile: &str) -> anyhow::Result<()> {
                 }
             }
         }
+    }
+}
+
+/// Check if decryption fails due to key mismatch and handle gracefully
+pub fn handle_key_mismatch_error(
+    encrypted_file_path: &Path,
+    error: &anyhow::Error,
+) -> anyhow::Result<bool> {
+    use std::io::{self, Write};
+
+    // Check if the error indicates a key mismatch (SOPS decryption failure)
+    let error_msg = error.to_string().to_lowercase();
+    if error_msg.contains("failed to decrypt") || error_msg.contains("no decryption key") {
+        println!(
+            "⚠️  Unable to decrypt secret: {}",
+            encrypted_file_path.display()
+        );
+        println!("   The current AGE key cannot decrypt this file.");
+        println!("   This usually means the secrets were encrypted with a different key.");
+        println!();
+        println!("What would you like to do?");
+        println!(
+            "  1. Skip this file and continue (the secret will NOT be available on this machine)"
+        );
+        println!("  2. Cancel the apply operation");
+        println!(
+            "  3. Import the correct AGE key for this profile (will overwrite the current key)"
+        );
+        println!();
+        print!("Enter your choice [1/2/3, default: 1]: ");
+        io::stdout().flush()?;
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+
+        match input.trim() {
+            "1" | "" => {
+                println!(
+                    "⚠️  Skipped encrypted file: {}",
+                    encrypted_file_path.display()
+                );
+                println!("   You can try again later with: ordinator age setup --profile default");
+                Ok(true) // Skip this file
+            }
+            "2" => {
+                println!("❌ Apply operation cancelled by user.");
+                println!("   You can retry after importing the correct AGE key with: ordinator age setup --profile default");
+                Err(anyhow::anyhow!("User cancelled apply due to key mismatch"))
+            }
+            "3" => {
+                println!("Please paste the correct AGE private key:");
+                io::stdout().flush()?;
+
+                let mut key_input = String::new();
+                io::stdin().read_line(&mut key_input)?;
+                let key_content = key_input.trim();
+
+                // Validate key format
+                if !key_content.starts_with("AGE-SECRET-KEY-") {
+                    println!(
+                        "❌ Invalid AGE key format. The key must start with 'AGE-SECRET-KEY-'."
+                    );
+                    return Err(anyhow::anyhow!("Invalid AGE key format"));
+                }
+
+                // Store the imported key (we'll need to determine the profile)
+                // For now, we'll use a default approach
+                let profile = "default"; // TODO: Determine current profile
+                let key_path = get_age_key_path(profile);
+                let key_dir = key_path.parent().unwrap();
+                fs::create_dir_all(key_dir)?;
+                fs::write(&key_path, key_content)?;
+                fs::set_permissions(&key_path, fs::Permissions::from_mode(0o600))?;
+
+                println!("✅ AGE key imported and stored at: {}", key_path.display());
+                println!("   Retrying decryption...");
+
+                Ok(false) // Retry decryption
+            }
+            _ => {
+                println!("⚠️  Invalid choice. Skipping file.");
+                println!("   You can try again later with: ordinator age setup --profile default");
+                Ok(true) // Skip this file
+            }
+        }
+    } else {
+        // Not a key mismatch error, re-raise the original error
+        Err(anyhow::anyhow!("Decryption failed: {}", error))
     }
 }
 
@@ -1719,12 +1814,14 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
     #[test]
     fn test_check_key_rotation_needed_recent_key() {
         use crate::config::{Config, ProfileConfig, SecretsConfig};
-        use chrono::{Utc, Duration};
+        use chrono::{Duration, Utc};
         let mut config = Config::default();
         let profile_name = "test".to_string();
         let recent_time = (Utc::now() - Duration::days(10)).to_rfc3339();
-        let mut profile = ProfileConfig::default();
-        profile.created_on = Some(recent_time);
+        let profile = ProfileConfig {
+            created_on: Some(recent_time),
+            ..Default::default()
+        };
         config.profiles.insert(profile_name.clone(), profile);
         config.secrets.key_rotation_interval_days = Some(30);
         // Save to temp file
@@ -1738,12 +1835,14 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
     #[test]
     fn test_check_key_rotation_needed_old_key() {
         use crate::config::{Config, ProfileConfig, SecretsConfig};
-        use chrono::{Utc, Duration};
+        use chrono::{Duration, Utc};
         let mut config = Config::default();
         let profile_name = "test".to_string();
         let old_time = (Utc::now() - Duration::days(100)).to_rfc3339();
-        let mut profile = ProfileConfig::default();
-        profile.created_on = Some(old_time.clone());
+        let profile = ProfileConfig {
+            created_on: Some(old_time.clone()),
+            ..Default::default()
+        };
         config.profiles.insert(profile_name.clone(), profile);
         config.secrets.key_rotation_interval_days = Some(30);
         let temp_file = tempfile::NamedTempFile::new().unwrap();
@@ -1769,10 +1868,11 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         let temp_file = tempfile::NamedTempFile::new().unwrap();
         config.save_to_file(temp_file.path()).unwrap();
         std::env::set_var("ORDINATOR_CONFIG", temp_file.path());
-        // Create a dummy key file with a recent mtime
-        let ordinator_config = std::env::temp_dir().join(".config").join("ordinator").join("age");
-        fs::create_dir_all(&ordinator_config).unwrap();
-        let key_path = ordinator_config.join("test.txt");
+        // Create a dummy key file with a recent mtime in the correct location
+        let config_dir = temp_file.path().parent().unwrap();
+        let age_dir = config_dir.join("age");
+        fs::create_dir_all(&age_dir).unwrap();
+        let key_path = age_dir.join("test.txt");
         fs::write(&key_path, "dummy").unwrap();
         let result = super::check_key_rotation_needed(&profile_name).unwrap();
         // Should be None since file is new
@@ -1782,12 +1882,14 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
     #[test]
     fn test_check_key_rotation_needed_missing_interval_defaults_to_90() {
         use crate::config::{Config, ProfileConfig};
-        use chrono::{Utc, Duration};
+        use chrono::{Duration, Utc};
         let mut config = Config::default();
         let profile_name = "test".to_string();
         let old_time = (Utc::now() - Duration::days(100)).to_rfc3339();
-        let mut profile = ProfileConfig::default();
-        profile.created_on = Some(old_time.clone());
+        let profile = ProfileConfig {
+            created_on: Some(old_time.clone()),
+            ..Default::default()
+        };
         config.profiles.insert(profile_name.clone(), profile);
         // No interval set
         let temp_file = tempfile::NamedTempFile::new().unwrap();
@@ -1812,78 +1914,5 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         // No key file exists
         let result = super::check_key_rotation_needed(&profile_name).unwrap();
         assert!(result.is_none());
-    }
-}
-
-/// Check if decryption fails due to key mismatch and handle gracefully
-pub fn handle_key_mismatch_error(encrypted_file_path: &Path, error: &anyhow::Error) -> anyhow::Result<bool> {
-    use std::io::{self, Write};
-    
-    // Check if the error indicates a key mismatch (SOPS decryption failure)
-    let error_msg = error.to_string().to_lowercase();
-    if error_msg.contains("failed to decrypt") || error_msg.contains("no decryption key") {
-        println!("⚠️  Unable to decrypt secret: {}", encrypted_file_path.display());
-        println!("   The current AGE key cannot decrypt this file.");
-        println!("   This usually means the secrets were encrypted with a different key.");
-        println!();
-        println!("What would you like to do?");
-        println!("  1. Skip this file and continue (the secret will NOT be available on this machine)");
-        println!("  2. Cancel the apply operation");
-        println!("  3. Import the correct AGE key for this profile (will overwrite the current key)");
-        println!();
-        print!("Enter your choice [1/2/3, default: 1]: ");
-        io::stdout().flush()?;
-        
-        let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
-        
-        match input.trim() {
-            "1" | "" => {
-                println!("⚠️  Skipped encrypted file: {}", encrypted_file_path.display());
-                println!("   You can try again later with: ordinator age setup --profile default");
-                Ok(true) // Skip this file
-            }
-            "2" => {
-                println!("❌ Apply operation cancelled by user.");
-                println!("   You can retry after importing the correct AGE key with: ordinator age setup --profile default");
-                Err(anyhow::anyhow!("User cancelled apply due to key mismatch"))
-            }
-            "3" => {
-                println!("Please paste the correct AGE private key:");
-                io::stdout().flush()?;
-                
-                let mut key_input = String::new();
-                io::stdin().read_line(&mut key_input)?;
-                let key_content = key_input.trim();
-                
-                // Validate key format
-                if !key_content.starts_with("AGE-SECRET-KEY-") {
-                    println!("❌ Invalid AGE key format. The key must start with 'AGE-SECRET-KEY-'.");
-                    return Err(anyhow::anyhow!("Invalid AGE key format"));
-                }
-                
-                // Store the imported key (we'll need to determine the profile)
-                // For now, we'll use a default approach
-                let profile = "default"; // TODO: Determine current profile
-                let key_path = get_age_key_path(profile);
-                let key_dir = key_path.parent().unwrap();
-                fs::create_dir_all(key_dir)?;
-                fs::write(&key_path, key_content)?;
-                fs::set_permissions(&key_path, fs::Permissions::from_mode(0o600))?;
-                
-                println!("✅ AGE key imported and stored at: {}", key_path.display());
-                println!("   Retrying decryption...");
-                
-                Ok(false) // Retry decryption
-            }
-            _ => {
-                println!("⚠️  Invalid choice. Skipping file.");
-                println!("   You can try again later with: ordinator age setup --profile default");
-                Ok(true) // Skip this file
-            }
-        }
-    } else {
-        // Not a key mismatch error, re-raise the original error
-        Err(anyhow::anyhow!("Decryption failed: {}", error))
     }
 }

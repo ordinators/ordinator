@@ -172,6 +172,63 @@ ordinator commit -m "Update encrypted configuration files"
 ordinator push
 ```
 
+### Interactive Age Key Setup Workflow
+
+When setting up a new machine or profile with encrypted secrets:
+
+```bash
+# 1. Clone repository with encrypted secrets
+git clone https://github.com/username/dotfiles.git ~/.dotfiles
+cd ~/.dotfiles
+
+# 2. Apply profile (will prompt for age key setup)
+ordinator apply --profile work
+
+# 3. System detects missing age key and prompts:
+# "No age key found for profile 'work'. Would you like to set up age encryption?"
+# 
+# Choose option 1: Generate new AGE key
+# - System creates new age key at ~/.config/ordinator/age/work.txt
+# - Continues with apply process
+# - All secrets are decrypted and placed at target locations
+
+# Or choose option 2: Import existing AGE key
+# - Enter path to existing age key file
+# - System copies it to the correct location
+# - Continues with apply process
+
+# Or choose option 3: Skip secrets
+# - Apply continues without decrypting secrets
+# - Useful when you don't have the original key
+```
+
+### Key Mismatch Recovery Workflow
+
+When encrypted secrets were created with a different age key:
+
+```bash
+# 1. Apply profile with encrypted secrets
+ordinator apply --profile work
+
+# 2. System detects key mismatch and prompts:
+# "Unable to decrypt secret: ~/.ssh/config"
+# "This file was encrypted with a different age key than the one currently available."
+# 
+# Choose option 1: Skip this file
+# - Apply continues with other files
+# - This secret remains encrypted and unavailable
+# - Other secrets are decrypted normally
+
+# Choose option 2: Import the correct AGE key
+# - Enter path to the correct age key file
+# - System uses it to decrypt the file
+# - Apply continues with all secrets decrypted
+
+# Choose option 3: Cancel
+# - Apply operation stops
+# - No changes are made to the system
+```
+
 ### Secrets Array Management
 
 The `secrets` array in your configuration tracks direct paths to source files:
@@ -376,6 +433,76 @@ ordinator apply --profile work --bootstrap
 bash ~/.dotfiles/scripts/bootstrap-work.sh
 ```
 
+### Interactive Age Key Setup
+
+When applying a profile with encrypted secrets but no age key is found, Ordinator will automatically prompt for setup:
+
+```bash
+# Apply a profile with encrypted secrets but no age key
+ordinator apply --profile work
+
+# The system will detect missing age key and prompt:
+# "No age key found for profile 'work'. Would you like to set up age encryption?"
+# Options: Generate new key, Import existing key, or Skip secrets
+
+# Choose to generate a new key:
+# 1. Generate new AGE key
+# The system will create the key and continue with apply
+
+# Or choose to import an existing key:
+# 2. Import existing AGE key
+# Enter the path to your existing age key file
+# The system will copy it and continue with apply
+
+# Or skip secrets entirely:
+# 3. Skip secrets
+# The apply will continue without decrypting secrets
+```
+
+### Handling Key Mismatch Scenarios
+
+If encrypted secrets were created with a different age key than the one currently available:
+
+```bash
+# Apply a profile with encrypted secrets
+ordinator apply --profile work
+
+# If key mismatch is detected, the system will prompt:
+# "Unable to decrypt secret: ~/.ssh/config"
+# "This file was encrypted with a different age key than the one currently available."
+# Options: Skip this file, Cancel operation, or Import the correct key
+
+# Choose to skip the file:
+# 1. Skip this file
+# The apply continues with other files, skipping this secret
+
+# Choose to import the correct key:
+# 2. Import the correct AGE key
+# Enter the path to the correct age key file
+# The system will use it to decrypt the file
+
+# Choose to cancel:
+# 3. Cancel
+# The apply operation stops
+```
+
+### Skipping Secrets During Apply
+
+You can skip all secrets processing during apply using the `--skip-secrets` flag:
+
+```bash
+# Apply without decrypting secrets
+ordinator apply --profile work --skip-secrets
+
+# Apply without secrets, bootstrap, or brew packages
+ordinator apply --profile work --skip-secrets --skip-bootstrap --skip-brew
+
+# Useful when:
+# - You don't have the age key for this profile
+# - You want to set up the environment without secrets first
+# - You're troubleshooting encryption issues
+```
+
 ### Collaborative Development
 
 ```bash
@@ -465,6 +592,27 @@ ordinator validate-config
 
 # Check for issues
 ordinator secrets scan
+```
+
+### Troubleshooting Age Key Issues
+
+```bash
+# If you get "No age key found for profile 'work'"
+ordinator apply --profile work
+# The system will automatically prompt for age key setup
+
+# If you get "Unable to decrypt secret" (key mismatch)
+ordinator apply --profile work
+# The system will prompt with options to skip, cancel, or import the correct key
+
+# If you want to skip all secrets processing
+ordinator apply --profile work --skip-secrets
+
+# If you need to manually set up age keys
+ordinator secrets setup --profile work
+
+# If you need to validate age key setup
+ordinator secrets validate
 ```
 
 This examples guide covers the most common workflows and use cases for Ordinator. For more detailed information, see the main documentation and command reference. 

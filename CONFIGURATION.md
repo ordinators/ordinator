@@ -103,7 +103,7 @@ update_on_changes = ["profiles", "bootstrap"]
   - You can edit the script using `ordinator bootstrap --edit --profile <name>`
 - `enabled` (bool): Whether this profile is active.
 - `description` (string, optional): Description of the profile.
-- `created_on` (string, optional): ISO 8601 timestamp of when the age key was created or last rotated. Used for key rotation reminders. Set automatically by Ordinator.
+- `created_on` (string, optional): ISO 8601 timestamp of when the age key was created or last rotated. Used for key rotation reminders. Set automatically by Ordinator during interactive key setup or manual key generation.
 - `exclude` (array of strings): Glob patterns for files or directories to exclude for this profile (overrides or adds to global exclusions).
 
 ## Bootstrap Scripts
@@ -175,8 +175,9 @@ description = "Laptop setup with minimal tools"
   - Must contain a valid age key in the format `age1...`
   - Used for both encryption and decryption operations
   - Default location: `~/.config/ordinator/age/key.txt` (or `{profile}.txt` for profile-specific keys)
-  - If not specified, SOPS will use default key locations
+  - If not specified, Ordinator will prompt for interactive setup during apply
   - **Security Note:** Decrypted secrets are never stored in the repository. They are only present in memory or at their destination after `ordinator apply`.
+  - **Interactive Setup:** If no key is found during apply, Ordinator will guide you through generating a new key or importing an existing one.
 
 - `sops_config` (string, optional): Path to the SOPS configuration file.
   - Used to configure SOPS encryption settings
@@ -398,28 +399,127 @@ When you run `ordinator secrets setup`, the following happens:
    - Format: Age v2 private key
    - Used for both encryption and decryption
 
-3. **SOPS Configuration**: Creates `.sops.yaml` configuration file
-   - Location: `~/.config/ordinator/.sops.{profile}.yaml`
-   - Configures age encryption method
-   - Sets up creation rules for encrypted files
+## Interactive Age Key Setup
 
-4. **Configuration Update**: Updates `ordinator.toml` with secrets settings
-   - Adds `age_key_file` path
-   - Adds `sops_config` path
-   - Sets up default encryption patterns
-   - Configures exclusion patterns
+Ordinator now supports automatic age key setup during the apply process, eliminating the need for manual `ordinator secrets setup` in most cases.
 
-### Example Setup Output
+### Automatic Key Detection
+
+When you run `ordinator apply --profile <name>`, Ordinator will:
+
+1. **Check for existing age key** for the profile
+2. **Detect missing keys** automatically
+3. **Prompt for key setup** if no key is found
+4. **Guide through setup process** with clear options
+
+### Setup Scenarios
+
+**Scenario 1: First-time Setup (New Key Generation)**
+```bash
+ordinator apply --profile work
+# Output:
+# ❌ AGE key not found for profile 'work'
+# Would you like to generate a new AGE key? (y/N): y
+# ✅ AGE key generated successfully
+#    Key stored at: ~/.config/ordinator/age/work.txt
+#    SOPS config created at: ~/.config/ordinator/.sops.work.yaml
+```
+
+**Scenario 2: Multi-machine Replication (Import Existing Key)**
+```bash
+ordinator apply --profile work
+# Output:
+# ❌ AGE key not found for profile 'work'
+# Do you have an existing AGE key to import? (y/N): y
+# Please paste your AGE private key (it will be stored securely):
+# AGE-SECRET-KEY-1abc123...
+# ✅ AGE key imported successfully
+#    Key stored at: ~/.config/ordinator/age/work.txt
+#    SOPS config created at: ~/.config/ordinator/.sops.work.yaml
+```
+
+### Key Mismatch Handling
+
+When encrypted secrets were created with a different age key than the one currently available, Ordinator provides graceful handling:
+
+**Automatic Detection:**
+- Detects key mismatch during decryption
+- Identifies which files cannot be decrypted
+- Provides clear options for resolution
+
+**User Options:**
+1. **Skip the file** - Continue without this secret
+2. **Cancel the operation** - Stop the apply process
+3. **Import the correct key** - Replace current key with the original
+
+**Example Interaction:**
+```bash
+ordinator apply --profile work
+# Output:
+# ⚠️  Unable to decrypt secret: ~/.ssh/config
+#    The current AGE key cannot decrypt this file.
+#    This usually means the secrets were encrypted with a different key.
+# 
+# What would you like to do?
+#   1. Skip this file and continue (the secret will NOT be available on this machine)
+#   2. Cancel the apply operation
+#   3. Import the correct AGE key for this profile (will overwrite the current key)
+# 
+# Enter your choice [1/2/3, default: 1]: 3
+# Please paste the correct AGE private key:
+# AGE-SECRET-KEY-1original...
+# ✅ AGE key imported and stored at: ~/.config/ordinator/age/work.txt
+#    Retrying decryption...
+```
+
+### Skip Secrets Flag
+
+You can skip all secrets processing during apply using the `--skip-secrets` flag:
 
 ```bash
-$ ordinator secrets setup --profile work
-✅ SOPS and age are already installed
-✅ Age key already exists: ~/.config/age/work.key
-✅ SOPS config already exists: ~/.config/ordinator/.sops.work.yaml
-✅ SOPS and age setup complete for profile: work
-   Age key: ~/.config/age/work.key
-   SOPS config: ~/.config/ordinator/.sops.work.yaml
+# Skip secrets decryption entirely
+ordinator apply --profile work --skip-secrets
+
+# Skip secrets, bootstrap, and brew installation
+ordinator apply --profile work --skip-secrets --skip-bootstrap --skip-brew
 ```
+
+### Configuration Updates
+
+The interactive setup process automatically updates your `ordinator.toml` configuration:
+
+```toml
+[secrets]
+age_key_file = "~/.config/ordinator/age/work.txt"
+sops_config = "~/.config/ordinator/.sops.work.yaml"
+encrypt_patterns = ["*.yaml", "*.txt"]
+exclude_patterns = ["*.bak"]
+key_rotation_interval_days = 90
+
+[profiles.work]
+files = ["~/.zshrc"]
+secrets = ["~/.ssh/config"]
+enabled = true
+description = "Work environment configuration"
+created_on = "2024-01-15T10:30:00Z"  # Set automatically during key setup
+```
+
+### Security Considerations
+
+**Key Storage:**
+- Age keys are stored with secure permissions (600)
+- Keys are stored in `~/.config/ordinator/age/{profile}.txt`
+- Each profile can have its own key for isolation
+
+**Key Validation:**
+- Imported keys are validated for correct format
+- Keys must start with `AGE-SECRET-KEY-`
+- Invalid keys are rejected with clear error messages
+
+**Backward Compatibility:**
+- Existing workflows continue to work
+- Manual `ordinator secrets setup` still available
+- No breaking changes to existing configurations
 
 ### Generated Configuration
 

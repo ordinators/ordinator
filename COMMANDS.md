@@ -274,6 +274,20 @@ ordinator apply --profile work --skip-brew
 5. **Enhanced error handling** with colorized output and clear guidance
 6. **Progress indicators** showing each file being symlinked
 
+**Interactive Age Key Setup:**
+When applying a profile with encrypted secrets but no age key is found, the system will:
+- Detect the missing age key automatically
+- Prompt you to set up age encryption for the profile
+- Guide you through generating a new key or importing an existing one
+- Continue with the apply process once the key is configured
+
+**Key Mismatch Handling:**
+If encrypted secrets were created with a different age key than the one currently available:
+- The system detects the key mismatch during decryption
+- Provides clear options: skip the file, cancel the operation, or import the correct key
+- Shows helpful guidance for resolving the issue
+- Continues with other apply operations even if some secrets cannot be decrypted
+
 **File Resolution:**
 - **Profile-specific files**: First looks for files in `files/<profile>/` directory
 - **Backward compatibility**: Falls back to flat `files/` structure for existing repositories
@@ -712,6 +726,12 @@ ordinator secrets setup --force
 - Updates `ordinator.toml` with secrets configuration
 - Sets up encryption patterns and exclusions
 - Configures age key file location and SOPS config path
+
+**Note:** This command is typically run automatically during `ordinator apply` when age keys are missing. Manual setup is only needed for:
+- Initial configuration before first apply
+- Force overwriting existing keys
+- Setting up keys for new profiles
+- Troubleshooting encryption issues
 
 ### `ordinator secrets list`
 
@@ -1469,6 +1489,18 @@ sudo ./ordinator-system.sh
 **"No age key file configured. Run 'ordinator secrets setup' first"**
 - Run `ordinator secrets setup --profile <profile>` to generate keys
 - Check that the age key file exists and is readable
+
+**"AGE key not found for profile '<profile>'"**
+- The system will automatically prompt for age key setup during apply
+- Choose to generate a new key or import an existing one
+- The setup process will guide you through the configuration
+
+**"Unable to decrypt secret: <file>"**
+- This indicates a key mismatch - the encrypted file was created with a different age key
+- The system will present options: skip the file, cancel the operation, or import the correct key
+- Choose "Import the correct AGE key" if you have the original key
+- Choose "Skip this file" to continue without this secret
+- Choose "Cancel" to stop the apply operation
 
 **"Encryption failed"**
 - Verify SOPS and age are properly installed
