@@ -149,8 +149,10 @@ impl ReadmeManager {
         let git_manager = crate::git::GitManager::new(dotfiles_dir.to_path_buf());
         let repo_url = git_manager.get_origin_url().unwrap_or(None);
 
+        // Load config for config-aware README generation
+        let (config, _) = crate::config::Config::load()?;
         let generator = READMEGenerator::new_with_repo_url(false, false, repo_url);
-        let content = generator.generate_readme()?;
+        let content = generator.generate_readme_with_config(&config)?;
         fs::write(&readme_path, content)?;
 
         Ok(Some(readme_path))

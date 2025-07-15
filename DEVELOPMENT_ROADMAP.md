@@ -714,22 +714,16 @@ ordinator apply --profile work
     - [x] Preview the README before saving.
     - [x] Optionally allow editing in $EDITOR before final save.
 - [x] Replace the placeholder in `interactive_customization` with real interactive logic.
-- [ ] Add Homebrew packages section to README generator
-- [ ] Create profile-specific collapsible HTML sections with package links to formulae.brew.sh
-- [ ] Read `homebrew_packages` from each profile in config
-- [ ] Generate separate sections for each profile that has packages
-- [ ] Sort packages alphabetically within each profile
-- [ ] Link each package to `https://formulae.brew.sh/formula/{package_name}`
-- [ ] Use profile-appropriate emojis (💼 work, 🏠 personal, 💻 laptop, ⚙️ default)
-- [ ] Enhance profiles section with detailed profile information (files, directories, bootstrap scripts only)
-- [ ] Use collapsible sections for both profiles and Homebrew packages sections
-- [ ] Keep profiles and Homebrew packages as separate, focused sections
-- [x] Update README generator to accept config parameter
-- [x] Update state tracking to include Homebrew packages changes
-- [ ] Add tests for profile-specific Homebrew packages README generation
-- [ ] Add tests for enhanced profile display
-- [x] Update documentation to mention new feature
-- [ ] Ensure backward compatibility with existing READMEs
+- [x] Add Homebrew packages section to README generator
+- [x] Create profile-specific collapsible HTML sections with package links to formulae.brew.sh
+- [x] Read `homebrew_formulas` and `homebrew_casks` from each profile in config
+- [x] Generate separate sections for each profile that has packages
+- [x] Sort packages alphabetically within each profile
+- [x] Link each package to `https://formulae.brew.sh/formula/{package_name}`
+- [x] Use profile-appropriate emojis (💼 work, 🏠 personal, 💻 laptop, ⚙️ default)
+- [x] Use collapsible sections for both profiles and Homebrew packages sections
+- [x] Keep profiles and Homebrew packages as separate, focused sections
+- [x] Ensure backward compatibility with existing READMEs
 - [x] Update `ordinator brew export` to use `brew leaves -r` instead of `brew list` for formulas
 - [x] Add `brew list --cask` support to export casks separately
 - [x] Store formulas and casks separately in TOML configuration
