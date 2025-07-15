@@ -116,15 +116,33 @@ update_on_changes = ["profiles", "bootstrap"]
 
     // Check that README.md file was created and contains Homebrew section
     let readme_file = temp.child("README.md");
-    assert!(readme_file.path().exists(), "README.md file was not created");
+    assert!(
+        readme_file.path().exists(),
+        "README.md file was not created"
+    );
     let readme_content = std::fs::read_to_string(readme_file.path()).unwrap();
     // Check for Homebrew Packages section and links
     if !readme_content.contains("## Homebrew Packages") {
-        println!("\n[DEBUG] README CONTENT:\n{}\n", readme_content);
+        println!("\n[DEBUG] README CONTENT:\n{readme_content}\n");
     }
-    assert!(readme_content.contains("## Homebrew Packages"), "README missing Homebrew Packages section");
-    assert!(readme_content.contains("<a href=\"https://formulae.brew.sh/formula/git\""), "README missing git formula link");
-    assert!(readme_content.contains("<a href=\"https://formulae.brew.sh/formula/neovim\""), "README missing neovim formula link");
-    assert!(readme_content.contains("<a href=\"https://formulae.brew.sh/cask/iterm2\""), "README missing iterm2 cask link");
-    assert!(readme_content.contains("<a href=\"https://formulae.brew.sh/formula/alacritty\""), "README missing alacritty formula link");
+    assert!(
+        readme_content.contains("## Homebrew Packages"),
+        "README missing Homebrew Packages section"
+    );
+    assert!(
+        readme_content.contains("<a href=\"https://formulae.brew.sh/formula/git\""),
+        "README missing git formula link"
+    );
+    assert!(
+        readme_content.contains("<a href=\"https://formulae.brew.sh/formula/neovim\""),
+        "README missing neovim formula link"
+    );
+    assert!(
+        readme_content.contains("<a href=\"https://formulae.brew.sh/cask/iterm2\""),
+        "README missing iterm2 cask link"
+    );
+    assert!(
+        readme_content.contains("<a href=\"https://formulae.brew.sh/formula/alacritty\""),
+        "README missing alacritty formula link"
+    );
 }

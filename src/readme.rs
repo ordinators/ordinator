@@ -246,7 +246,8 @@ impl ReadmeManager {
                     content.push_str("\nTo apply a profile:\n```bash\nordinator apply --profile <profile-name>\n```\n\n");
                     // After the profiles section, add Homebrew packages if present in config
                     if let Ok((config, _)) = crate::config::Config::load() {
-                        let homebrew_section = READMEGenerator { repo_url: None }.generate_homebrew_packages_with_config(&config);
+                        let homebrew_section = READMEGenerator { repo_url: None }
+                            .generate_homebrew_packages_with_config(&config);
                         if !homebrew_section.is_empty() {
                             content.push_str(&homebrew_section);
                         }
@@ -374,26 +375,6 @@ impl READMEGenerator {
         Self { repo_url }
     }
 
-    /// Generate README content from template
-    pub fn generate_readme(&self) -> Result<String> {
-        let mut content = String::new();
-
-        // Add header
-        content.push_str(&self.generate_header());
-
-        // Add sections
-        content.push_str(&self.generate_quick_install());
-        content.push_str(&self.generate_profiles());
-        content.push_str(&self.generate_age_key());
-        content.push_str(&self.generate_troubleshooting());
-        content.push_str(&self.generate_security());
-
-        // Add footer
-        content.push_str(&self.generate_footer());
-
-        Ok(content)
-    }
-
     /// Generate README content from template with config
     pub fn generate_readme_with_config(&self, config: &crate::config::Config) -> Result<String> {
         let mut content = String::new();
@@ -430,11 +411,11 @@ impl READMEGenerator {
             formulas.sort();
             casks.sort();
             let emoji = match profile_name.as_str() {
-                "work" => "\u{1F4BC}", // 💼
-                "personal" => "\u{1F3E0}", // 🏠
-                "laptop" => "\u{1F4BB}", // 💻
+                "work" => "\u{1F4BC}",           // 💼
+                "personal" => "\u{1F3E0}",       // 🏠
+                "laptop" => "\u{1F4BB}",         // 💻
                 "default" => "\u{2699}\u{FE0F}", // ⚙️
-                _ => "\u{2699}\u{FE0F}", // ⚙️
+                _ => "\u{2699}\u{FE0F}",         // ⚙️
             };
             content.push_str(&format!(
                 "<details>\n  <summary><strong>{emoji} {profile_name} Profile Packages</strong></summary>\n  <div style=\"margin-top:10px; padding:10px; border:1px solid #ddd; border-radius:8px;\">\n"
@@ -444,8 +425,7 @@ impl READMEGenerator {
                 for (i, formula) in formulas.iter().enumerate() {
                     let url = format!("https://formulae.brew.sh/formula/{formula}");
                     content.push_str(&format!(
-                        "<a href=\"{url}\" target=\"_blank\">{}</a>",
-                        formula
+                        "<a href=\"{url}\" target=\"_blank\">{formula}</a>"
                     ));
                     if i < formulas.len() - 1 {
                         content.push_str(" • ");
@@ -457,10 +437,7 @@ impl READMEGenerator {
                 content.push_str("    <p><strong>Casks:</strong> ");
                 for (i, cask) in casks.iter().enumerate() {
                     let url = format!("https://formulae.brew.sh/cask/{cask}");
-                    content.push_str(&format!(
-                        "<a href=\"{url}\" target=\"_blank\">{}</a>",
-                        cask
-                    ));
+                    content.push_str(&format!("<a href=\"{url}\" target=\"_blank\">{cask}</a>"));
                     if i < casks.len() - 1 {
                         content.push_str(" • ");
                     }
@@ -490,12 +467,6 @@ impl READMEGenerator {
         let pat_example = "https://YOUR_PAT@github.com/username/dotfiles.git";
 
         format!("## Quick Install\n\n```bash\n{install_command}\n```\n\n### For Private Repositories\n\nIf this is a private repository, you'll need a GitHub Personal Access Token (PAT).\n\nReplace `YOUR_PAT` in the command below with your actual token:\n\n```bash\ngit clone {pat_example} ~/.dotfiles\n```\n\n**Note**: Your PAT will be included in the command. Keep it secure and do not share it with others.\n\n")
-    }
-
-    fn generate_profiles(&self) -> String {
-        // This method will be updated to accept a config parameter
-        // For now, return the hardcoded version for backward compatibility
-        String::from("## Profiles\n\nThis repository contains the following profiles:\n\n- **work**: Work environment configuration\n- **personal**: Personal environment configuration\n- **laptop**: Laptop-specific configuration\n\nTo apply a profile:\n```bash\nordinator apply --profile <profile-name>\n```\n\n")
     }
 
     fn generate_profiles_with_config(&self, config: &crate::config::Config) -> String {
