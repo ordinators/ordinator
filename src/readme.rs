@@ -242,6 +242,13 @@ impl ReadmeManager {
                         content.push_str(&format!("- **{name}**: {desc}\n"));
                     }
                     content.push_str("\nTo apply a profile:\n```bash\nordinator apply --profile <profile-name>\n```\n\n");
+                    // After the profiles section, add Homebrew packages if present in config
+                    if let Ok((config, _)) = crate::config::Config::load() {
+                        let homebrew_section = READMEGenerator { repo_url: None }.generate_homebrew_packages_with_config(&config);
+                        if !homebrew_section.is_empty() {
+                            content.push_str(&homebrew_section);
+                        }
+                    }
                 }
                 "AGE Key Setup" => {
                     content.push_str("## AGE Key Setup\n\nThis repository uses encrypted secrets. You'll need to set up an AGE key:\n\n1. Generate an AGE key:\n```bash\nordinator secrets setup --profile <profile-name>\n```\n\n2. The key will be created at `~/.config/ordinator/age/<profile>.txt`\n\n3. **Never commit your AGE key to version control!**\n\n");
@@ -395,6 +402,7 @@ impl READMEGenerator {
         // Add sections
         content.push_str(&self.generate_quick_install());
         content.push_str(&self.generate_profiles_with_config(config));
+        content.push_str(&self.generate_homebrew_packages_with_config(config));
         content.push_str(&self.generate_age_key());
         content.push_str(&self.generate_troubleshooting());
         content.push_str(&self.generate_security());
@@ -403,6 +411,67 @@ impl READMEGenerator {
         content.push_str(&self.generate_footer());
 
         Ok(content)
+    }
+
+    /// Generate Homebrew packages section for all profiles
+    fn generate_homebrew_packages_with_config(&self, config: &crate::config::Config) -> String {
+        let mut content = String::new();
+        let mut any_packages = false;
+
+        for (profile_name, profile_config) in &config.profiles {
+            let mut formulas = profile_config.homebrew_formulas.clone();
+            let mut casks = profile_config.homebrew_casks.clone();
+            if formulas.is_empty() && casks.is_empty() {
+                continue;
+            }
+            any_packages = true;
+            formulas.sort();
+            casks.sort();
+            let emoji = match profile_name.as_str() {
+                "work" => "\u{1F4BC}", // 💼
+                "personal" => "\u{1F3E0}", // 🏠
+                "laptop" => "\u{1F4BB}", // 💻
+                "default" => "\u{2699}\u{FE0F}", // ⚙️
+                _ => "\u{2699}\u{FE0F}", // ⚙️
+            };
+            content.push_str(&format!(
+                "<details>\n  <summary><strong>{emoji} {profile_name} Profile Packages</strong></summary>\n  <div style=\"margin-top:10px; padding:10px; border:1px solid #ddd; border-radius:8px;\">\n"
+            ));
+            if !formulas.is_empty() {
+                content.push_str("    <p><strong>Formulas:</strong> ");
+                for (i, formula) in formulas.iter().enumerate() {
+                    let url = format!("https://formulae.brew.sh/formula/{formula}");
+                    content.push_str(&format!(
+                        "<a href=\"{url}\" target=\"_blank\">{}</a>",
+                        formula
+                    ));
+                    if i < formulas.len() - 1 {
+                        content.push_str(" • ");
+                    }
+                }
+                content.push_str("</p>\n");
+            }
+            if !casks.is_empty() {
+                content.push_str("    <p><strong>Casks:</strong> ");
+                for (i, cask) in casks.iter().enumerate() {
+                    let url = format!("https://formulae.brew.sh/cask/{cask}");
+                    content.push_str(&format!(
+                        "<a href=\"{url}\" target=\"_blank\">{}</a>",
+                        cask
+                    ));
+                    if i < casks.len() - 1 {
+                        content.push_str(" • ");
+                    }
+                }
+                content.push_str("</p>\n");
+            }
+            content.push_str("  </div>\n</details>\n\n");
+        }
+        if any_packages {
+            format!("## Homebrew Packages\n\n{content}")
+        } else {
+            String::new()
+        }
     }
 
     // Template generation methods
