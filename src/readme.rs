@@ -164,6 +164,9 @@ impl ReadmeManager {
         _config: &crate::config::Config,
         dotfiles_dir: &Path,
     ) -> Result<Option<PathBuf>> {
+        use dialoguer::{Input, MultiSelect, Confirm, Editor};
+        use std::io;
+
         let readme_path = dotfiles_dir.join("README.md");
 
         if self.dry_run {
@@ -171,16 +174,100 @@ impl ReadmeManager {
             return Ok(Some(readme_path));
         }
 
-        // Get repository URL
-        let git_manager = crate::git::GitManager::new(dotfiles_dir.to_path_buf());
-        let repo_url = git_manager.get_origin_url().unwrap_or(None);
+        // Prompt for project name and description
+        let project_name: String = Input::new()
+            .with_prompt("Project name for your dotfiles repo")
+            .default("Dotfiles Repository".into())
+            .interact_text()?;
+        let project_desc: String = Input::new()
+            .with_prompt("Short description")
+            .default("Personal and work environment configuration managed by Ordinator.".into())
+            .interact_text()?;
 
-        // For now, just generate a default README
-        // TODO: Implement interactive prompts
-        let generator = READMEGenerator::new_with_repo_url(true, false, repo_url);
-        let content = generator.generate_readme()?;
-        fs::write(&readme_path, content)?;
+        // Prompt for profiles
+        let mut profiles = Vec::new();
+        loop {
+            let profile: String = Input::new()
+                .with_prompt("Add a profile (leave blank to finish)")
+                .allow_empty(true)
+                .interact_text()?;
+            if profile.trim().is_empty() {
+                break;
+            }
+            let desc: String = Input::new()
+                .with_prompt(format!("Description for profile '{profile}'"))
+                .default("No description".into())
+                .interact_text()?;
+            profiles.push((profile, desc));
+        }
+        if profiles.is_empty() {
+            profiles.push(("work".to_string(), "Work environment configuration".to_string()));
+            profiles.push(("personal".to_string(), "Personal environment configuration".to_string()));
+        }
 
+        // Prompt for sections to include
+        let section_options = vec![
+            "Quick Install",
+            "Profiles",
+            "AGE Key Setup",
+            "Troubleshooting",
+            "Security Notes",
+        ];
+        let selections = MultiSelect::new()
+            .with_prompt("Select sections to include in your README")
+            .items(&section_options)
+            .defaults(&[true, true, true, true, true])
+            .interact()?;
+
+        // Build README content
+        let mut content = String::new();
+        content.push_str(&format!("# {project_name}\n\n{project_desc}\n\n"));
+        for &idx in &selections {
+            match section_options[idx] {
+                "Quick Install" => {
+                    let repo_url = "https://github.com/yourname/dotfiles.git";
+                    let install_command = format!("curl -fsSL https://raw.githubusercontent.com/ordinators/ordinator/master/scripts/install.sh | sh && ordinator init {repo_url} && ordinator apply");
+                    content.push_str(&format!("## Quick Install\n\n```bash\n{install_command}\n```\n\n"));
+                }
+                "Profiles" => {
+                    content.push_str("## Profiles\n\nThis repository contains the following profiles:\n\n");
+                    for (name, desc) in &profiles {
+                        content.push_str(&format!("- **{name}**: {desc}\n"));
+                    }
+                    content.push_str("\nTo apply a profile:\n```bash\nordinator apply --profile <profile-name>\n```\n\n");
+                }
+                "AGE Key Setup" => {
+                    content.push_str("## AGE Key Setup\n\nThis repository uses encrypted secrets. You'll need to set up an AGE key:\n\n1. Generate an AGE key:\n```bash\nordinator secrets setup --profile <profile-name>\n```\n\n2. The key will be created at `~/.config/ordinator/age/<profile>.txt`\n\n3. **Never commit your AGE key to version control!**\n\n");
+                }
+                "Troubleshooting" => {
+                    content.push_str("## Troubleshooting\n\n### Common Issues\n\n- **Broken symlinks**: Run `ordinator repair` to fix\n- **Missing files**: Run `ordinator apply` to recreate symlinks\n- **Secrets not decrypting**: Ensure your AGE key is in the correct location\n- **Permission errors**: Check file permissions and ownership\n\n");
+                }
+                "Security Notes" => {
+                    content.push_str("## Security Notes\n\n- Keep your AGE key secure and never commit it to version control\n- Use different AGE keys for different environments (work/personal)\n- Regularly rotate your AGE keys\n- Be careful with Personal Access Tokens - they provide access to your repositories\n\n");
+                }
+                _ => {}
+            }
+        }
+
+        // Preview and confirm
+        println!("\n--- README Preview ---\n\n{content}\n---------------------\n");
+        if !Confirm::new().with_prompt("Save this README to README.md?").default(true).interact()? {
+            eprintln!("Aborted by user. No README written.");
+            return Ok(None);
+        }
+
+        // Optionally open in $EDITOR
+        if Confirm::new().with_prompt("Edit README in $EDITOR before saving?").default(false).interact()? {
+            if let Some(edited) = Editor::new().edit(&content)? {
+                fs::write(&readme_path, edited)?;
+            } else {
+                fs::write(&readme_path, content)?;
+            }
+        } else {
+            fs::write(&readme_path, content)?;
+        }
+
+        println!("README.md written to {readme_path:?}");
         Ok(Some(readme_path))
     }
 

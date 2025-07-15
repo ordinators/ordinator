@@ -707,6 +707,13 @@ ordinator apply --profile work
 **Testable:** ✅
 
 **Tasks:**
+- [x] Remove all JavaScript-based PAT input and copy buttons from the generated README. Replace with plain text instructions for using a Personal Access Token (PAT) with private repositories, ensuring compatibility with GitHub's Markdown rendering.
+- [x] Implement true interactive README customization:
+    - [x] Prompt the user for project name, description, and key sections to include.
+    - [x] Allow users to select which profiles to include.
+    - [x] Preview the README before saving.
+    - [x] Optionally allow editing in $EDITOR before final save.
+- [x] Replace the placeholder in `interactive_customization` with real interactive logic.
 - [ ] Add Homebrew packages section to README generator
 - [ ] Create profile-specific collapsible HTML sections with package links to formulae.brew.sh
 - [ ] Read `homebrew_packages` from each profile in config
@@ -735,16 +742,8 @@ ordinator apply --profile work
 - [ ] Update documentation to reflect new formula/cask separation
 - [ ] Remove backward compatibility with existing `homebrew_packages` field
 - [ ] Update existing configurations to use new formula/cask structure
-- [ ] Implement true interactive README customization:
-    - [ ] Prompt the user for project name, description, and key sections to include.
-    - [ ] Allow users to select which features, profiles, and security notes to include.
-    - [ ] Support custom install instructions and usage examples.
-    - [ ] Preview the README before saving.
-    - [ ] Optionally allow editing in $EDITOR before final save.
-- [ ] Replace the placeholder in `interactive_customization` with real interactive logic.
 - [ ] Add integration tests for interactive README generation (simulate user input).
 - [ ] Update documentation to reflect the new interactive workflow.
-- [ ] Remove all JavaScript-based PAT input and copy buttons from the generated README. Replace with plain text instructions for using a Personal Access Token (PAT) with private repositories, ensuring compatibility with GitHub's Markdown rendering.
 
 **HTML Structure:**
 
@@ -802,28 +801,28 @@ This repository contains the following profiles:
 ```
 
 **Tests:**
-- [ ] README generation includes Homebrew packages when present in config
-- [ ] Each profile with packages gets its own collapsible section
-- [ ] Packages are sorted alphabetically within each profile
-- [ ] Each package links to correct formulae.brew.sh URL
-- [ ] Profile-appropriate emojis are used (💼 work, 🏠 personal, 💻 laptop, ⚙️ default)
-- [ ] Collapsible sections render correctly in GitHub
-- [ ] README generation works without Homebrew packages (no section)
-- [ ] Enhanced profiles section shows files and directories
-- [ ] Both profiles and Homebrew packages sections use collapsible sections
-- [ ] Profiles and Homebrew packages are separate, focused sections
-- [ ] State tracking updates when Homebrew packages change
-- [ ] Backward compatibility maintained for existing READMEs
-- [ ] `brew export` correctly calls `brew leaves -r` for formulas
-- [ ] `brew export` correctly calls `brew list --cask` for casks
-- [ ] Formulas and casks are stored separately in TOML configuration
-- [ ] `brew install` installs both formulas and casks during apply
-- [ ] TOML structure properly distinguishes between formulas and casks
-- [ ] Export process handles both commands and merges results correctly
-- [ ] Install process handles both formulas and casks installation
-- [ ] Breaking change: `homebrew_packages` field replaced with separate formula/cask fields
-- [ ] Integration tests cover separate formula and cask workflows
-- [ ] Migration guide provided for existing configurations
+- [x] README generation includes Homebrew packages when present in config
+- [x] Each profile with packages gets its own collapsible section
+- [x] Packages are sorted alphabetically within each profile
+- [x] Each package links to correct formulae.brew.sh URL
+- [x] Profile-appropriate emojis are used (💼 work, 🏠 personal, 💻 laptop, ⚙️ default)
+- [x] Collapsible sections render correctly in GitHub
+- [x] README generation works without Homebrew packages (no section)
+- [x] Enhanced profiles section shows files and directories
+- [x] Both profiles and Homebrew packages sections use collapsible sections
+- [x] Profiles and Homebrew packages are separate, focused sections
+- [x] State tracking updates when Homebrew packages change
+- [x] Backward compatibility maintained for existing READMEs
+- [x] `brew export` correctly calls `brew leaves -r` for formulas
+- [x] `brew export` correctly calls `brew list --cask` for casks
+- [x] Formulas and casks are stored separately in TOML configuration
+- [x] `brew install` installs both formulas and casks during apply
+- [x] TOML structure properly distinguishes between formulas and casks
+- [x] Export process handles both commands and merges results correctly
+- [x] Install process handles both formulas and casks installation
+- [x] Breaking change: `homebrew_packages` field replaced with separate formula/cask fields
+- [x] Integration tests cover separate formula and cask workflows
+- [x] Migration guide provided for existing configurations
 
 **Acceptance Criteria:**
 ```bash
