@@ -362,9 +362,9 @@ impl READMEGenerator {
             .as_deref()
             .unwrap_or("https://github.com/yourname/dotfiles.git");
         let install_command = format!("curl -fsSL https://raw.githubusercontent.com/ordinators/ordinator/master/scripts/install.sh | sh && ordinator init {repo_url} && ordinator apply");
-        let pat_command = "curl -fsSL https://raw.githubusercontent.com/ordinators/ordinator/master/scripts/install.sh | sh && ordinator init https://username:YOUR_PAT@github.com/username/dotfiles.git && ordinator apply".to_string();
+        let pat_example = "https://YOUR_PAT@github.com/username/dotfiles.git";
 
-        format!("## Quick Install\n\n```bash\n{install_command}\n```\n\n<button onclick=\"navigator.clipboard.writeText('{install_command}')\">📋 Copy to Clipboard</button>\n\n### For Private Repositories\n\nIf this is a private repository, you'll need a Personal Access Token (PAT). Paste your PAT below and click the button to get a command with your token:\n\n<input type=\"text\" id=\"pat-input\" placeholder=\"Paste your GitHub Personal Access Token here\" style=\"width: 100%; padding: 8px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px;\">\n<button onclick=\"const pat = document.getElementById('pat-input').value; if (pat) {{ navigator.clipboard.writeText('{pat_command}'); alert('Command with PAT copied to clipboard!'); }} else {{ alert('Please enter your Personal Access Token first.'); }}\">🔐 Copy Command with PAT</button>\n\n**Note**: Your PAT will be included in the command. Keep it secure and don't share the command with others.\n\n")
+        format!("## Quick Install\n\n```bash\n{install_command}\n```\n\n### For Private Repositories\n\nIf this is a private repository, you'll need a GitHub Personal Access Token (PAT).\n\nReplace `YOUR_PAT` in the command below with your actual token:\n\n```bash\ngit clone {pat_example} ~/.dotfiles\n```\n\n**Note**: Your PAT will be included in the command. Keep it secure and do not share it with others.\n\n")
     }
 
     fn generate_profiles(&self) -> String {
