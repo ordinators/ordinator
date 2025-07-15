@@ -707,34 +707,35 @@ ordinator apply --profile work
 **Testable:** ✅
 
 **Tasks:**
-- [ ] Add Homebrew packages section to README generator
-- [ ] Create profile-specific collapsible HTML sections with package links to formulae.brew.sh
-- [ ] Read `homebrew_packages` from each profile in config
-- [ ] Generate separate sections for each profile that has packages
-- [ ] Sort packages alphabetically within each profile
-- [ ] Link each package to `https://formulae.brew.sh/formula/{package_name}`
-- [ ] Use profile-appropriate emojis (💼 work, 🏠 personal, 💻 laptop, ⚙️ default)
-- [ ] Enhance profiles section with detailed profile information (files, directories, bootstrap scripts only)
-- [ ] Use collapsible sections for both profiles and Homebrew packages sections
-- [ ] Keep profiles and Homebrew packages as separate, focused sections
-- [ ] Update README generator to accept config parameter
-- [ ] Update state tracking to include Homebrew packages changes
-- [ ] Add tests for profile-specific Homebrew packages README generation
-- [ ] Add tests for enhanced profile display
-- [ ] Update documentation to mention new feature
-- [ ] Ensure backward compatibility with existing READMEs
-- [ ] Update `ordinator brew export` to use `brew leaves -r` instead of `brew list` for formulas
-- [ ] Add `brew list --cask` support to export casks separately
-- [ ] Store formulas and casks separately in TOML configuration
-- [ ] Update `ordinator brew install` to install both formulas and casks on apply
-- [ ] Add separate `homebrew_formulas` and `homebrew_casks` fields to profile configuration
-- [ ] Update TOML structure to distinguish between formulas and casks
-- [ ] Modify export process to call both commands and merge results
-- [ ] Update install process to handle both formulas and casks installation
-- [ ] Add tests for separate formula and cask handling
-- [ ] Update documentation to reflect new formula/cask separation
-- [ ] Remove backward compatibility with existing `homebrew_packages` field
-- [ ] Update existing configurations to use new formula/cask structure
+- [x] Remove all JavaScript-based PAT input and copy buttons from the generated README. Replace with plain text instructions for using a Personal Access Token (PAT) with private repositories, ensuring compatibility with GitHub's Markdown rendering.
+- [x] Implement true interactive README customization:
+    - [x] Prompt the user for project name, description, and key sections to include.
+    - [x] Allow users to select which profiles to include.
+    - [x] Preview the README before saving.
+    - [x] Optionally allow editing in $EDITOR before final save.
+- [x] Replace the placeholder in `interactive_customization` with real interactive logic.
+- [x] Add Homebrew packages section to README generator
+- [x] Create profile-specific collapsible HTML sections with package links to formulae.brew.sh
+- [x] Read `homebrew_formulas` and `homebrew_casks` from each profile in config
+- [x] Generate separate sections for each profile that has packages
+- [x] Sort packages alphabetically within each profile
+- [x] Link each package to `https://formulae.brew.sh/formula/{package_name}`
+- [x] Use profile-appropriate emojis (💼 work, 🏠 personal, 💻 laptop, ⚙️ default)
+- [x] Use collapsible sections for both profiles and Homebrew packages sections
+- [x] Keep profiles and Homebrew packages as separate, focused sections
+- [x] Ensure backward compatibility with existing READMEs
+- [x] Update `ordinator brew export` to use `brew leaves -r` instead of `brew list` for formulas
+- [x] Add `brew list --cask` support to export casks separately
+- [x] Store formulas and casks separately in TOML configuration
+- [x] Update `ordinator brew install` to install both formulas and casks on apply
+- [x] Add separate `homebrew_formulas` and `homebrew_casks` fields to profile configuration
+- [x] Update TOML structure to distinguish between formulas and casks
+- [x] Modify export process to call both commands and merge results
+- [x] Update install process to handle both formulas and casks installation
+- [x] Add tests for separate formula and cask handling
+- [x] Update documentation to reflect new formula/cask separation
+- [x] Remove backward compatibility with existing `homebrew_packages` field
+- [x] Update existing configurations to use new formula/cask structure
 
 **HTML Structure:**
 
@@ -792,28 +793,28 @@ This repository contains the following profiles:
 ```
 
 **Tests:**
-- [ ] README generation includes Homebrew packages when present in config
-- [ ] Each profile with packages gets its own collapsible section
-- [ ] Packages are sorted alphabetically within each profile
-- [ ] Each package links to correct formulae.brew.sh URL
-- [ ] Profile-appropriate emojis are used (💼 work, 🏠 personal, 💻 laptop, ⚙️ default)
-- [ ] Collapsible sections render correctly in GitHub
-- [ ] README generation works without Homebrew packages (no section)
-- [ ] Enhanced profiles section shows files, directories, and bootstrap scripts only
-- [ ] Both profiles and Homebrew packages sections use collapsible sections
-- [ ] Profiles and Homebrew packages are separate, focused sections
-- [ ] State tracking updates when Homebrew packages change
-- [ ] Backward compatibility maintained for existing READMEs
-- [ ] `brew export` correctly calls `brew leaves -r` for formulas
-- [ ] `brew export` correctly calls `brew list --cask` for casks
-- [ ] Formulas and casks are stored separately in TOML configuration
-- [ ] `brew install` installs both formulas and casks during apply
-- [ ] TOML structure properly distinguishes between formulas and casks
-- [ ] Export process handles both commands and merges results correctly
-- [ ] Install process handles both formulas and casks installation
-- [ ] Breaking change: `homebrew_packages` field replaced with separate formula/cask fields
-- [ ] Integration tests cover separate formula and cask workflows
-- [ ] Migration guide provided for existing configurations
+- [x] README generation includes Homebrew packages when present in config
+- [x] Each profile with packages gets its own collapsible section
+- [x] Packages are sorted alphabetically within each profile
+- [x] Each package links to correct formulae.brew.sh URL
+- [x] Profile-appropriate emojis are used (💼 work, 🏠 personal, 💻 laptop, ⚙️ default)
+- [x] Collapsible sections render correctly in GitHub
+- [x] README generation works without Homebrew packages (no section)
+- [x] Enhanced profiles section shows files and directories
+- [x] Both profiles and Homebrew packages sections use collapsible sections
+- [x] Profiles and Homebrew packages are separate, focused sections
+- [x] State tracking updates when Homebrew packages change
+- [x] Backward compatibility maintained for existing READMEs
+- [x] `brew export` correctly calls `brew leaves -r` for formulas
+- [x] `brew export` correctly calls `brew list --cask` for casks
+- [x] Formulas and casks are stored separately in TOML configuration
+- [x] `brew install` installs both formulas and casks during apply
+- [x] TOML structure properly distinguishes between formulas and casks
+- [x] Export process handles both commands and merges results correctly
+- [x] Install process handles both formulas and casks installation
+- [x] Breaking change: `homebrew_packages` field replaced with separate formula/cask fields
+- [x] Integration tests cover separate formula and cask workflows
+- [x] Migration guide provided for existing configurations
 
 **Acceptance Criteria:**
 ```bash

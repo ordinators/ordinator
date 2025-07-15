@@ -87,12 +87,9 @@ Ordinator supports multiple environment profiles (work, personal, laptop) that a
 
 Ordinator provides secure secrets management using Mozilla SOPS and age encryption. The workflow automatically encrypts sensitive files and stores only encrypted versions in your repository, eliminating the risk of accidentally committing plaintext secrets. The system includes automatic plaintext detection, profile-specific encryption keys, and key rotation capabilities for enhanced security.
 
-### Security Features
+### Security Confidence
 
-- **Encrypted Storage**: All secrets are stored encrypted in the repository using SOPS and age
-- **Secure Decryption**: During `apply`, secrets are decrypted in memory and copied to target locations with secure permissions (600)
-- **No Plaintext in Repository**: Decrypted files are never stored in the repository
-- **Temporary Processing**: Decryption happens in temporary files that are automatically cleaned up
+Ordinator uses age encryption with X25519 keys, providing 128 bits of modern cryptographic security. This means that, as long as you keep your age private key safe, your secrets are protected by security so strong that brute-forcing them is considered impossible with any current or foreseeable technology. You can have extremely high confidence that your encrypted secrets will remain private.
 
 > **Never commit your AGE key or other sensitive secrets to your repository.**
 > The AGE key (typically at `~/.config/age/{profile}.key`) and SOPS configuration (typically at `~/.config/ordinator/.sops.{profile}.yaml`) should be kept secure and backed up separately.

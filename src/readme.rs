@@ -6,7 +6,6 @@ use std::env;
 use std::fs;
 use std::fs::File;
 use std::io::Read;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -19,9 +18,8 @@ struct ReadmeState {
     last_updated: u64,
 }
 
-fn get_state_file_path() -> PathBuf {
-    // Store in dotfiles repo instead of Ordinator home
-    PathBuf::from(STATE_FILE)
+fn get_state_file_path(dotfiles_dir: &Path) -> PathBuf {
+    dotfiles_dir.join(STATE_FILE)
 }
 
 fn compute_config_hash(config: &crate::config::Config) -> String {
@@ -63,8 +61,8 @@ fn compute_config_hash(config: &crate::config::Config) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-fn read_state() -> Option<ReadmeState> {
-    let path = get_state_file_path();
+fn read_state(dotfiles_dir: &Path) -> Option<ReadmeState> {
+    let path = get_state_file_path(dotfiles_dir);
     if let Ok(mut file) = File::open(path) {
         let mut buf = String::new();
         if file.read_to_string(&mut buf).is_ok() {
@@ -76,8 +74,8 @@ fn read_state() -> Option<ReadmeState> {
     None
 }
 
-fn write_state(hash: &str) {
-    let path = get_state_file_path();
+fn write_state(dotfiles_dir: &Path, hash: &str) {
+    let path = get_state_file_path(dotfiles_dir);
     let state = ReadmeState {
         config_hash: hash.to_string(),
         last_updated: SystemTime::now()
@@ -151,11 +149,10 @@ impl ReadmeManager {
         let git_manager = crate::git::GitManager::new(dotfiles_dir.to_path_buf());
         let repo_url = git_manager.get_origin_url().unwrap_or(None);
 
-        // Generate install script
-        self.generate_install_script(dotfiles_dir)?;
-
+        // Load config for config-aware README generation
+        let (config, _) = crate::config::Config::load()?;
         let generator = READMEGenerator::new_with_repo_url(false, false, repo_url);
-        let content = generator.generate_readme()?;
+        let content = generator.generate_readme_with_config(&config)?;
         fs::write(&readme_path, content)?;
 
         Ok(Some(readme_path))
@@ -167,6 +164,8 @@ impl ReadmeManager {
         _config: &crate::config::Config,
         dotfiles_dir: &Path,
     ) -> Result<Option<PathBuf>> {
+        use dialoguer::{Confirm, Editor, Input, MultiSelect};
+
         let readme_path = dotfiles_dir.join("README.md");
 
         if self.dry_run {
@@ -174,19 +173,126 @@ impl ReadmeManager {
             return Ok(Some(readme_path));
         }
 
-        // Get repository URL
-        let git_manager = crate::git::GitManager::new(dotfiles_dir.to_path_buf());
-        let repo_url = git_manager.get_origin_url().unwrap_or(None);
+        // Prompt for project name and description
+        let project_name: String = Input::new()
+            .with_prompt("Project name for your dotfiles repo")
+            .default("Dotfiles Repository".into())
+            .interact_text()?;
+        let project_desc: String = Input::new()
+            .with_prompt("Short description")
+            .default("Personal and work environment configuration managed by Ordinator.".into())
+            .interact_text()?;
 
-        // Generate install script
-        self.generate_install_script(dotfiles_dir)?;
+        // Prompt for profiles
+        let mut profiles = Vec::new();
+        loop {
+            let profile: String = Input::new()
+                .with_prompt("Add a profile (leave blank to finish)")
+                .allow_empty(true)
+                .interact_text()?;
+            if profile.trim().is_empty() {
+                break;
+            }
+            let desc: String = Input::new()
+                .with_prompt(format!("Description for profile '{profile}'"))
+                .default("No description".into())
+                .interact_text()?;
+            profiles.push((profile, desc));
+        }
+        if profiles.is_empty() {
+            profiles.push((
+                "work".to_string(),
+                "Work environment configuration".to_string(),
+            ));
+            profiles.push((
+                "personal".to_string(),
+                "Personal environment configuration".to_string(),
+            ));
+        }
 
-        // For now, just generate a default README
-        // TODO: Implement interactive prompts
-        let generator = READMEGenerator::new_with_repo_url(true, false, repo_url);
-        let content = generator.generate_readme()?;
-        fs::write(&readme_path, content)?;
+        // Prompt for sections to include
+        let section_options = vec![
+            "Quick Install",
+            "Profiles",
+            "AGE Key Setup",
+            "Troubleshooting",
+            "Security Notes",
+        ];
+        let selections = MultiSelect::new()
+            .with_prompt("Select sections to include in your README")
+            .items(&section_options)
+            .defaults(&[true, true, true, true, true])
+            .interact()?;
 
+        // Build README content
+        let mut content = String::new();
+        content.push_str(&format!("# {project_name}\n\n{project_desc}\n\n"));
+        for &idx in &selections {
+            match section_options[idx] {
+                "Quick Install" => {
+                    let repo_url = "https://github.com/yourname/dotfiles.git";
+                    let install_command = format!("curl -fsSL https://raw.githubusercontent.com/ordinators/ordinator/master/scripts/install.sh | sh && ordinator init {repo_url} && ordinator apply");
+                    content.push_str(&format!(
+                        "## Quick Install\n\n```bash\n{install_command}\n```\n\n"
+                    ));
+                }
+                "Profiles" => {
+                    content.push_str(
+                        "## Profiles\n\nThis repository contains the following profiles:\n\n",
+                    );
+                    for (name, desc) in &profiles {
+                        content.push_str(&format!("- **{name}**: {desc}\n"));
+                    }
+                    content.push_str("\nTo apply a profile:\n```bash\nordinator apply --profile <profile-name>\n```\n\n");
+                    // After the profiles section, add Homebrew packages if present in config
+                    if let Ok((config, _)) = crate::config::Config::load() {
+                        let homebrew_section = READMEGenerator { repo_url: None }
+                            .generate_homebrew_packages_with_config(&config);
+                        if !homebrew_section.is_empty() {
+                            content.push_str(&homebrew_section);
+                        }
+                    }
+                }
+                "AGE Key Setup" => {
+                    content.push_str("## AGE Key Setup\n\nThis repository uses encrypted secrets. You'll need to set up an AGE key:\n\n1. Generate an AGE key:\n```bash\nordinator secrets setup --profile <profile-name>\n```\n\n2. The key will be created at `~/.config/ordinator/age/<profile>.txt`\n\n3. **Never commit your AGE key to version control!**\n\n");
+                }
+                "Troubleshooting" => {
+                    content.push_str("## Troubleshooting\n\n### Common Issues\n\n- **Broken symlinks**: Run `ordinator repair` to fix\n- **Missing files**: Run `ordinator apply` to recreate symlinks\n- **Secrets not decrypting**: Ensure your AGE key is in the correct location\n- **Permission errors**: Check file permissions and ownership\n\n");
+                }
+                "Security Notes" => {
+                    content.push_str("## Security Notes\n\n- Keep your AGE key secure and never commit it to version control\n- Use different AGE keys for different environments (work/personal)\n- Regularly rotate your AGE keys\n- Be careful with Personal Access Tokens - they provide access to your repositories\n\n");
+                }
+                _ => {}
+            }
+        }
+
+        // Preview and confirm
+        println!("\n--- README Preview ---\n\n{content}\n---------------------\n");
+        if !Confirm::new()
+            .with_prompt("Save this README to README.md?")
+            .default(true)
+            .interact()?
+        {
+            eprintln!("Aborted by user. No README written.");
+            return Ok(None);
+        }
+
+        // Optionally open in $EDITOR
+        if Confirm::new()
+            .with_prompt("Edit README in $EDITOR before saving?")
+            .default(false)
+            .interact()?
+        {
+            if let Some(edited) = Editor::new().edit(&content)? {
+                fs::write(&readme_path, edited)?;
+            } else {
+                fs::write(&readme_path, content)?;
+            }
+        } else {
+            fs::write(&readme_path, content)?;
+        }
+
+        println!("README.md written to {readme_path:?}");
         Ok(Some(readme_path))
     }
 
@@ -206,9 +312,6 @@ impl ReadmeManager {
         // Get repository URL
         let git_manager = crate::git::GitManager::new(dotfiles_dir.to_path_buf());
         let repo_url = git_manager.get_origin_url().unwrap_or(None);
-
-        // Generate install script for preview
-        self.generate_install_script(dotfiles_dir)?;
 
         let generator = READMEGenerator::new_with_repo_url(false, true, repo_url);
         let content = generator.generate_readme_with_config(config)?;
@@ -241,9 +344,6 @@ impl ReadmeManager {
             let git_manager = crate::git::GitManager::new(dotfiles_dir.to_path_buf());
             let repo_url = git_manager.get_origin_url().unwrap_or(None);
 
-            // Generate install script
-            self.generate_install_script(dotfiles_dir)?;
-
             let generator = READMEGenerator::new_with_repo_url(false, false, repo_url);
             let content = generator.generate_readme_with_config(config)?;
             fs::write(&readme_path, content)?;
@@ -262,42 +362,6 @@ impl ReadmeManager {
 
         Ok(Some(readme_path))
     }
-
-    /// Generate install script in the dotfiles repository
-    fn generate_install_script(&self, dotfiles_dir: &Path) -> Result<()> {
-        let scripts_dir = dotfiles_dir.join("scripts");
-        fs::create_dir_all(&scripts_dir)?;
-
-        let install_script = r#"#!/bin/bash
-# Ordinator Install Script
-# This script installs Ordinator and sets up your dotfiles
-
-set -e
-
-echo "Installing Ordinator..."
-
-# Check if Homebrew is installed
-if ! command -v brew &> /dev/null; then
-    echo "Homebrew is not installed. Installing Homebrew..."
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-fi
-
-# Install Ordinator via Homebrew
-echo "Installing Ordinator via Homebrew..."
-brew install ordinators/ordinator/ordinator
-
-echo "Ordinator installed successfully!"
-echo "Run 'ordinator --help' to see available commands."
-"#;
-
-        let script_path = scripts_dir.join("install.sh");
-        fs::write(&script_path, install_script)?;
-        let mut perms = fs::metadata(&script_path)?.permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&script_path, perms)?;
-
-        Ok(())
-    }
 }
 
 /// README generator with customization options
@@ -311,26 +375,6 @@ impl READMEGenerator {
         Self { repo_url }
     }
 
-    /// Generate README content from template
-    pub fn generate_readme(&self) -> Result<String> {
-        let mut content = String::new();
-
-        // Add header
-        content.push_str(&self.generate_header());
-
-        // Add sections
-        content.push_str(&self.generate_quick_install());
-        content.push_str(&self.generate_profiles());
-        content.push_str(&self.generate_age_key());
-        content.push_str(&self.generate_troubleshooting());
-        content.push_str(&self.generate_security());
-
-        // Add footer
-        content.push_str(&self.generate_footer());
-
-        Ok(content)
-    }
-
     /// Generate README content from template with config
     pub fn generate_readme_with_config(&self, config: &crate::config::Config) -> Result<String> {
         let mut content = String::new();
@@ -341,6 +385,7 @@ impl READMEGenerator {
         // Add sections
         content.push_str(&self.generate_quick_install());
         content.push_str(&self.generate_profiles_with_config(config));
+        content.push_str(&self.generate_homebrew_packages_with_config(config));
         content.push_str(&self.generate_age_key());
         content.push_str(&self.generate_troubleshooting());
         content.push_str(&self.generate_security());
@@ -349,6 +394,63 @@ impl READMEGenerator {
         content.push_str(&self.generate_footer());
 
         Ok(content)
+    }
+
+    /// Generate Homebrew packages section for all profiles
+    fn generate_homebrew_packages_with_config(&self, config: &crate::config::Config) -> String {
+        let mut content = String::new();
+        let mut any_packages = false;
+
+        for (profile_name, profile_config) in &config.profiles {
+            let mut formulas = profile_config.homebrew_formulas.clone();
+            let mut casks = profile_config.homebrew_casks.clone();
+            if formulas.is_empty() && casks.is_empty() {
+                continue;
+            }
+            any_packages = true;
+            formulas.sort();
+            casks.sort();
+            let emoji = match profile_name.as_str() {
+                "work" => "\u{1F4BC}",           // 💼
+                "personal" => "\u{1F3E0}",       // 🏠
+                "laptop" => "\u{1F4BB}",         // 💻
+                "default" => "\u{2699}\u{FE0F}", // ⚙️
+                _ => "\u{2699}\u{FE0F}",         // ⚙️
+            };
+            content.push_str(&format!(
+                "<details>\n  <summary><strong>{emoji} {profile_name} Profile Packages</strong></summary>\n  <div style=\"margin-top:10px; padding:10px; border:1px solid #ddd; border-radius:8px;\">\n"
+            ));
+            if !formulas.is_empty() {
+                content.push_str("    <p><strong>Formulas:</strong> ");
+                for (i, formula) in formulas.iter().enumerate() {
+                    let url = format!("https://formulae.brew.sh/formula/{formula}");
+                    content.push_str(&format!(
+                        "<a href=\"{url}\" target=\"_blank\">{formula}</a>"
+                    ));
+                    if i < formulas.len() - 1 {
+                        content.push_str(" • ");
+                    }
+                }
+                content.push_str("</p>\n");
+            }
+            if !casks.is_empty() {
+                content.push_str("    <p><strong>Casks:</strong> ");
+                for (i, cask) in casks.iter().enumerate() {
+                    let url = format!("https://formulae.brew.sh/cask/{cask}");
+                    content.push_str(&format!("<a href=\"{url}\" target=\"_blank\">{cask}</a>"));
+                    if i < casks.len() - 1 {
+                        content.push_str(" • ");
+                    }
+                }
+                content.push_str("</p>\n");
+            }
+            content.push_str("  </div>\n</details>\n\n");
+        }
+        if any_packages {
+            format!("## Homebrew Packages\n\n{content}")
+        } else {
+            String::new()
+        }
     }
 
     // Template generation methods
@@ -362,15 +464,9 @@ impl READMEGenerator {
             .as_deref()
             .unwrap_or("https://github.com/yourname/dotfiles.git");
         let install_command = format!("curl -fsSL https://raw.githubusercontent.com/ordinators/ordinator/master/scripts/install.sh | sh && ordinator init {repo_url} && ordinator apply");
-        let pat_command = "curl -fsSL https://raw.githubusercontent.com/ordinators/ordinator/master/scripts/install.sh | sh && ordinator init https://username:YOUR_PAT@github.com/username/dotfiles.git && ordinator apply".to_string();
+        let pat_example = "https://YOUR_PAT@github.com/username/dotfiles.git";
 
-        format!("## Quick Install\n\n```bash\n{install_command}\n```\n\n<button onclick=\"navigator.clipboard.writeText('{install_command}')\">📋 Copy to Clipboard</button>\n\n### For Private Repositories\n\nIf this is a private repository, you'll need a Personal Access Token (PAT). Paste your PAT below and click the button to get a command with your token:\n\n<input type=\"text\" id=\"pat-input\" placeholder=\"Paste your GitHub Personal Access Token here\" style=\"width: 100%; padding: 8px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px;\">\n<button onclick=\"const pat = document.getElementById('pat-input').value; if (pat) {{ navigator.clipboard.writeText('{pat_command}'); alert('Command with PAT copied to clipboard!'); }} else {{ alert('Please enter your Personal Access Token first.'); }}\">🔐 Copy Command with PAT</button>\n\n**Note**: Your PAT will be included in the command. Keep it secure and don't share the command with others.\n\n")
-    }
-
-    fn generate_profiles(&self) -> String {
-        // This method will be updated to accept a config parameter
-        // For now, return the hardcoded version for backward compatibility
-        String::from("## Profiles\n\nThis repository contains the following profiles:\n\n- **work**: Work environment configuration\n- **personal**: Personal environment configuration\n- **laptop**: Laptop-specific configuration\n\nTo apply a profile:\n```bash\nordinator apply --profile <profile-name>\n```\n\n")
+        format!("## Quick Install\n\n```bash\n{install_command}\n```\n\n### For Private Repositories\n\nIf this is a private repository, you'll need a GitHub Personal Access Token (PAT).\n\nReplace `YOUR_PAT` in the command below with your actual token:\n\n```bash\ngit clone {pat_example} ~/.dotfiles\n```\n\n**Note**: Your PAT will be included in the command. Keep it secure and do not share it with others.\n\n")
     }
 
     fn generate_profiles_with_config(&self, config: &crate::config::Config) -> String {
@@ -411,9 +507,9 @@ impl READMEGenerator {
 
 /// Check if README needs updating based on config changes
 /// Uses hash comparison to detect if relevant config sections have changed
-pub fn readme_needs_update(config: &crate::config::Config) -> bool {
+pub fn readme_needs_update(config: &crate::config::Config, dotfiles_dir: &Path) -> bool {
     let current_hash = compute_config_hash(config);
-    let state = read_state();
+    let state = read_state(dotfiles_dir);
     state
         .as_ref()
         .map(|s| s.config_hash != current_hash)
@@ -431,7 +527,7 @@ pub fn auto_update_readme(config: &crate::config::Config, dotfiles_dir: &Path) -
 
     // Update state hash
     let current_hash = compute_config_hash(config);
-    write_state(&current_hash);
+    write_state(dotfiles_dir, &current_hash);
 
     Ok(())
 }

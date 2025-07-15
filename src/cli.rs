@@ -880,7 +880,7 @@ pub async fn run(args: Args) -> Result<()> {
             // Auto-update README if needed
             if !args.dry_run {
                 let dotfiles_dir = config_path.parent().unwrap();
-                if crate::readme::readme_needs_update(&config) {
+                if crate::readme::readme_needs_update(&config, dotfiles_dir) {
                     if config.readme.auto_update {
                         if let Err(e) = crate::readme::auto_update_readme(&config, dotfiles_dir) {
                             if !args.quiet {
@@ -1850,7 +1850,7 @@ pub async fn run(args: Args) -> Result<()> {
             }
 
             // Auto-update README if needed
-            if !args.dry_run && crate::readme::readme_needs_update(&config) {
+            if !args.dry_run && crate::readme::readme_needs_update(&config, _dotfiles_dir) {
                 if config.readme.auto_update {
                     if let Err(e) = crate::readme::auto_update_readme(&config, _dotfiles_dir) {
                         if !args.quiet {
@@ -2868,8 +2868,8 @@ pub async fn run(args: Args) -> Result<()> {
 
                     // Check if packages already exist and force is not set
                     let profile_config = config.get_profile(&profile).unwrap();
-                    if !profile_config.homebrew_packages.is_empty() && !force {
-                        eprintln!("⚠️  Profile '{profile}' already has Homebrew packages defined.");
+                    if !profile_config.homebrew_formulas.is_empty() && !force {
+                        eprintln!("⚠️  Profile '{profile}' already has Homebrew formulas defined.");
                         eprintln!("   Use --force to overwrite existing package list.");
                         std::process::exit(1);
                     }
@@ -2895,7 +2895,7 @@ pub async fn run(args: Args) -> Result<()> {
                     // Auto-update README if needed
                     if !args.dry_run {
                         let dotfiles_dir = config_path.parent().unwrap();
-                        if crate::readme::readme_needs_update(&config) {
+                        if crate::readme::readme_needs_update(&config, dotfiles_dir) {
                             if config.readme.auto_update {
                                 if let Err(e) =
                                     crate::readme::auto_update_readme(&config, dotfiles_dir)

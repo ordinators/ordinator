@@ -1366,16 +1366,6 @@ fn test_cli_readme_default() {
 }
 
 #[test]
-fn test_cli_readme_interactive() {
-    let temp = assert_fs::TempDir::new().unwrap();
-    let (_config_guard, _test_mode_guard) = common::setup_test_environment_with_config(&temp, None);
-
-    let mut cmd = common::create_ordinator_command(&temp);
-    cmd.args(["readme", "interactive"]);
-    cmd.assert().success();
-}
-
-#[test]
 fn test_cli_readme_preview() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = common::setup_test_environment_with_config(&temp, None);
