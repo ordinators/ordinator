@@ -151,9 +151,6 @@ impl ReadmeManager {
         let git_manager = crate::git::GitManager::new(dotfiles_dir.to_path_buf());
         let repo_url = git_manager.get_origin_url().unwrap_or(None);
 
-        // Generate install script
-        self.generate_install_script(dotfiles_dir)?;
-
         let generator = READMEGenerator::new_with_repo_url(false, false, repo_url);
         let content = generator.generate_readme()?;
         fs::write(&readme_path, content)?;
@@ -177,9 +174,6 @@ impl ReadmeManager {
         // Get repository URL
         let git_manager = crate::git::GitManager::new(dotfiles_dir.to_path_buf());
         let repo_url = git_manager.get_origin_url().unwrap_or(None);
-
-        // Generate install script
-        self.generate_install_script(dotfiles_dir)?;
 
         // For now, just generate a default README
         // TODO: Implement interactive prompts
@@ -206,9 +200,6 @@ impl ReadmeManager {
         // Get repository URL
         let git_manager = crate::git::GitManager::new(dotfiles_dir.to_path_buf());
         let repo_url = git_manager.get_origin_url().unwrap_or(None);
-
-        // Generate install script for preview
-        self.generate_install_script(dotfiles_dir)?;
 
         let generator = READMEGenerator::new_with_repo_url(false, true, repo_url);
         let content = generator.generate_readme_with_config(config)?;
@@ -241,9 +232,6 @@ impl ReadmeManager {
             let git_manager = crate::git::GitManager::new(dotfiles_dir.to_path_buf());
             let repo_url = git_manager.get_origin_url().unwrap_or(None);
 
-            // Generate install script
-            self.generate_install_script(dotfiles_dir)?;
-
             let generator = READMEGenerator::new_with_repo_url(false, false, repo_url);
             let content = generator.generate_readme_with_config(config)?;
             fs::write(&readme_path, content)?;
@@ -261,42 +249,6 @@ impl ReadmeManager {
         }
 
         Ok(Some(readme_path))
-    }
-
-    /// Generate install script in the dotfiles repository
-    fn generate_install_script(&self, dotfiles_dir: &Path) -> Result<()> {
-        let scripts_dir = dotfiles_dir.join("scripts");
-        fs::create_dir_all(&scripts_dir)?;
-
-        let install_script = r#"#!/bin/bash
-# Ordinator Install Script
-# This script installs Ordinator and sets up your dotfiles
-
-set -e
-
-echo "Installing Ordinator..."
-
-# Check if Homebrew is installed
-if ! command -v brew &> /dev/null; then
-    echo "Homebrew is not installed. Installing Homebrew..."
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-fi
-
-# Install Ordinator via Homebrew
-echo "Installing Ordinator via Homebrew..."
-brew install ordinators/ordinator/ordinator
-
-echo "Ordinator installed successfully!"
-echo "Run 'ordinator --help' to see available commands."
-"#;
-
-        let script_path = scripts_dir.join("install.sh");
-        fs::write(&script_path, install_script)?;
-        let mut perms = fs::metadata(&script_path)?.permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&script_path, perms)?;
-
-        Ok(())
     }
 }
 
