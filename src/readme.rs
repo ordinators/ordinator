@@ -6,7 +6,6 @@ use std::env;
 use std::fs;
 use std::fs::File;
 use std::io::Read;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -19,9 +18,8 @@ struct ReadmeState {
     last_updated: u64,
 }
 
-fn get_state_file_path() -> PathBuf {
-    // Store in dotfiles repo instead of Ordinator home
-    PathBuf::from(STATE_FILE)
+fn get_state_file_path(dotfiles_dir: &Path) -> PathBuf {
+    dotfiles_dir.join(STATE_FILE)
 }
 
 fn compute_config_hash(config: &crate::config::Config) -> String {
@@ -63,8 +61,8 @@ fn compute_config_hash(config: &crate::config::Config) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-fn read_state() -> Option<ReadmeState> {
-    let path = get_state_file_path();
+fn read_state(dotfiles_dir: &Path) -> Option<ReadmeState> {
+    let path = get_state_file_path(dotfiles_dir);
     if let Ok(mut file) = File::open(path) {
         let mut buf = String::new();
         if file.read_to_string(&mut buf).is_ok() {
@@ -76,8 +74,8 @@ fn read_state() -> Option<ReadmeState> {
     None
 }
 
-fn write_state(hash: &str) {
-    let path = get_state_file_path();
+fn write_state(dotfiles_dir: &Path, hash: &str) {
+    let path = get_state_file_path(dotfiles_dir);
     let state = ReadmeState {
         config_hash: hash.to_string(),
         last_updated: SystemTime::now()
@@ -164,8 +162,7 @@ impl ReadmeManager {
         _config: &crate::config::Config,
         dotfiles_dir: &Path,
     ) -> Result<Option<PathBuf>> {
-        use dialoguer::{Input, MultiSelect, Confirm, Editor};
-        use std::io;
+        use dialoguer::{Confirm, Editor, Input, MultiSelect};
 
         let readme_path = dotfiles_dir.join("README.md");
 
@@ -201,8 +198,14 @@ impl ReadmeManager {
             profiles.push((profile, desc));
         }
         if profiles.is_empty() {
-            profiles.push(("work".to_string(), "Work environment configuration".to_string()));
-            profiles.push(("personal".to_string(), "Personal environment configuration".to_string()));
+            profiles.push((
+                "work".to_string(),
+                "Work environment configuration".to_string(),
+            ));
+            profiles.push((
+                "personal".to_string(),
+                "Personal environment configuration".to_string(),
+            ));
         }
 
         // Prompt for sections to include
@@ -227,10 +230,14 @@ impl ReadmeManager {
                 "Quick Install" => {
                     let repo_url = "https://github.com/yourname/dotfiles.git";
                     let install_command = format!("curl -fsSL https://raw.githubusercontent.com/ordinators/ordinator/master/scripts/install.sh | sh && ordinator init {repo_url} && ordinator apply");
-                    content.push_str(&format!("## Quick Install\n\n```bash\n{install_command}\n```\n\n"));
+                    content.push_str(&format!(
+                        "## Quick Install\n\n```bash\n{install_command}\n```\n\n"
+                    ));
                 }
                 "Profiles" => {
-                    content.push_str("## Profiles\n\nThis repository contains the following profiles:\n\n");
+                    content.push_str(
+                        "## Profiles\n\nThis repository contains the following profiles:\n\n",
+                    );
                     for (name, desc) in &profiles {
                         content.push_str(&format!("- **{name}**: {desc}\n"));
                     }
@@ -251,13 +258,21 @@ impl ReadmeManager {
 
         // Preview and confirm
         println!("\n--- README Preview ---\n\n{content}\n---------------------\n");
-        if !Confirm::new().with_prompt("Save this README to README.md?").default(true).interact()? {
+        if !Confirm::new()
+            .with_prompt("Save this README to README.md?")
+            .default(true)
+            .interact()?
+        {
             eprintln!("Aborted by user. No README written.");
             return Ok(None);
         }
 
         // Optionally open in $EDITOR
-        if Confirm::new().with_prompt("Edit README in $EDITOR before saving?").default(false).interact()? {
+        if Confirm::new()
+            .with_prompt("Edit README in $EDITOR before saving?")
+            .default(false)
+            .interact()?
+        {
             if let Some(edited) = Editor::new().edit(&content)? {
                 fs::write(&readme_path, edited)?;
             } else {
@@ -450,9 +465,9 @@ impl READMEGenerator {
 
 /// Check if README needs updating based on config changes
 /// Uses hash comparison to detect if relevant config sections have changed
-pub fn readme_needs_update(config: &crate::config::Config) -> bool {
+pub fn readme_needs_update(config: &crate::config::Config, dotfiles_dir: &Path) -> bool {
     let current_hash = compute_config_hash(config);
-    let state = read_state();
+    let state = read_state(dotfiles_dir);
     state
         .as_ref()
         .map(|s| s.config_hash != current_hash)
@@ -470,7 +485,7 @@ pub fn auto_update_readme(config: &crate::config::Config, dotfiles_dir: &Path) -
 
     // Update state hash
     let current_hash = compute_config_hash(config);
-    write_state(&current_hash);
+    write_state(dotfiles_dir, &current_hash);
 
     Ok(())
 }

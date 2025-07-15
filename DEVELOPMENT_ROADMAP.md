@@ -724,26 +724,24 @@ ordinator apply --profile work
 - [ ] Enhance profiles section with detailed profile information (files, directories, bootstrap scripts only)
 - [ ] Use collapsible sections for both profiles and Homebrew packages sections
 - [ ] Keep profiles and Homebrew packages as separate, focused sections
-- [ ] Update README generator to accept config parameter
-- [ ] Update state tracking to include Homebrew packages changes
+- [x] Update README generator to accept config parameter
+- [x] Update state tracking to include Homebrew packages changes
 - [ ] Add tests for profile-specific Homebrew packages README generation
 - [ ] Add tests for enhanced profile display
-- [ ] Update documentation to mention new feature
+- [x] Update documentation to mention new feature
 - [ ] Ensure backward compatibility with existing READMEs
-- [ ] Update `ordinator brew export` to use `brew leaves -r` instead of `brew list` for formulas
-- [ ] Add `brew list --cask` support to export casks separately
-- [ ] Store formulas and casks separately in TOML configuration
-- [ ] Update `ordinator brew install` to install both formulas and casks on apply
-- [ ] Add separate `homebrew_formulas` and `homebrew_casks` fields to profile configuration
-- [ ] Update TOML structure to distinguish between formulas and casks
-- [ ] Modify export process to call both commands and merge results
-- [ ] Update install process to handle both formulas and casks installation
-- [ ] Add tests for separate formula and cask handling
-- [ ] Update documentation to reflect new formula/cask separation
-- [ ] Remove backward compatibility with existing `homebrew_packages` field
-- [ ] Update existing configurations to use new formula/cask structure
-- [ ] Add integration tests for interactive README generation (simulate user input).
-- [ ] Update documentation to reflect the new interactive workflow.
+- [x] Update `ordinator brew export` to use `brew leaves -r` instead of `brew list` for formulas
+- [x] Add `brew list --cask` support to export casks separately
+- [x] Store formulas and casks separately in TOML configuration
+- [x] Update `ordinator brew install` to install both formulas and casks on apply
+- [x] Add separate `homebrew_formulas` and `homebrew_casks` fields to profile configuration
+- [x] Update TOML structure to distinguish between formulas and casks
+- [x] Modify export process to call both commands and merge results
+- [x] Update install process to handle both formulas and casks installation
+- [x] Add tests for separate formula and cask handling
+- [x] Update documentation to reflect new formula/cask separation
+- [x] Remove backward compatibility with existing `homebrew_packages` field
+- [x] Update existing configurations to use new formula/cask structure
 
 **HTML Structure:**
 

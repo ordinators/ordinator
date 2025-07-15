@@ -36,10 +36,11 @@ description = "Default profile for basic dotfiles"
 exclude = ["*.bak"]
 
 [profiles.work]
-files = ["~/.gitconfig"]
+files = ["~/.zshrc", "~/.gitconfig"]
 directories = []
 secrets = ["~/.ssh/config", "~/.aws/credentials"]
-homebrew_packages = ["git", "neovim", "ripgrep", "sops", "age", "jq", "yq"]
+homebrew_formulas = ["git", "neovim", "ripgrep"]
+homebrew_casks = ["google-chrome", "iterm2"]
 enabled = true
 description = "Work environment profile"
 created_on = "2024-06-10T15:23:00Z"
@@ -48,7 +49,8 @@ created_on = "2024-06-10T15:23:00Z"
 files = ["~/.zshrc"]
 directories = []
 secrets = ["~/.config/api_keys.json"]
-homebrew_packages = ["git", "neovim"]
+homebrew_formulas = ["git", "alacritty"]
+homebrew_casks = ["karabiner-elements"]
 enabled = true
 description = "Personal environment profile"
 

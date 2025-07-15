@@ -287,7 +287,8 @@ directories = []
 enabled = true
 description = "Default profile for basic dotfiles"
 exclude = []
-homebrew_packages = []
+homebrew_formulas = []
+homebrew_casks = []
 
 [secrets]
 encrypt_patterns = []

@@ -88,9 +88,13 @@ pub struct ProfileConfig {
     #[serde(default)]
     pub exclude: Vec<String>,
 
-    /// Homebrew packages for this profile
+    /// Homebrew formulas for this profile
     #[serde(default)]
-    pub homebrew_packages: Vec<String>,
+    pub homebrew_formulas: Vec<String>,
+
+    /// Homebrew casks for this profile
+    #[serde(default)]
+    pub homebrew_casks: Vec<String>,
 
     /// Date/time when the age key was created (ISO 8601 string)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -223,7 +227,8 @@ impl Config {
                 enabled: true,
                 description: Some("Default profile for basic dotfiles".to_string()),
                 exclude: Vec::new(),
-                homebrew_packages: Vec::new(),
+                homebrew_formulas: Vec::new(),
+                homebrew_casks: Vec::new(),
                 secrets: Vec::new(),
                 created_on: None,
             },
@@ -239,7 +244,8 @@ impl Config {
                 enabled: true,
                 description: Some("Work environment profile".to_string()),
                 exclude: Vec::new(),
-                homebrew_packages: Vec::new(),
+                homebrew_formulas: Vec::new(),
+                homebrew_casks: Vec::new(),
                 secrets: Vec::new(),
                 created_on: None,
             },
@@ -255,7 +261,8 @@ impl Config {
                 enabled: true,
                 description: Some("Personal environment profile".to_string()),
                 exclude: Vec::new(),
-                homebrew_packages: Vec::new(),
+                homebrew_formulas: Vec::new(),
+                homebrew_casks: Vec::new(),
                 secrets: Vec::new(),
                 created_on: None,
             },
@@ -666,7 +673,8 @@ mod tests {
             enabled: true,
             description: Some("Test profile".to_string()),
             exclude: Vec::new(),
-            homebrew_packages: Vec::new(),
+            homebrew_formulas: Vec::new(),
+            homebrew_casks: Vec::new(),
             secrets: Vec::new(),
             created_on: None,
         };

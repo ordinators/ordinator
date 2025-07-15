@@ -16,11 +16,11 @@ fn test_brew_export_and_list_with_dummy_brew() {
     brew_dir.create_dir_all().unwrap();
     let brew_path = brew_dir.child("brew");
     let mut brew_file = std::fs::File::create(brew_path.path()).unwrap();
-    // Simulate 'brew list --formula' and 'brew list --cask'
+    // Simulate 'brew leaves -r' for formulas and 'brew list --cask' for casks
     writeln!(brew_file, "#!/bin/sh").unwrap();
     writeln!(
         brew_file,
-        "if [ \"$1\" = 'list' ] && [ \"$2\" = '--formula' ]; then echo 'dummyformula'; exit 0; fi"
+        "if [ \"$1\" = 'leaves' ] && [ \"$2\" = '-r' ]; then echo 'dummyformula'; exit 0; fi"
     )
     .unwrap();
     writeln!(
