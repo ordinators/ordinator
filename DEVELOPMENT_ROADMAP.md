@@ -956,6 +956,42 @@ ordinator apply --profile work
 
 **Completion Statement:** This completes Phase 4.10 (Hash-Based Filename Mapping) and prepares for Phase 5 (System Commands & Script Generation).
 
+### 4.11 Optimized Homebrew Installation
+**Priority:** Medium  
+**Dependencies:** 4.9  
+**Estimated Time:** 2-3 days  
+**Testable:** ✅
+
+**Tasks:**
+- [ ] Query installed Homebrew formulas with `brew leaves -r` on target system
+- [ ] Query installed Homebrew casks with `brew list --cask` on target system
+- [ ] Compare installed packages to those in config/profile
+- [ ] Form a single `brew install` command for all missing formulas
+- [ ] Form a single `brew install --cask` command for all missing casks
+- [ ] Only execute install commands for packages not already installed
+- [ ] Ensure dry-run mode prints optimized commands without executing
+- [ ] Refactor apply logic to use optimized installation
+- [ ] Add/adjust tests to verify optimization and command formation
+- [ ] Update documentation to describe optimized Homebrew installation
+
+**Tests:**
+- [ ] Correctly detects already-installed formulas and casks
+- [ ] Only missing packages are included in install commands
+- [ ] Single install command is formed for formulas and casks
+- [ ] Dry-run mode outputs correct commands
+- [ ] Integration tests cover optimized Homebrew installation
+- [ ] Backward compatibility maintained for existing workflows
+
+**Acceptance Criteria:**
+# On apply, only missing Homebrew packages are installed
+ordinator apply --profile work
+# Queries installed formulas and casks
+# Installs only missing formulas with one brew install command
+# Installs only missing casks with one brew install --cask command
+# Dry-run mode prints the optimized commands
+
+**Completion Statement:** This completes Phase 4.11 (Optimized Homebrew Installation) and prepares for Phase 5 (System Commands & Script Generation).
+
 ---
 
 ## Phase 5: System Commands & Script Generation ⚙️
