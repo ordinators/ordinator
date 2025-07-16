@@ -12,6 +12,7 @@ use tracing::{info, warn};
 
 use crate::config::Config;
 use crate::git::GitManager;
+use crate::utils::generate_file_hash;
 
 #[derive(Parser)]
 #[command(name = "ordinator")]
@@ -951,7 +952,7 @@ pub async fn run(args: Args) -> Result<()> {
             Ok(())
         }
         Commands::Add { path, profile, all } => {
-            let (config, _config_path) = Config::load()?;
+            let (mut config, _config_path) = Config::load()?;
             let profile_name = match profile {
                 Some(p) => p,
                 None => {
@@ -984,23 +985,27 @@ pub async fn run(args: Args) -> Result<()> {
 
             if all {
                 // Update all tracked files for the profile
-                let profile = config.get_profile(&profile_name).unwrap();
+                let profile = config.get_profile_mut(&profile_name).unwrap();
                 let mut updated_count = 0;
                 let total_files = profile.files.len();
 
                 for file_path in &profile.files {
                     let source_path = std::path::Path::new(file_path);
                     if source_path.exists() {
-                        let profile_file_path =
-                            config.get_profile_file_path(&profile_name, file_path)?;
-                        if let Some(parent) = profile_file_path.parent() {
-                            std::fs::create_dir_all(parent)?;
-                        }
+                        let hash = generate_file_hash(file_path);
+                        let filename = source_path.file_name().unwrap().to_string_lossy();
+                        let hash_filename = format!("{hash}_{filename}");
+                        let dotfiles_dir = crate::utils::get_dotfiles_dir()?;
+                        let profile_files_dir = dotfiles_dir.join("files").join(&profile_name);
+                        std::fs::create_dir_all(&profile_files_dir)?;
+                        let profile_file_path = profile_files_dir.join(&hash_filename);
                         std::fs::copy(source_path, &profile_file_path)?;
+                        profile
+                            .file_mappings
+                            .insert(hash_filename.clone(), file_path.clone());
                         updated_count += 1;
                         if !args.quiet {
-                            let msg =
-                                format!("[{updated_count}/{total_files}] Updated '{file_path}'");
+                            let msg = format!("[{updated_count}/{total_files}] Updated '{file_path}' as '{hash_filename}'");
                             if color_enabled() {
                                 println!("{}", msg.green());
                             } else {
@@ -1011,7 +1016,7 @@ pub async fn run(args: Args) -> Result<()> {
                         eprintln!("Warning: Source file '{file_path}' does not exist");
                     }
                 }
-
+                config.save_to_file(&_config_path)?;
                 if !args.quiet {
                     let msg = format!("Updated {updated_count} files for profile '{profile_name}'");
                     if color_enabled() {
@@ -1026,7 +1031,7 @@ pub async fn run(args: Args) -> Result<()> {
                     .as_ref()
                     .ok_or_else(|| anyhow::anyhow!("Path is required when not using --all flag"))?;
 
-                let profile = config.get_profile(&profile_name).unwrap();
+                let profile = config.get_profile_mut(&profile_name).unwrap();
                 if !profile.files.contains(path_str) {
                     return Err(anyhow::anyhow!(
                         "File '{}' is not tracked for profile '{}'. Use 'ordinator watch {} --profile {}' to start tracking it.",
@@ -1039,15 +1044,22 @@ pub async fn run(args: Args) -> Result<()> {
                     return Err(anyhow::anyhow!("Source file '{path_str}' does not exist."));
                 }
 
-                let profile_file_path = config.get_profile_file_path(&profile_name, path_str)?;
-                if let Some(parent) = profile_file_path.parent() {
-                    std::fs::create_dir_all(parent)?;
-                }
-
+                let hash = generate_file_hash(path_str);
+                let filename = path_obj.file_name().unwrap().to_string_lossy();
+                let hash_filename = format!("{hash}_{filename}");
+                let dotfiles_dir = crate::utils::get_dotfiles_dir()?;
+                let profile_files_dir = dotfiles_dir.join("files").join(&profile_name);
+                std::fs::create_dir_all(&profile_files_dir)?;
+                let profile_file_path = profile_files_dir.join(&hash_filename);
                 std::fs::copy(path_obj, &profile_file_path)?;
-
+                profile
+                    .file_mappings
+                    .insert(hash_filename.clone(), path_str.clone());
+                config.save_to_file(&_config_path)?;
                 if !args.quiet {
-                    let msg = format!("Updated '{path_str}' for profile '{profile_name}'");
+                    let msg = format!(
+                        "Updated '{path_str}' for profile '{profile_name}' as '{hash_filename}'"
+                    );
                     if color_enabled() {
                         println!("{}", msg.green());
                     } else {
@@ -1055,7 +1067,6 @@ pub async fn run(args: Args) -> Result<()> {
                     }
                 }
             }
-
             Ok(())
         }
 
@@ -2476,38 +2487,30 @@ pub async fn run(args: Args) -> Result<()> {
 
                 if all {
                     // Update all tracked secret files for the profile
-                    let profile = config.get_profile(&profile_name).unwrap();
+                    let profile = config.get_profile_mut(&profile_name).unwrap();
                     let mut updated_count = 0;
                     let total_secrets = profile.secrets.len();
 
                     for secret_path in &profile.secrets {
-                        // Find the actual source file using the direct path
                         let source_path = std::path::Path::new(secret_path);
-
                         if source_path.exists() {
-                            // Read the source file content
                             let file_content = std::fs::read_to_string(source_path)?;
-
-                            // Encrypt the content in memory
                             let encrypted_content =
                                 crate::secrets::encrypt_content_with_sops(&file_content)?;
-
-                            // Determine the encrypted file path in the repository
-                            let encrypted_file_name = format!(
-                                "{}.enc",
-                                source_path.file_name().unwrap().to_string_lossy()
-                            );
+                            let hash = generate_file_hash(secret_path);
+                            let filename = source_path.file_name().unwrap().to_string_lossy();
+                            let hash_filename = format!("{hash}_{filename}.enc");
                             let base_dir = config_path.parent().unwrap().to_path_buf();
                             let secrets_dir = base_dir.join("secrets").join(&profile_name);
                             std::fs::create_dir_all(&secrets_dir)?;
-                            let encrypted_file_path = secrets_dir.join(&encrypted_file_name);
-
-                            // Write the encrypted content to the repository
+                            let encrypted_file_path = secrets_dir.join(&hash_filename);
                             std::fs::write(&encrypted_file_path, encrypted_content)?;
-
+                            profile
+                                .file_mappings
+                                .insert(hash_filename.clone(), secret_path.clone());
                             updated_count += 1;
                             if !args.quiet {
-                                let msg = format!("[{updated_count}/{total_secrets}] Re-encrypted '{secret_path}'");
+                                let msg = format!("[{updated_count}/{total_secrets}] Re-encrypted '{secret_path}' as '{hash_filename}'");
                                 if color_enabled() {
                                     println!("{}", msg.green());
                                 } else {
@@ -2518,11 +2521,9 @@ pub async fn run(args: Args) -> Result<()> {
                             eprintln!("Warning: Source file '{secret_path}' does not exist");
                         }
                     }
-
+                    config.save_to_file(&config_path)?;
                     if !args.quiet {
-                        let msg = format!(
-                            "Re-encrypted {updated_count} secret files for profile '{profile_name}'"
-                        );
+                        let msg = format!("Re-encrypted {updated_count} secret files for profile '{profile_name}'");
                         if color_enabled() {
                             println!("{}", msg.green());
                         } else {
@@ -2534,56 +2535,36 @@ pub async fn run(args: Args) -> Result<()> {
                     let file_str = file.as_ref().ok_or_else(|| {
                         anyhow::anyhow!("File is required when not using --all flag")
                     })?;
-
                     let file_path = std::path::Path::new(file_str);
                     if !file_path.exists() {
                         return Err(anyhow::anyhow!("File '{}' does not exist.", file_str));
                     }
-
                     if !file_path.is_file() {
                         return Err(anyhow::anyhow!(
                             "Path '{}' is not a file. Only files can be added to secrets tracking.",
                             file_str
                         ));
                     }
-
-                    // Check if file should be encrypted based on patterns
-                    let base_dir = config_path.parent().unwrap().to_path_buf();
-                    let _manager = crate::secrets::SecretsManager::new(
-                        None,
-                        None,
-                        config.clone(),
-                        base_dir.clone(),
-                    );
-
-                    // User explicitly marked this as a secret, so treat it as such regardless of patterns
-
-                    // Add to secrets tracking if not already tracked
                     config.add_secret_to_profile(&profile_name, file_str.clone())?;
-
-                    // Read the source file content
+                    let profile = config.get_profile_mut(&profile_name).unwrap();
                     let file_content = std::fs::read_to_string(file_path)?;
-
-                    // Encrypt the content in memory
                     let encrypted_content =
                         crate::secrets::encrypt_content_with_sops(&file_content)?;
-
-                    // Determine the encrypted file path in the repository
-                    let encrypted_file_name =
-                        format!("{}.enc", file_path.file_name().unwrap().to_string_lossy());
+                    let hash = generate_file_hash(file_str);
+                    let filename = file_path.file_name().unwrap().to_string_lossy();
+                    let hash_filename = format!("{hash}_{filename}.enc");
+                    let base_dir = config_path.parent().unwrap().to_path_buf();
                     let secrets_dir = base_dir.join("secrets").join(&profile_name);
                     std::fs::create_dir_all(&secrets_dir)?;
-                    let encrypted_file_path = secrets_dir.join(&encrypted_file_name);
-
-                    // Write only the encrypted content to the repository
+                    let encrypted_file_path = secrets_dir.join(&hash_filename);
                     std::fs::write(&encrypted_file_path, encrypted_content)?;
-
-                    // Save the configuration
+                    profile
+                        .file_mappings
+                        .insert(hash_filename.clone(), file_str.clone());
                     config.save_to_file(&config_path)?;
-
                     if !args.quiet {
                         let msg = format!(
-                            "✅ Added '{file_str}' to secrets tracking for profile '{profile_name}'"
+                            "✅ Added '{file_str}' to secrets tracking for profile '{profile_name}' as '{hash_filename}'"
                         );
                         if color_enabled() {
                             println!("{}", msg.green());
@@ -2597,7 +2578,6 @@ pub async fn run(args: Args) -> Result<()> {
                         println!("   Original file remains unchanged");
                     }
                 }
-
                 Ok(())
             }
 

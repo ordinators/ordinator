@@ -34,6 +34,7 @@
 - Track user-defined dotfiles in a Git repository (e.g., `~/.dotfiles`)
 - Symlink dotfiles into the home directory with backup and overwrite protection
 - Support nested folders (`.config`, `Library/Preferences`, etc.)
+- **Hash-based filename mapping:** All tracked files and secrets are stored as `files/<profile>/<hash>_<filename>`, with a mapping in the config to prevent collisions and ensure deterministic, profile-specific storage.
 
 ### ✅ Bootstrap Process
 
@@ -87,6 +88,7 @@
 - Secrets handling must never expose plaintext unexpectedly
 - Sudo-required commands are opt-in and manually executed
 - Config must support profiles and non-interactive modes
+- **Hash-based mapping ensures collision resistance and deterministic file storage, even for files with the same name in different locations.**
 - Clear logs and validation help build user confidence
 - CLI must feel intuitive — especially for developers who know Git
 - Internals written in Rust for safety, performance, and reliability
@@ -100,6 +102,7 @@
 - Secrets handled with Mozilla `sops` and `age`
 - Git management via `git2` crate or shell-out to Git
 - Config specified via `ordinator.toml`
+- **Hash-based filename mapping for all tracked files and secrets, with mapping table in config**
 - Dry-run, logging, and system-script generation core to apply engine
 - Installable via Homebrew or `curl | sh` installer
 - CI/CD includes automated testing, code formatting, and static analysis

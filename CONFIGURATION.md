@@ -107,6 +107,13 @@ update_on_changes = ["profiles", "bootstrap"]
 - `description` (string, optional): Description of the profile.
 - `created_on` (string, optional): ISO 8601 timestamp of when the age key was created or last rotated. Used for key rotation reminders. Set automatically by Ordinator during interactive key setup or manual key generation.
 - `exclude` (array of strings): Glob patterns for files or directories to exclude for this profile (overrides or adds to global exclusions).
+- `file_mappings` (table): Maps hash-based filenames to original file paths for this profile. Used for all apply/symlink and secrets operations.
+
+**Example:**
+
+    [profiles.work.file_mappings]
+    a1b2c3_config.txt = "~/.config/app/config.txt"
+    9f8e7d_config.enc = "~/.ssh/config"
 
 ## Bootstrap Scripts
 
@@ -721,23 +728,14 @@ dotfiles-repo/
     └── bootstrap-personal.sh
 ```
 
-### Profile-Specific File Storage
-
-**New Structure (Phase 4.5+):**
-- Files are stored in `files/<profile>/` subdirectories
-- Each profile has its own directory for file storage
-- Same file can exist in multiple profiles with different content
-- Backward compatibility with flat `files/` structure
-
-**File Types:**
-- **Regular files**: Stored in `files/<profile>/` (managed by `files` array)
-- **Encrypted files**: Stored encrypted in `files/<profile>/` (managed by `secrets` array)
-- **Directories**: Stored in `files/<profile>/` (managed by `directories` array)
+**Profile-Specific File Storage (Hash-Based Mapping):**
+- Files are stored as `files/<profile>/<hash>_<filename>`
+- The mapping from hash-based filename to original path is tracked in `file_mappings`
+- All apply/symlink and secrets operations use this mapping
 
 **File Resolution Order:**
-1. Look for file in `files/<profile>/` (profile-specific)
-2. Fall back to `files/` (flat structure for backward compatibility)
-3. If neither exists, use profile-specific path for new files
+1. Look up the mapping in `file_mappings` for the profile
+2. If not found, fall back to legacy structure for backward compatibility
 
 **Secrets Array Management:**
 - The `secrets` array contains direct paths to source files

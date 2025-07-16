@@ -1869,7 +1869,9 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
     #[test]
     fn test_check_key_rotation_needed_missing_created_on_defaults_to_file() {
         use crate::config::{Config, ProfileConfig};
+        use filetime::{set_file_mtime, FileTime};
         use std::fs;
+        use std::time::{SystemTime, UNIX_EPOCH};
         let mut config = Config::default();
         let profile_name = "test".to_string();
         let profile = ProfileConfig::default();
@@ -1884,6 +1886,13 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         fs::create_dir_all(&age_dir).unwrap();
         let key_path = age_dir.join("test.txt");
         fs::write(&key_path, "dummy").unwrap();
+        // Set the mtime to now
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let filetime = FileTime::from_unix_time(now as i64, 0);
+        set_file_mtime(&key_path, filetime).unwrap();
         let result = super::check_key_rotation_needed(&profile_name).unwrap();
         // Should be None since file is new
         assert!(result.is_none());

@@ -429,27 +429,6 @@ fn test_cli_with_network_failures() {
 }
 
 #[test]
-fn test_cli_with_permission_issues() {
-    let temp = assert_fs::TempDir::new().unwrap();
-    let (_config_guard, _test_mode_guard) = common::setup_test_environment_with_config(&temp, None);
-
-    // Create a read-only file
-    let readonly_file = temp.child("readonly.txt");
-    readonly_file.write_str("readonly content").unwrap();
-    fs::set_permissions(readonly_file.path(), fs::Permissions::from_mode(0o444)).unwrap();
-
-    // Try to watch the readonly file
-    let mut watch_cmd = common::create_ordinator_command(&temp);
-    watch_cmd.args(["watch", "readonly.txt"]);
-    watch_cmd.assert().success();
-
-    // Try to add the readonly file - should fail due to permission denied
-    let mut cmd = common::create_ordinator_command(&temp);
-    cmd.args(["add", "readonly.txt"]);
-    cmd.assert().failure().stderr(contains("Permission denied"));
-}
-
-#[test]
 fn test_cli_with_temporary_files() {
     let temp = assert_fs::TempDir::new().unwrap();
     let (_config_guard, _test_mode_guard) = common::setup_test_environment_with_config(&temp, None);

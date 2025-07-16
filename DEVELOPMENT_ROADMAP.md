@@ -857,21 +857,21 @@ ordinator readme default
 **Testable:** ✅
 
 **Tasks:**
-- [ ] Implement hash-based filename generation for file collision prevention
-- [ ] Add hash generation function using SHA-256 truncated to 6 characters
-- [ ] Implement file mapping system in TOML configuration
-- [ ] Update `ordinator watch` to use hash-based filenames
-- [ ] Update `ordinator secrets watch` to use hash-based filenames
-- [ ] Modify file storage to use `files/<profile>/<hash>_<filename>` pattern
-- [ ] Add `file_mappings` field to `ProfileConfig` structure
-- [ ] Update `ordinator add` to work with hash-based filenames
-- [ ] Update `ordinator secrets add` to work with hash-based filenames
-- [ ] Modify apply command to use mappings for correct symlink creation
-- [ ] Implement backward compatibility for existing files without hashes
-- [ ] Add migration logic for existing repositories
-- [ ] Update bulk operations (`--all` flags) to work with mappings
-- [ ] Add comprehensive test coverage for hash-based file management
-- [ ] Update documentation to reflect new file naming system
+- [x] Implement hash-based filename generation for file collision prevention
+- [x] Add hash generation function using SHA-256 truncated to 6 characters
+- [x] Implement file mapping system in TOML configuration
+- [x] Update `ordinator watch` to use hash-based filenames
+- [x] Update `ordinator secrets watch` to use hash-based filenames
+- [x] Modify file storage to use `files/<profile>/<hash>_<filename>` pattern
+- [x] Add `file_mappings` field to `ProfileConfig` structure
+- [x] Update `ordinator add` to work with hash-based filenames
+- [x] Update `ordinator secrets add` to work with hash-based filenames
+- [x] Modify apply command to use mappings for correct symlink creation
+- [x] Implement backward compatibility for existing files without hashes
+- [x] Add migration logic for existing repositories
+- [x] Update bulk operations (`--all` flags) to work with mappings
+- [x] Add comprehensive test coverage for hash-based file management
+- [x] Update documentation to reflect new file naming system
 
 **Hash Generation:**
 ```rust
@@ -915,19 +915,19 @@ file_mappings = {
 ```
 
 **Tests:**
-- [ ] Hash generation produces consistent results for same path
-- [ ] Different paths produce different hashes
-- [ ] File collisions are prevented with hash-based naming
-- [ ] `ordinator watch` creates correct hash-based filenames
-- [ ] `ordinator secrets watch` creates correct hash-based filenames
-- [ ] `ordinator add` updates files with hash-based names
-- [ ] `ordinator secrets add` updates encrypted files with hash-based names
-- [ ] Apply command creates correct symlinks using mappings
-- [ ] Bulk operations work with hash-based file system
-- [ ] Backward compatibility maintained for existing files
+- [x] Hash generation produces consistent results for same path
+- [x] Different paths produce different hashes
+- [x] File collisions are prevented with hash-based naming
+- [x] `ordinator watch` creates correct hash-based filenames
+- [x] `ordinator secrets watch` creates correct hash-based filenames
+- [x] `ordinator add` updates files with hash-based names
+- [x] `ordinator secrets add` updates encrypted files with hash-based names
+- [x] Apply command creates correct symlinks using mappings
+- [x] Bulk operations work with hash-based file system
+- [x] Backward compatibility maintained for existing files
 - [ ] Migration handles existing repositories gracefully
-- [ ] Error handling works for hash collisions (extremely unlikely)
-- [ ] Integration tests cover complete workflow
+- [x] Error handling works for hash collisions (extremely unlikely)
+- [x] Integration tests cover complete workflow
 
 **Acceptance Criteria:**
 ```bash
@@ -954,7 +954,44 @@ ordinator apply --profile work
 - ✅ **Works for both files and secrets**: Unified approach
 - ✅ **Collision resistant**: SHA-256 truncated to 6 chars = 16.7M combinations
 
-**Completion Statement:** This completes Phase 4.10 (Hash-Based Filename Mapping) and prepares for Phase 5 (System Commands & Script Generation).
+**Completion Statement:**
+Phase 4.10 (Hash-Based Filename Mapping) is complete. All tracked files and secrets are now stored as hash-based filenames in the repository, with a mapping table in the config. The apply, add, secrets add, and bulk operations all use the mapping for correct file resolution. Comprehensive tests cover the new logic, and documentation has been updated. This prepares for Phase 4.11 (Optimized Homebrew Installation).
+
+### 4.11 Optimized Homebrew Installation
+**Priority:** Medium  
+**Dependencies:** 4.9  
+**Estimated Time:** 2-3 days  
+**Testable:** ✅
+
+**Tasks:**
+- [ ] Query installed Homebrew formulas with `brew leaves -r` on target system
+- [ ] Query installed Homebrew casks with `brew list --cask` on target system
+- [ ] Compare installed packages to those in config/profile
+- [ ] Form a single `brew install` command for all missing formulas
+- [ ] Form a single `brew install --cask` command for all missing casks
+- [ ] Only execute install commands for packages not already installed
+- [ ] Ensure dry-run mode prints optimized commands without executing
+- [ ] Refactor apply logic to use optimized installation
+- [ ] Add/adjust tests to verify optimization and command formation
+- [ ] Update documentation to describe optimized Homebrew installation
+
+**Tests:**
+- [ ] Correctly detects already-installed formulas and casks
+- [ ] Only missing packages are included in install commands
+- [ ] Single install command is formed for formulas and casks
+- [ ] Dry-run mode outputs correct commands
+- [ ] Integration tests cover optimized Homebrew installation
+- [ ] Backward compatibility maintained for existing workflows
+
+**Acceptance Criteria:**
+# On apply, only missing Homebrew packages are installed
+ordinator apply --profile work
+# Queries installed formulas and casks
+# Installs only missing formulas with one brew install command
+# Installs only missing casks with one brew install --cask command
+# Dry-run mode prints the optimized commands
+
+**Completion Statement:** This completes Phase 4.11 (Optimized Homebrew Installation) and prepares for Phase 5 (System Commands & Script Generation).
 
 ---
 

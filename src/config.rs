@@ -99,6 +99,10 @@ pub struct ProfileConfig {
     /// Date/time when the age key was created (ISO 8601 string)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_on: Option<String>,
+
+    /// Hash-based filename mappings: "hash_filename" = "original_path"
+    #[serde(default)]
+    pub file_mappings: HashMap<String, String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -231,6 +235,7 @@ impl Config {
                 homebrew_casks: Vec::new(),
                 secrets: Vec::new(),
                 created_on: None,
+                file_mappings: HashMap::new(),
             },
         );
 
@@ -248,6 +253,7 @@ impl Config {
                 homebrew_casks: Vec::new(),
                 secrets: Vec::new(),
                 created_on: None,
+                file_mappings: HashMap::new(),
             },
         );
 
@@ -265,6 +271,7 @@ impl Config {
                 homebrew_casks: Vec::new(),
                 secrets: Vec::new(),
                 created_on: None,
+                file_mappings: HashMap::new(),
             },
         );
 
@@ -438,11 +445,27 @@ impl Config {
         Ok(profile_file_path)
     }
 
-    /// Get the source file path for symlinking (handles both flat and profile-specific structures)
+    /// Get the source file path for symlinking (handles hash-based mapping and legacy structures)
     pub fn get_source_file_path(&self, profile_name: &str, file_path: &str) -> Result<PathBuf> {
         let dotfiles_dir = get_dotfiles_dir()?;
 
-        // First check if profile-specific file exists
+        // First, try to use the hash-based mapping if it exists
+        if let Some(profile) = self.get_profile(profile_name) {
+            // Find the hash_filename for this file_path
+            if let Some((hash_filename, _)) =
+                profile.file_mappings.iter().find(|(_, v)| v == &file_path)
+            {
+                let profile_file_path = dotfiles_dir
+                    .join("files")
+                    .join(profile_name)
+                    .join(hash_filename);
+                if profile_file_path.exists() {
+                    return Ok(profile_file_path);
+                }
+            }
+        }
+
+        // Fallback: check if profile-specific file exists (legacy)
         let profile_file_path = dotfiles_dir
             .join("files")
             .join(profile_name)
@@ -451,13 +474,24 @@ impl Config {
             return Ok(profile_file_path);
         }
 
-        // Fall back to flat structure for backward compatibility
+        // Fallback: flat structure (legacy)
         let flat_file_path = dotfiles_dir.join("files").join(file_path);
         if flat_file_path.exists() {
             return Ok(flat_file_path);
         }
 
-        // If neither exists, return the profile-specific path (for new files)
+        // If neither exists, return the hash-based path (for new files)
+        if let Some(profile) = self.get_profile(profile_name) {
+            if let Some((hash_filename, _)) =
+                profile.file_mappings.iter().find(|(_, v)| v == &file_path)
+            {
+                return Ok(dotfiles_dir
+                    .join("files")
+                    .join(profile_name)
+                    .join(hash_filename));
+            }
+        }
+        // Otherwise, return the profile-specific path (legacy default)
         Ok(profile_file_path)
     }
 
@@ -677,6 +711,7 @@ mod tests {
             homebrew_casks: Vec::new(),
             secrets: Vec::new(),
             created_on: None,
+            file_mappings: HashMap::new(),
         };
 
         config.add_profile("test".to_string(), new_profile);
@@ -691,6 +726,31 @@ mod tests {
         let removed = config.remove_profile("test");
         assert!(removed.is_some());
         assert!(!config.has_profile("test"));
+    }
+
+    #[test]
+    fn test_file_mappings_roundtrip() {
+        let mut config = Config::create_default();
+        let profile = config.profiles.get_mut("default").unwrap();
+        profile.file_mappings.insert(
+            "a1b2c3_config.txt".to_string(),
+            "~/.config/app/config.txt".to_string(),
+        );
+        profile.file_mappings.insert(
+            "d4e5f6_config.txt".to_string(),
+            "~/Documents/config.txt".to_string(),
+        );
+        let toml = toml::to_string_pretty(&config).unwrap();
+        let parsed: Config = toml::from_str(&toml).unwrap();
+        let parsed_profile = parsed.get_profile("default").unwrap();
+        assert_eq!(
+            parsed_profile.file_mappings["a1b2c3_config.txt"],
+            "~/.config/app/config.txt"
+        );
+        assert_eq!(
+            parsed_profile.file_mappings["d4e5f6_config.txt"],
+            "~/Documents/config.txt"
+        );
     }
 
     #[test]
