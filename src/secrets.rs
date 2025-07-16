@@ -1884,6 +1884,13 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         fs::create_dir_all(&age_dir).unwrap();
         let key_path = age_dir.join("test.txt");
         fs::write(&key_path, "dummy").unwrap();
+        // Set the mtime to now
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let filetime = FileTime::from_unix_time(now as i64, 0);
+        set_file_mtime(&key_path, filetime).unwrap();
         let result = super::check_key_rotation_needed(&profile_name).unwrap();
         // Should be None since file is new
         assert!(result.is_none());

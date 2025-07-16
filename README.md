@@ -74,10 +74,18 @@ When you run `ordinator apply`, Ordinator:
 1. **Generates the profile's bootstrap script** (if defined), which contains additional setup steps such as installing tools or configuring system settings.
 2. **Decrypts and copies secrets** (if secrets management is configured and not skipped) - secrets are decrypted in memory and copied to target locations with secure permissions (600).
 3. **Installs Homebrew packages** defined in the profile (if package management is configured and not skipped).
-4. **Symlinks all tracked files** for the selected profile from your dotfiles repository into their correct locations in your home directory, backing up any existing files if configured.
+4. **Symlinks all tracked files** for the selected profile from your dotfiles repository into their correct locations in your home directory, backing up any existing files if configured. **Files are stored in the repository as hash-based filenames (files/<profile>/<hash>_<filename>), and the mapping to the original path is tracked in the config.**
 5. **Performs safety checks** to avoid overwriting important files unless you use the `--force` flag.
 6. **Supports dry-run mode** so you can preview all changes without making modifications by adding the `--dry-run` flag.
 
+### Hash-Based Filename Mapping
+
+To prevent filename collisions and ensure deterministic storage, Ordinator stores all tracked files and secrets as hash-based filenames in the repository. The mapping from hash-based filename to original path is tracked in the TOML config under `file_mappings` for each profile. This ensures that even files with the same name in different locations are uniquely stored and correctly symlinked/applied.
+
+**Example:**
+
+    files/work/a1b2c3_config.txt   # maps to ~/.config/app/config.txt
+    files/work/9f8e7d_config.enc   # maps to ~/.ssh/config (encrypted)
 
 ## Profiles
 

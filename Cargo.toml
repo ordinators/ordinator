@@ -75,6 +75,8 @@ is-terminal = "0.1"
 shellexpand = "3.1"
 dialoguer = "0.11"
 
+filetime = "0.2"
+
 [dev-dependencies]
 # Testing frameworks
 tempfile = "3.8"

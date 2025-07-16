@@ -38,6 +38,8 @@ All tests use temporary directories and isolated environments to prevent interfe
   - Error handling for untracked files
   - Profile-specific file management
   - Exclusion pattern validation
+  - **Hash-based filename mapping and file_mappings logic**
+  - **Test helpers and assertions expect hash-based filenames and mappings**
 
 #### `apply.rs` - Configuration Application
 - **Purpose**: Tests the `ordinator apply` command for deploying configurations
@@ -47,6 +49,8 @@ All tests use temporary directories and isolated environments to prevent interfe
   - Bootstrap script execution
   - Secrets decryption during apply
   - Conflict resolution and backup creation
+  - **Hash-based filename mapping and file_mappings logic**
+  - **Test helpers and assertions expect hash-based filenames and mappings**
 
 #### `watch.rs` - File Tracking
 - **Purpose**: Tests the `ordinator watch` command for starting file tracking
@@ -76,6 +80,8 @@ All tests use temporary directories and isolated environments to prevent interfe
   - Plaintext secrets detection and scanning
   - Mock encryption/decryption for testing
   - Error handling for encryption failures
+  - **Hash-based filename mapping and file_mappings logic**
+  - **Test helpers and assertions expect hash-based filenames and mappings**
 
 ### Git Integration
 

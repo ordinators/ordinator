@@ -125,20 +125,28 @@ ordinator watch ~/.bashrc
 - **Automatically scans for plaintext secrets** and warns if found (does not block the operation)
 - **Adds file to tracking**: Updates the profile's `files` array in configuration
 
-**File Storage Structure:**
-```
-dotfiles-repo/
-├── files/
-│   ├── default/
-│   │   ├── .zshrc
-│   │   └── .gitconfig
-│   ├── work/
-│   │   ├── .zshrc
-│   │   └── .ssh/config
-│   └── personal/
-│       ├── .zshrc
-│       └── .config/alacritty/alacritty.yml
-```
+## File Storage Structure (Hash-Based Mapping)
+
+As of Phase 4.10, all tracked files and secrets are stored using a hash-based filename mapping to prevent collisions and ensure deterministic, profile-specific storage. Each file is stored as:
+
+    files/<profile>/<hash>_<filename>
+
+Where `<hash>` is a 6-character SHA-256 hash of the original file path. The mapping from hash-based filename to original path is tracked in the TOML config under the `file_mappings` table for each profile.
+
+**Example:**
+
+    files/work/a1b2c3_config.txt   # maps to ~/.config/app/config.txt
+    files/work/9f8e7d_config.enc   # maps to ~/.ssh/config (encrypted)
+
+**TOML Mapping:**
+
+    [profiles.work.file_mappings]
+    a1b2c3_config.txt = "~/.config/app/config.txt"
+    9f8e7d_config.enc = "~/.ssh/config"
+
+**File Resolution:**
+- All apply/symlink and secrets operations use the mapping to resolve the correct source file for each tracked path.
+- Backward compatibility: If a mapping is missing, the legacy file structure is used as a fallback.
 
 **Conflict Handling:**
 - If the same file exists in multiple profiles, separate copies are created
@@ -292,6 +300,8 @@ If encrypted secrets were created with a different age key than the one currentl
 - **Profile-specific files**: First looks for files in `files/<profile>/` directory
 - **Backward compatibility**: Falls back to flat `files/` structure for existing repositories
 - **Missing files**: Provides clear guidance when source files are not found
+- **All apply/symlink and secrets operations use the mapping** to resolve the correct source file for each tracked path.
+- **Backward compatibility**: If a mapping is missing, the legacy file structure is used as a fallback.
 
 **Error Handling:**
 - **Colorized output**: Uses colors for success (green), warnings (yellow), and errors (red)

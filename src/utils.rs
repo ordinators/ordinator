@@ -1,5 +1,6 @@
 use anyhow::Result;
 use chrono::Local;
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -243,6 +244,14 @@ pub fn repair_symlink(symlink_path: &Path, expected_target: &Path) -> Result<()>
     std::os::windows::fs::symlink_file(expected_target, symlink_path)?;
 
     Ok(())
+}
+
+/// Generate a 6-character SHA-256 hash from a file path
+pub fn generate_file_hash(path: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(path.as_bytes());
+    let result = hasher.finalize();
+    format!("{result:x}")[0..6].to_string()
 }
 
 #[cfg(test)]
@@ -556,5 +565,28 @@ mod tests {
             .unwrap();
         assert!(is_symlink(&target));
         assert!(target.parent().unwrap().exists());
+    }
+
+    #[test]
+    fn test_generate_file_hash_deterministic() {
+        let path = "/Users/test/.zshrc";
+        let hash1 = generate_file_hash(path);
+        let hash2 = generate_file_hash(path);
+        assert_eq!(
+            hash1, hash2,
+            "Hash should be deterministic for the same path"
+        );
+    }
+
+    #[test]
+    fn test_generate_file_hash_unique() {
+        let path1 = "/Users/test/.zshrc";
+        let path2 = "/Users/test/.bashrc";
+        let hash1 = generate_file_hash(path1);
+        let hash2 = generate_file_hash(path2);
+        assert_ne!(
+            hash1, hash2,
+            "Different paths should produce different hashes"
+        );
     }
 }
