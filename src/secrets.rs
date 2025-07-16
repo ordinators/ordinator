@@ -1869,7 +1869,9 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
     #[test]
     fn test_check_key_rotation_needed_missing_created_on_defaults_to_file() {
         use crate::config::{Config, ProfileConfig};
+        use filetime::{set_file_mtime, FileTime};
         use std::fs;
+        use std::time::{SystemTime, UNIX_EPOCH};
         let mut config = Config::default();
         let profile_name = "test".to_string();
         let profile = ProfileConfig::default();
