@@ -964,34 +964,27 @@ Phase 4.10 (Hash-Based Filename Mapping) is complete. All tracked files and secr
 **Testable:** ✅
 
 **Tasks:**
-- [ ] Query installed Homebrew formulas with `brew leaves -r` on target system
-- [ ] Query installed Homebrew casks with `brew list --cask` on target system
-- [ ] Compare installed packages to those in config/profile
-- [ ] Form a single `brew install` command for all missing formulas
-- [ ] Form a single `brew install --cask` command for all missing casks
-- [ ] Only execute install commands for packages not already installed
-- [ ] Ensure dry-run mode prints optimized commands without executing
-- [ ] Refactor apply logic to use optimized installation
-- [ ] Add/adjust tests to verify optimization and command formation
-- [ ] Update documentation to describe optimized Homebrew installation
+- [x] Query installed Homebrew formulas with `brew leaves -r` on target system
+- [x] Query installed Homebrew casks with `brew list --cask` on target system
+- [x] Compare installed packages to those in config/profile
+- [x] Form a single `brew install` command for all missing formulas
+- [x] Form a single `brew install --cask` command for all missing casks
+- [x] Only execute install commands for packages not already installed
+- [x] Ensure dry-run mode prints optimized commands without executing
+- [x] Refactor apply logic to use optimized installation
+- [x] Add/adjust tests to verify optimization and command formation
+- [x] Update documentation to describe optimized Homebrew installation
 
 **Tests:**
-- [ ] Correctly detects already-installed formulas and casks
-- [ ] Only missing packages are included in install commands
-- [ ] Single install command is formed for formulas and casks
-- [ ] Dry-run mode outputs correct commands
-- [ ] Integration tests cover optimized Homebrew installation
-- [ ] Backward compatibility maintained for existing workflows
+- [x] Correctly detects already-installed formulas and casks
+- [x] Only missing packages are included in install commands
+- [x] Single install command is formed for formulas and casks
+- [x] Dry-run mode outputs correct commands
+- [x] Integration tests cover optimized Homebrew installation
+- [x] Backward compatibility maintained for existing workflows
 
-**Acceptance Criteria:**
-# On apply, only missing Homebrew packages are installed
-ordinator apply --profile work
-# Queries installed formulas and casks
-# Installs only missing formulas with one brew install command
-# Installs only missing casks with one brew install --cask command
-# Dry-run mode prints the optimized commands
-
-**Completion Statement:** This completes Phase 4.11 (Optimized Homebrew Installation) and prepares for Phase 5 (System Commands & Script Generation).
+**Completion Statement:**
+Phase 4.11 (Optimized Homebrew Installation) is complete. Homebrew package installation now only installs missing formulas and casks using a single command for each, with full test coverage and documentation updates. All tests pass and the codebase is ready for the next phase.
 
 ---
 

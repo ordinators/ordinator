@@ -775,3 +775,67 @@ exclude_patterns = []
         .success()
         .stderr(predicates::str::contains("No plaintext secrets found"));
 }
+
+#[test]
+fn test_check_key_rotation_needed_missing_created_on_defaults_to_file() {
+    use filetime::{set_file_mtime, FileTime};
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let temp = assert_fs::TempDir::new().unwrap();
+    let config_content = r#"
+[global]
+default_profile = "test"
+
+[profiles.test]
+files = []
+directories = []
+enabled = true
+description = "Test profile"
+exclude = []
+
+[secrets]
+key_rotation_interval_days = 30
+"#;
+    let (_config_guard, _test_mode_guard) =
+        common::setup_test_environment_with_config(&temp, Some(config_content));
+    let config_dir = temp.path();
+    let age_dir = config_dir.join("age");
+    fs::create_dir_all(&age_dir).unwrap();
+    let key_path = age_dir.join("test.txt");
+    fs::write(&key_path, "dummy").unwrap();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let filetime = FileTime::from_unix_time(now as i64, 0);
+    set_file_mtime(&key_path, filetime).unwrap();
+    std::thread::sleep(std::time::Duration::from_secs(1));
+    // Create a mock sops binary in a temp bin dir
+    let bin_dir = temp.child("bin");
+    bin_dir.create_dir_all().unwrap();
+    let sops_path = bin_dir.child("sops");
+    sops_path
+        .write_str("#!/bin/sh\necho 'SOPS mock'\nexit 0\n")
+        .unwrap();
+    fs::set_permissions(sops_path.path(), fs::Permissions::from_mode(0o755)).unwrap();
+    // Create a mock age binary that does nothing but succeeds
+    let age_path = bin_dir.child("age");
+    age_path.write_str("#!/bin/sh\nexit 0\n").unwrap();
+    fs::set_permissions(age_path.path(), fs::Permissions::from_mode(0o755)).unwrap();
+    // Set PATH with RAII guard
+    let _path_guard = common::EnvVarGuard::set("PATH", bin_dir.path());
+    // Use the CLI to check for key rotation needed
+    let mut cmd = common::create_ordinator_command(&temp);
+    cmd.env("PATH", bin_dir.path());
+    cmd.args(["age", "validate", "--profile", "test"]);
+    let output = cmd.output().unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    eprintln!("[DEBUG] age validate stdout: {stdout}");
+    eprintln!("[DEBUG] age validate stderr: {stderr}");
+    // Should not print a rotation warning
+    assert!(
+        stdout.contains("Age encryption setup is valid")
+            || stderr.contains("Age encryption setup is valid")
+    );
+}

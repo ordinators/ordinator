@@ -379,27 +379,20 @@ bash ~/.dotfiles/scripts/bootstrap-work.sh
 
 ## Package Management
 
-### Exporting Homebrew Packages
+### Installing Homebrew Packages
 
 ```bash
-# Export currently installed packages for a profile
-ordinator brew export --profile work
-
-# This adds packages to your configuration
-# They will be installed when you apply the profile
-```
-
-### Installing Packages
-
-```bash
-# Install packages for a profile
-ordinator brew install --profile work
-
-# Or install during apply
+# Install Homebrew formulas and casks for a profile
 ordinator apply --profile work
 
-# Skip package installation
-ordinator apply --profile work --skip-brew
+# Or install packages directly
+ordinator brew install --profile work
+
+# Only missing formulas and casks will be installed for the selected profile
+# Already-installed packages are skipped
+
+# Dry-run mode prints the install commands without executing them
+ordinator brew install --profile work --dry-run
 ```
 
 ### Managing Package Lists
