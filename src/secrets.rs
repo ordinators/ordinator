@@ -1855,9 +1855,10 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         };
         config.profiles.insert(profile_name.clone(), profile);
         config.secrets.key_rotation_interval_days = Some(30);
-        let temp_file = tempfile::NamedTempFile::new().unwrap();
-        config.save_to_file(temp_file.path()).unwrap();
-        std::env::set_var("ORDINATOR_CONFIG", temp_file.path());
+        let temp_dir = tempfile::tempdir().unwrap();
+        let config_path = temp_dir.path().join("ordinator.toml");
+        config.save_to_file(&config_path).unwrap();
+        std::env::set_var("ORDINATOR_CONFIG", &config_path);
         let result = super::check_key_rotation_needed(&profile_name).unwrap();
         assert!(result.is_some());
         let msg = result.unwrap();
