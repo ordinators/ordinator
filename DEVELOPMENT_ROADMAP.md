@@ -990,39 +990,61 @@ Phase 4.11 (Optimized Homebrew Installation) is complete. Homebrew package insta
 
 ## Phase 5: System Commands & Script Generation ⚙️
 
-### 5.1 System Command Parsing
-**Priority**: Medium  
-**Dependencies**: 1.1  
-**Estimated Time**: 2-3 days  
-**Testable**: ✅
+### 5.1 Profile-Specific Setup Scripts with Global Fallback
 
-**Tasks**:
-- [ ] Parse system commands from config
-- [ ] Validate command safety
-- [ ] Generate system script (`ordinator-system.sh`)
-- [ ] Never execute sudo commands directly
-- [ ] Add interactive mode for step-by-step system command execution
-- [ ] Implement progress indicators for script generation and validation
-- [ ] Add colorized output for safety level indicators (Safe/Warning/Dangerous/Blocked)
-- [ ] Enhance error messages for command validation failures
+**Priority:** Medium  
+**Dependencies:** 1.1  
+**Estimated Time:** 2-3 days  
+**Testable:** ✅
 
-**Tests**:
-- [ ] Commands are parsed correctly
-- [ ] Scripts are generated properly
-- [ ] Safety validation works
-- [ ] No sudo commands are executed
-- [ ] Interactive mode works for command execution
-- [ ] Progress indicators display during script generation
-- [ ] Colorized output renders safety levels correctly
+**Tasks:**
+- [ ] Add `[install_script] script = "$ORDINATOR_HOME/setup.sh"` to config for global setup script.
+- [ ] Add optional `setup_script` field to each profile in config for profile-specific scripts.
+- [ ] On `ordinator init`, generate a default `setup.sh` at the repo root (with comments and best practices).
+- [ ] If a profile is specified at init, optionally generate `setup-<profile>.sh` as a template.
+- [ ] Implement fallback logic: use profile-specific script if present, otherwise use global script.
+- [ ] On `ordinator apply` or `ordinator bootstrap`, print the correct script path for the user to run.
+- [ ] Never execute scripts automatically; always require manual execution.
+- [ ] Set generated script permissions to `700` (owner executable).
+- [ ] Validate that referenced script files exist and are readable; print clear errors if not.
+- [ ] Add comments to generated scripts about sourcing secrets securely and not storing secrets in plaintext.
+- [ ] Update documentation (CONFIGURATION.md, COMMANDS.md, README) to explain the setup script workflow, fallback logic, and security best practices.
+- [ ] Add unit and integration tests for config parsing, fallback logic, and CLI output.
+- [ ] Ensure backward compatibility for users with only a global script.
 
-**Acceptance Criteria**:
-```bash
-ordinator generate-script --profile work
-# Creates ordinator-system.sh for manual execution
-# Interactive mode guides through command execution
-# Progress indicators show generation status
-# Colorized output highlights safety levels
+**UX/Documentation:**
+- [ ] CLI output after `apply`/`bootstrap` should clearly state which script to run.
+- [ ] If no script is configured, print a helpful message and suggest creating one.
+- [ ] Document the recommended pattern for handling secrets (encrypted file, sourced at runtime).
+- [ ] Add onboarding notes and CLI help for new users.
+
+**Security:**
+- [ ] Never store secrets in setup scripts; recommend sourcing an encrypted secrets file.
+- [ ] Warn users in docs and script comments about not putting secrets in plaintext scripts.
+
+**Testing:**
+- [ ] Test all fallback scenarios: profile-specific script, global script, neither present.
+- [ ] Test script generation, permissions, and error handling.
+
+**Acceptance Criteria:**
 ```
+# With profile-specific script
+ordinator apply --profile work
+# Output: "To complete your setup for profile 'work', run: $ORDINATOR_HOME/setup-work.sh"
+
+# With only global script
+ordinator apply --profile personal
+# Output: "To complete your setup, run: $ORDINATOR_HOME/setup.sh"
+
+# With neither present
+ordinator apply --profile laptop
+# Output: "No setup script configured for this profile or globally. Please create $ORDINATOR_HOME/setup.sh"
+```
+
+**Completion Statement:**  
+This completes Phase 5.1 (Profile-Specific Setup Scripts with Global Fallback), providing a secure, user-friendly, and extensible system for managing setup scripts in Ordinator.
+
+---
 
 ### 5.2 macOS-Specific Features
 **Priority**: Medium  
