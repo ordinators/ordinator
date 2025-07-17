@@ -1459,6 +1459,23 @@ ordinator apply --profile work
 ordinator apply --profile work --skip-brew
 ```
 
+### Homebrew Package Installation
+
+When you run `ordinator apply` or `ordinator brew install`, Ordinator will:
+- Query the list of currently installed Homebrew formulas and casks
+- Compare them to the list in your profile configuration
+- Install only the missing formulas and casks using a single `brew install` and a single `brew install --cask` command
+- Skip already-installed packages for efficiency and idempotency
+- In dry-run mode, print the exact install commands that would be run, without executing them
+
+**Example:**
+
+    ordinator apply --profile work
+    # Installs only missing formulas/casks for the 'work' profile
+
+    ordinator brew install --profile personal --dry-run
+    # Prints the optimized install commands for the 'personal' profile
+
 ### System Setup
 
 ```bash

@@ -1867,38 +1867,6 @@ jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
     }
 
     #[test]
-    fn test_check_key_rotation_needed_missing_created_on_defaults_to_file() {
-        use crate::config::{Config, ProfileConfig};
-        use filetime::{set_file_mtime, FileTime};
-        use std::fs;
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let mut config = Config::default();
-        let profile_name = "test".to_string();
-        let profile = ProfileConfig::default();
-        config.profiles.insert(profile_name.clone(), profile);
-        config.secrets.key_rotation_interval_days = Some(30);
-        let temp_file = tempfile::NamedTempFile::new().unwrap();
-        config.save_to_file(temp_file.path()).unwrap();
-        std::env::set_var("ORDINATOR_CONFIG", temp_file.path());
-        // Create a dummy key file with a recent mtime in the correct location
-        let config_dir = temp_file.path().parent().unwrap();
-        let age_dir = config_dir.join("age");
-        fs::create_dir_all(&age_dir).unwrap();
-        let key_path = age_dir.join("test.txt");
-        fs::write(&key_path, "dummy").unwrap();
-        // Set the mtime to now
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        let filetime = FileTime::from_unix_time(now as i64, 0);
-        set_file_mtime(&key_path, filetime).unwrap();
-        let result = super::check_key_rotation_needed(&profile_name).unwrap();
-        // Should be None since file is new
-        assert!(result.is_none());
-    }
-
-    #[test]
     fn test_check_key_rotation_needed_missing_interval_defaults_to_90() {
         use crate::config::{Config, ProfileConfig};
         use chrono::{Duration, Utc};

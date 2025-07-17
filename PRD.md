@@ -81,6 +81,9 @@
 - CLI and optionally JSON output
 - Useful for testing, debugging, and trust-building
 
+### ✅ Homebrew Integration
+- Only missing formulas and casks are installed during apply, using a single command for each. Already-installed packages are skipped for efficiency and idempotency.
+
 ---
 
 ## 5. Design Considerations
@@ -92,6 +95,7 @@
 - Clear logs and validation help build user confidence
 - CLI must feel intuitive — especially for developers who know Git
 - Internals written in Rust for safety, performance, and reliability
+- Homebrew installation is optimized for performance and idempotency: only missing packages are installed, reducing redundant operations and improving user experience.
 
 ---
 
@@ -106,6 +110,7 @@
 - Dry-run, logging, and system-script generation core to apply engine
 - Installable via Homebrew or `curl | sh` installer
 - CI/CD includes automated testing, code formatting, and static analysis
+- Homebrew installation logic queries installed packages and forms a single install command for missing formulas and casks.
 
 ---
 

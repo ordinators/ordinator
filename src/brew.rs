@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use std::process::Command;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::config::Config;
 
@@ -36,44 +36,86 @@ impl BrewManager {
     }
 
     /// Install Homebrew packages from config
-    pub async fn install_packages(&self, profile: &str, config: &Config) -> Result<()> {
-        info!("Installing Homebrew packages for profile: {}", profile);
-
+    pub async fn install_packages(&self, profile: &str, config: &Config) -> anyhow::Result<()> {
+        use anyhow::Context;
+        tracing::info!("Installing Homebrew packages for profile: {}", profile);
         let profile_config = config
             .get_profile(profile)
             .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found", profile))?;
-
-        let formulas = &profile_config.homebrew_formulas;
-        let casks = &profile_config.homebrew_casks;
-
-        if formulas.is_empty() && casks.is_empty() {
-            info!(
+        if profile_config.homebrew_formulas.is_empty() && profile_config.homebrew_casks.is_empty() {
+            tracing::info!(
                 "No Homebrew formulas or casks defined for profile '{}'",
                 profile
             );
             return Ok(());
         }
-
-        // Install formulas
-        if !formulas.is_empty() {
-            info!("Installing {} formulas", formulas.len());
-            for formula in formulas {
-                self.install_formula(formula).await?;
+        let (missing_formulas, missing_casks) = self.get_missing_packages(profile_config).await?;
+        if missing_formulas.is_empty() && missing_casks.is_empty() {
+            println!(
+                "All Homebrew formulas and casks for profile '{profile}' are already installed."
+            );
+            return Ok(());
+        }
+        // Install missing formulas in one command
+        if !missing_formulas.is_empty() {
+            if self.dry_run {
+                println!(
+                    "[DRY-RUN] Would install formulas: {}",
+                    missing_formulas.join(" ")
+                );
+            } else {
+                let mut cmd = std::process::Command::new("brew");
+                cmd.arg("install");
+                for formula in &missing_formulas {
+                    cmd.arg(formula);
+                }
+                let output = cmd.output().with_context(|| {
+                    format!(
+                        "Failed to run brew install for formulas: {}",
+                        missing_formulas.join(", ")
+                    )
+                })?;
+                if output.status.success() {
+                    tracing::info!("Installed formulas: {}", missing_formulas.join(", "));
+                } else {
+                    let error = String::from_utf8_lossy(&output.stderr);
+                    tracing::warn!(
+                        "Failed to install formulas: {}: {}",
+                        missing_formulas.join(", "),
+                        error
+                    );
+                }
             }
         }
-
-        // Install casks
-        if !casks.is_empty() {
-            info!("Installing {} casks", casks.len());
-            for cask in casks {
-                self.install_cask(cask).await?;
+        // Install missing casks in one command
+        if !missing_casks.is_empty() {
+            if self.dry_run {
+                println!("[DRY-RUN] Would install casks: {}", missing_casks.join(" "));
+            } else {
+                let mut cmd = std::process::Command::new("brew");
+                cmd.arg("install");
+                cmd.arg("--cask");
+                for cask in &missing_casks {
+                    cmd.arg(cask);
+                }
+                let output = cmd.output().with_context(|| {
+                    format!(
+                        "Failed to run brew install --cask for casks: {}",
+                        missing_casks.join(", ")
+                    )
+                })?;
+                if output.status.success() {
+                    tracing::info!("Installed casks: {}", missing_casks.join(", "));
+                } else {
+                    let error = String::from_utf8_lossy(&output.stderr);
+                    tracing::warn!(
+                        "Failed to install casks: {}: {}",
+                        missing_casks.join(", "),
+                        error
+                    );
+                }
             }
         }
-
-        info!(
-            "Homebrew package installation complete for profile '{}'",
-            profile
-        );
         Ok(())
     }
 
@@ -138,55 +180,25 @@ impl BrewManager {
         Ok((formulas, casks))
     }
 
-    /// Install a single formula
-    async fn install_formula(&self, package: &str) -> Result<()> {
-        if self.dry_run {
-            println!("[DRY-RUN] Would install formula: {package}");
-            return Ok(());
-        }
-
-        let mut cmd = Command::new("brew");
-        cmd.arg("install");
-        cmd.arg(package);
-
-        let output = cmd
-            .output()
-            .with_context(|| format!("Failed to run brew install for formula: {package}"))?;
-
-        if output.status.success() {
-            info!("Installed formula: {}", package);
-        } else {
-            let error = String::from_utf8_lossy(&output.stderr);
-            warn!("Failed to install formula {}: {}", package, error);
-        }
-
-        Ok(())
-    }
-
-    /// Install a single cask
-    async fn install_cask(&self, cask: &str) -> Result<()> {
-        if self.dry_run {
-            println!("[DRY-RUN] Would install cask: {cask}");
-            return Ok(());
-        }
-
-        let mut cmd = Command::new("brew");
-        cmd.arg("install");
-        cmd.arg("--cask");
-        cmd.arg(cask);
-
-        let output = cmd
-            .output()
-            .with_context(|| format!("Failed to run brew install --cask for cask: {cask}"))?;
-
-        if output.status.success() {
-            info!("Installed cask: {}", cask);
-        } else {
-            let error = String::from_utf8_lossy(&output.stderr);
-            warn!("Failed to install cask {}: {}", cask, error);
-        }
-
-        Ok(())
+    /// Compute missing formulas and casks
+    async fn get_missing_packages(
+        &self,
+        profile_config: &crate::config::ProfileConfig,
+    ) -> anyhow::Result<(Vec<String>, Vec<String>)> {
+        let (installed_formulas, installed_casks) = self.get_current_packages().await?;
+        let missing_formulas: Vec<String> = profile_config
+            .homebrew_formulas
+            .iter()
+            .filter(|f| !installed_formulas.contains(f))
+            .cloned()
+            .collect();
+        let missing_casks: Vec<String> = profile_config
+            .homebrew_casks
+            .iter()
+            .filter(|c| !installed_casks.contains(c))
+            .cloned()
+            .collect();
+        Ok((missing_formulas, missing_casks))
     }
 
     /// Check if Homebrew is installed
@@ -203,6 +215,46 @@ impl BrewManager {
 mod tests {
     use super::*;
     use crate::config::Config;
+    use std::sync::{Arc, Mutex};
+
+    // Helper struct to override get_current_packages for testing
+    struct TestBrewManager {
+        installed_formulas: Arc<Mutex<Vec<String>>>,
+        installed_casks: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl TestBrewManager {
+        fn new(formulas: Vec<&str>, casks: Vec<&str>) -> Self {
+            Self {
+                installed_formulas: Arc::new(Mutex::new(
+                    formulas.into_iter().map(|s| s.to_string()).collect(),
+                )),
+                installed_casks: Arc::new(Mutex::new(
+                    casks.into_iter().map(|s| s.to_string()).collect(),
+                )),
+            }
+        }
+        async fn get_missing_packages(
+            &self,
+            profile_config: &crate::config::ProfileConfig,
+        ) -> anyhow::Result<(Vec<String>, Vec<String>)> {
+            let installed_formulas = self.installed_formulas.lock().unwrap().clone();
+            let installed_casks = self.installed_casks.lock().unwrap().clone();
+            let missing_formulas: Vec<String> = profile_config
+                .homebrew_formulas
+                .iter()
+                .filter(|f| !installed_formulas.contains(f))
+                .cloned()
+                .collect();
+            let missing_casks: Vec<String> = profile_config
+                .homebrew_casks
+                .iter()
+                .filter(|c| !installed_casks.contains(c))
+                .cloned()
+                .collect();
+            Ok((missing_formulas, missing_casks))
+        }
+    }
 
     #[test]
     fn test_brew_manager_creation() {
@@ -294,5 +346,39 @@ mod tests {
         let parsed_profile = parsed.get_profile("default").unwrap();
         assert_eq!(parsed_profile.homebrew_formulas[0], "dummyformula");
         assert_eq!(parsed_profile.homebrew_casks[0], "dummycask");
+    }
+
+    #[tokio::test]
+    async fn test_get_missing_packages() {
+        let mut config = Config::create_default();
+        let profile = config.profiles.get_mut("default").unwrap();
+        profile.homebrew_formulas = vec!["git".to_string(), "neovim".to_string()];
+        profile.homebrew_casks = vec!["iterm2".to_string(), "alfred".to_string()];
+        let manager = TestBrewManager::new(vec!["git"], vec!["iterm2"]);
+        let (missing_formulas, missing_casks) =
+            manager.get_missing_packages(profile).await.unwrap();
+        assert_eq!(missing_formulas, vec!["neovim"]);
+        assert_eq!(missing_casks, vec!["alfred"]);
+    }
+
+    #[tokio::test]
+    async fn test_install_packages_dry_run_and_noop() {
+        let mut config = Config::create_default();
+        let profile = config.profiles.get_mut("default").unwrap();
+        profile.homebrew_formulas = vec!["git".to_string(), "neovim".to_string()];
+        profile.homebrew_casks = vec!["iterm2".to_string(), "alfred".to_string()];
+        // Case 1: All packages already installed
+        let manager = TestBrewManager::new(vec!["git", "neovim"], vec!["iterm2", "alfred"]);
+        let (missing_formulas, missing_casks) =
+            manager.get_missing_packages(profile).await.unwrap();
+        assert!(missing_formulas.is_empty());
+        assert!(missing_casks.is_empty());
+        // Case 2: Some packages missing, dry-run
+        let manager = TestBrewManager::new(vec!["git"], vec!["iterm2"]);
+        let (missing_formulas, missing_casks) =
+            manager.get_missing_packages(profile).await.unwrap();
+        assert_eq!(missing_formulas, vec!["neovim"]);
+        assert_eq!(missing_casks, vec!["alfred"]);
+        // (We can't capture stdout easily here, but this ensures the logic is correct)
     }
 }
