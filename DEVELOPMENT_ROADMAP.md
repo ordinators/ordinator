@@ -124,6 +124,14 @@ ordinator repair                       # Fixes broken symlinks
 - ✅ Improved error messages and debug output
 - ✅ Added comprehensive test coverage for symlink scenarios
 - ✅ Fixed test isolation issues with `ORDINATOR_HOME` environment variable
+- ✅ Added profile-specific file storage with hash-based filenames
+- ✅ Implemented enhanced conflict resolution with backup creation
+- ✅ Added dry-run mode support for all apply operations
+- ✅ Added verbose and quiet mode support for better user experience
+- ✅ Enhanced symlink repair logic with detailed debugging
+- ✅ Added colorized output for better visual feedback
+- ✅ Implemented proper error handling for missing source files
+- ✅ Added comprehensive debug logging for troubleshooting
 
 ---
 
@@ -1120,7 +1128,45 @@ echo "========================================"
 
 ---
 
-### 5.2 macOS-Specific Features
+### 5.2 Replication Script and Branch Detection
+
+**Priority:** High
+**Dependencies:** 5.1
+**Estimated Time:** 1 day
+**Testable:** ✅
+
+**Tasks:**
+- [ ] On `ordinator init`, generate a `replicate.sh` script at the root of the user's dotfiles repo.
+- [ ] In the generated README, add a one-liner using the main branch by default:
+  ```bash
+  bash <(curl -fsSL https://raw.githubusercontent.com/<username>/<repo>/main/replicate.sh)
+  ```
+- [ ] Add a note in the README: "If your repository uses a different default branch (e.g., master), update the one-liner to match your branch name."
+- [ ] Auto-detect the default branch name (using `git remote show origin | awk '/HEAD branch/ {print $NF}'`) for internal use (e.g., CLI output, onboarding messages, or advanced scripting).
+- [ ] Ensure the replicate.sh script uses the detected branch name for any internal git operations or URLs.
+- [ ] Document the rationale for using main by default and the branch detection logic for robustness.
+
+**UX/Documentation:**
+- [ ] README always shows the main branch in the one-liner, with a clear note about updating for custom branch names.
+- [ ] CLI and onboarding output use the detected branch name for accuracy.
+- [ ] Users are never left with a broken one-liner due to branch mismatch.
+
+**Acceptance Criteria:**
+```
+# README one-liner uses main branch by default:
+bash <(curl -fsSL https://raw.githubusercontent.com/<username>/<repo>/main/replicate.sh)
+
+# README note:
+# If your repository uses a different default branch (e.g., master), update the one-liner to match your branch name.
+
+# Internally, replicate.sh and CLI output use the detected branch name for all git operations and URLs.
+
+# If the branch cannot be detected, default to main and print a warning.
+```
+
+---
+
+### 5.3 macOS-Specific Features
 **Priority**: Medium  
 **Dependencies**: 5.1  
 **Estimated Time**: 2-3 days  
