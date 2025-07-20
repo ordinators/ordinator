@@ -990,41 +990,196 @@ Phase 4.11 (Optimized Homebrew Installation) is complete. Homebrew package insta
 
 ## Phase 5: System Commands & Script Generation ⚙️
 
-### 5.1 System Command Parsing
-**Priority**: Medium  
-**Dependencies**: 1.1  
-**Estimated Time**: 2-3 days  
-**Testable**: ✅
+### 5.1 Profile-Specific Setup Scripts (No Global Fallback)
 
-**Tasks**:
-- [ ] Parse system commands from config
-- [ ] Validate command safety
-- [ ] Generate system script (`ordinator-system.sh`)
-- [ ] Never execute sudo commands directly
-- [ ] Add interactive mode for step-by-step system command execution
-- [ ] Implement progress indicators for script generation and validation
-- [ ] Add colorized output for safety level indicators (Safe/Warning/Dangerous/Blocked)
-- [ ] Enhance error messages for command validation failures
+**Priority:** Medium  
+**Dependencies:** 1.1  
+**Estimated Time:** 2-3 days  
+**Testable:** ✅
 
-**Tests**:
-- [ ] Commands are parsed correctly
-- [ ] Scripts are generated properly
-- [ ] Safety validation works
-- [ ] No sudo commands are executed
-- [ ] Interactive mode works for command execution
-- [ ] Progress indicators display during script generation
-- [ ] Colorized output renders safety levels correctly
+**Tasks:**
+- [x] Enforce that all profile names must be filesystem-safe: only letters, numbers, dash (-), and underscore (_). Reject any profile name that does not match this pattern.
+- [x] Add `[install_script] script = "$ORDINATOR_HOME/<profile>/bootstrap.sh"` to config for each profile's setup script.
+- [x] Add optional `setup_script` field to each profile in config for profile-specific scripts (default to `$ORDINATOR_HOME/<profile>/bootstrap.sh`).
+- [x] Remove automatic bootstrap script generation from `ordinator init`. Instead, after init completes, display a message suggesting 'ordinator bootstrap generate --profile <profile>' as an available next step.
+- [x] When generating a bootstrap script for a profile, also generate a blank `bootstrap-secrets.env` file in the same profile directory.
+- [x] Ensure all `bootstrap-secrets.env` files (in base and all profile subfolders) are included in `.gitignore`.
+- [x] Implement fallback logic: use profile-specific script if present, otherwise use global script.
+- [x] On `ordinator apply` or `ordinator bootstrap`, print the correct script path for the user to run.
+- [x] Never execute scripts automatically; always require manual execution.
+- [x] Set generated script permissions to `700` (owner executable).
+- [x] Validate that referenced script files exist and are readable; print clear info if not.
+- [x] Add comments to generated scripts about sourcing secrets securely and not storing secrets in plaintext.
+- [x] Update documentation (CONFIGURATION.md, COMMANDS.md, README) to explain the setup script workflow, fallback logic, and security best practices.
+- [x] Add unit and integration tests for config parsing, fallback logic, and CLI output.
+- [x] Ensure backward compatibility for users with only a global script.
+- [x] Implement the full ordinator bootstrap command family:
+    - `ordinator bootstrap show --profile <profile>`: Prints the resolved path to the bootstrap script for the selected profile, with a clear instruction for running it. If the script does not exist, prints an info message notifying the user that no script was detected and proceeds without error.
+    - `ordinator bootstrap generate --profile <profile> [--force]`: Generates the default template script at `$ORDINATOR_HOME/<profile>/bootstrap.sh` and a blank `bootstrap-secrets.env` in the same directory. Refuses to overwrite unless `--force` is given. Prints the path to the generated script.
+    - `ordinator bootstrap edit --profile <profile>`: Opens the resolved script in `$EDITOR`. If the script does not exist, prints a helpful info message and suggests `ordinator bootstrap generate`. If `$EDITOR` is not set, prints a clear error or falls back to `vi`.
+    - All commands use profile-specific script logic. If neither exists, print a clear info message and proceed without error.
 
-**Acceptance Criteria**:
-```bash
-ordinator generate-script --profile work
-# Creates ordinator-system.sh for manual execution
-# Interactive mode guides through command execution
-# Progress indicators show generation status
-# Colorized output highlights safety levels
+**UX/Documentation:**
+- [x] Profile names must be filesystem-safe: only letters, numbers, dash (-), and underscore (_). Any attempt to create or use a profile with an invalid name will be rejected with a clear error message.
+- [x] After `ordinator init`, display a message such as: "Next step: To create a setup/bootstrap script for your profile, run 'ordinator bootstrap generate --profile <profile>'"
+- [x] CLI output after `apply`/`bootstrap` should clearly state which script to run.
+- [x] If no script is configured, print an info message and proceed (do not fail or error).
+- [x] Document the recommended pattern for handling secrets (encrypted file, sourced at runtime).
+- [x] Add onboarding notes and CLI help for new users, including profile name requirements.
+- [x] Always print the full path and a clear instruction for running the script.
+- [x] If the script is missing, always suggest the generate command as an option.
+- [x] Never execute scripts automatically; always require manual execution.
+
+**Security:**
+- [x] Never store secrets in setup scripts; recommend sourcing an encrypted secrets file.
+- [x] Warn users in docs and script comments about not putting secrets in plaintext scripts.
+- [x] Ensure all `bootstrap-secrets.env` files are in `.gitignore`.
+
+**Testing:**
+- [x] Test all fallback scenarios: profile-specific script, global script, neither present.
+- [x] Test script and secrets file generation, permissions, and info handling when script is missing.
+- [x] Test that invalid profile names are rejected everywhere (creation, script generation, apply, etc.) and that error messages are clear.
+
+**Acceptance Criteria:**
+```
+# If a user tries to create or use a profile with an invalid name:
+# Output: "Error: Profile name 'work profile' is not filesystem-safe. Allowed characters: letters, numbers, dash (-), underscore (_)."
+
+# After ordinator init
+# Output: "Next step: To create a setup/bootstrap script for your profile, run 'ordinator bootstrap generate --profile <profile>'"
+
+# With profile-specific script
+ordinator apply --profile work
+# Output: "To complete your setup for profile 'work', run: bash $ORDINATOR_HOME/work/bootstrap.sh"
+
+# With neither present
+ordinator apply --profile laptop
+# Output: "No bootstrap script detected for this profile. Proceeding without a setup script."
+
+# ordinator bootstrap --profile <profile>
+# Prints the resolved path to the bootstrap script and run instructions, or an info message if none exists.
+
+# ordinator bootstrap generate --profile <profile> [--force]
+# Generates the default script at $ORDINATOR_HOME/<profile>/bootstrap.sh and a blank bootstrap-secrets.env in the same directory, refuses to overwrite unless --force is given.
+
+# ordinator bootstrap edit --profile <profile>
+# Opens the script in $EDITOR, or prints an info message if not found.
 ```
 
-### 5.2 macOS-Specific Features
+**Summary Table:**
+
+| Command                                 | Action/Output                                      |
+|------------------------------------------|----------------------------------------------------|
+| ordinator bootstrap show --profile work | Print path to work profile script, or info if missing |
+| ordinator bootstrap generate --profile work | Create default script and blank secrets file if missing |
+| ordinator bootstrap edit --profile work  | Open script in $EDITOR, or info if missing         |
+
+---
+
+### Example: Profile-Specific bootstrap.sh Script
+
+```sh
+#!/usr/bin/env bash
+# Ordinator Bootstrap Script for the 'work' profile
+# This script is intended to be run manually after ordinator apply --profile work.
+# Edit this file to add your custom setup logic (install plugins, configure tools, etc).
+#
+# ⚠️  SECURITY WARNING ⚠️
+# This script will be committed to your Git repository in PLAINTEXT format.
+# NEVER put secrets, API keys, passwords, or any sensitive information directly in this script.
+# 
+# Instead, store secrets in the encrypted bootstrap-secrets.env file (which is gitignored)
+# and source it at runtime if needed (see example below).
+#
+# Examples of what NOT to put in this script:
+# - API keys (AWS_ACCESS_KEY_ID, GITHUB_TOKEN, etc.)
+# - Passwords or private keys
+# - Database credentials
+# - Any other sensitive information
+#
+# Examples of what IS safe to put in this script:
+# - System configuration (defaults write, etc.)
+# - Tool setup commands
+# - Non-sensitive environment variables
+# - Custom application configuration
+# - Plugin installations for tools
+
+set -euo pipefail
+
+START_TIME=$(date +%s)
+
+echo "========================================"
+echo " Ordinator Bootstrap Script Starting (work profile)"
+echo "========================================"
+echo
+
+# Source secrets for this profile if available
+if [ -f "$ORDINATOR_HOME/work/bootstrap-secrets.env" ]; then
+  . "$ORDINATOR_HOME/work/bootstrap-secrets.env"
+  echo "Loaded secrets from $ORDINATOR_HOME/work/bootstrap-secrets.env"
+fi
+
+# --- User Customization Section ---
+
+# Add your setup steps below this line
+# Examples:
+# defaults write com.apple.dock autohide -bool true
+# npm install -g typescript
+# git config --global user.name "Your Name"
+# git config --global user.email "your.email@example.com"
+
+# --- End User Customization Section ---
+
+echo
+END_TIME=$(date +%s)
+ELAPSED=$((END_TIME - START_TIME))
+echo "========================================"
+echo " Ordinator Bootstrap Script Complete (work profile)"
+echo " Total time: ${ELAPSED}s"
+echo "========================================"
+```
+
+---
+
+### 5.2 Replication Script and Branch Detection
+
+**Priority:** High
+**Dependencies:** 5.1
+**Estimated Time:** 1 day
+**Testable:** ✅
+
+**Tasks:**
+- [ ] On `ordinator init`, generate a `replicate.sh` script at the root of the user's dotfiles repo.
+- [ ] In the generated README, add a one-liner using the main branch by default:
+  ```bash
+  bash <(curl -fsSL https://raw.githubusercontent.com/<username>/<repo>/main/replicate.sh)
+  ```
+- [ ] Add a note in the README: "If your repository uses a different default branch (e.g., master), update the one-liner to match your branch name."
+- [ ] Auto-detect the default branch name (using `git remote show origin | awk '/HEAD branch/ {print $NF}'`) for internal use (e.g., CLI output, onboarding messages, or advanced scripting).
+- [ ] Ensure the replicate.sh script uses the detected branch name for any internal git operations or URLs.
+- [ ] Document the rationale for using main by default and the branch detection logic for robustness.
+
+**UX/Documentation:**
+- [ ] README always shows the main branch in the one-liner, with a clear note about updating for custom branch names.
+- [ ] CLI and onboarding output use the detected branch name for accuracy.
+- [ ] Users are never left with a broken one-liner due to branch mismatch.
+
+**Acceptance Criteria:**
+```
+# README one-liner uses main branch by default:
+bash <(curl -fsSL https://raw.githubusercontent.com/<username>/<repo>/main/replicate.sh)
+
+# README note:
+# If your repository uses a different default branch (e.g., master), update the one-liner to match your branch name.
+
+# Internally, replicate.sh and CLI output use the detected branch name for all git operations and URLs.
+
+# If the branch cannot be detected, default to main and print a warning.
+```
+
+---
+
+### 5.3 macOS-Specific Features
 **Priority**: Medium  
 **Dependencies**: 5.1  
 **Estimated Time**: 2-3 days  
@@ -1264,3 +1419,59 @@ ordinator --check-updates
 **Total Estimated Time**: 24-38 days (4-6 weeks)
 
 This timeline assumes focused development time and can be adjusted based on availability and priorities. 
+
+### Onboarding Output Examples
+
+**After a fresh init (no repo):**
+```
+Repository initialized successfully at /Users/you/.ordinator
+
+Next steps:
+  1. Review and customize your configuration:
+       ordinator config edit
+  2. Add files and secrets to track:
+       ordinator add ~/.zshrc --profile work
+       ordinator secrets add ~/.aws/credentials --profile work
+  3. (Recommended) Create and edit a setup/bootstrap script for your environment:
+       ordinator bootstrap generate
+       ordinator bootstrap edit
+     Or for a specific profile:
+       ordinator bootstrap generate --profile work
+       ordinator bootstrap edit --profile work
+  4. Apply your configuration to set up your environment:
+       ordinator apply --profile work
+  5. (Optional) Commit and push your changes:
+       ordinator commit -m "Initial setup"
+       ordinator push
+
+For more commands and help, run:
+  ordinator --help
+  ordinator COMMAND --help
+
+Documentation: https://github.com/ordinators/ordinator
+```
+
+**After repo replication (ordinator init <repo-url>):**
+```
+Repository cloned and initialized at /Users/you/.ordinator
+
+Next steps:
+  1. Apply your configuration to set up your environment (and set up your AGE key if prompted):
+       ordinator apply --profile work
+     (Ordinator will prompt you to generate or import your AGE key if secrets are present.)
+  2. (Optional) Edit tracked files, profiles, or bootstrap scripts as needed:
+       ordinator config edit
+       ordinator bootstrap edit [--profile work]
+  3. (Optional) Add new files or secrets to track:
+       ordinator add ~/.vimrc --profile work
+       ordinator secrets add ~/.aws/credentials --profile work
+  4. (Optional) Commit and push any local changes:
+       ordinator commit -m "Local customization"
+       ordinator push
+
+For more commands and help, run:
+  ordinator --help
+  ordinator COMMAND --help
+
+Documentation: https://github.com/ordinators/ordinator
+``` 

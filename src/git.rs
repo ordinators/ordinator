@@ -103,6 +103,12 @@ impl GitManager {
 
     /// Commit changes with a message
     pub fn commit(&self, message: &str) -> Result<()> {
+        // Always check for repo existence, even in test mode
+        if !self.exists() {
+            return Err(anyhow::anyhow!(
+                "No Git repository found. Run 'ordinator init' first."
+            ));
+        }
         if Self::is_test_mode() {
             info!("[TEST MODE] Skipping git commit: {}", message);
             return Ok(());

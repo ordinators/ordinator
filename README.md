@@ -34,6 +34,7 @@ brew install ordinators/ordinator/ordinator
 ordinator init https://github.com/username/dotfiles.git
 
 # Start watching your files
+# When you watch a file, Ordinator moves it into your dotfiles repository and creates a symlink at the original location, so your system transparently uses the tracked version.
 ordinator watch ~/.zshrc --profile work
 ordinator watch ~/.gitconfig --profile work
 
@@ -41,6 +42,7 @@ ordinator watch ~/.gitconfig --profile work
 ordinator age setup --profile work
 
 # Start watching sensitive files (secure workflow)
+# When you watch a sensitive file with the secure workflow, Ordinator encrypts the file, stores only the encrypted version in your repository, and leaves the original file untouched unless you choose to remove it.
 ordinator secrets watch ~/.ssh/config --profile work
 ordinator secrets watch ~/.aws/credentials --profile work
 
@@ -57,35 +59,23 @@ ordinator push
 
 ### 2. Replicate Your Dotfiles Repository to Another Device
 
-**Step 1:** Click the generated install link in your repository's README and run it in your terminal:
+**Run the replication script from your repository (recommended):**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/username/dotfiles/master/scripts/install.sh | sh
+bash <(curl -fsSL https://raw.githubusercontent.com/<username>/<repo>/main/replicate.sh)
 ```
 
-**Step 2:** Apply your configuration:
-```bash
-ordinator apply --profile work
-```
+This script will:
+- Install Ordinator if needed
+- Clone your dotfiles repository (if not already present)
+- Detect and use your default profile (or prompt if needed)
+- Apply your configuration
+- Guide you through secrets/AGE key setup if required
+- Prompt you to run your profile's bootstrap script if one exists
 
-## How It Works
+That's it! Your environment will be replicated and ready to use.
 
-When you run `ordinator apply`, Ordinator:
 
-1. **Generates the profile's bootstrap script** (if defined), which contains additional setup steps such as installing tools or configuring system settings.
-2. **Decrypts and copies secrets** (if secrets management is configured and not skipped) - secrets are decrypted in memory and copied to target locations with secure permissions (600).
-3. **Installs Homebrew packages** defined in the profile (if package management is configured and not skipped).
-4. **Symlinks all tracked files** for the selected profile from your dotfiles repository into their correct locations in your home directory, backing up any existing files if configured. **Files are stored in the repository as hash-based filenames (files/<profile>/<hash>_<filename>), and the mapping to the original path is tracked in the config.**
-5. **Performs safety checks** to avoid overwriting important files unless you use the `--force` flag.
-6. **Supports dry-run mode** so you can preview all changes without making modifications by adding the `--dry-run` flag.
 
-### Hash-Based Filename Mapping
-
-To prevent filename collisions and ensure deterministic storage, Ordinator stores all tracked files and secrets as hash-based filenames in the repository. The mapping from hash-based filename to original path is tracked in the TOML config under `file_mappings` for each profile. This ensures that even files with the same name in different locations are uniquely stored and correctly symlinked/applied.
-
-**Example:**
-
-    files/work/a1b2c3_config.txt   # maps to ~/.config/app/config.txt
-    files/work/9f8e7d_config.enc   # maps to ~/.ssh/config (encrypted)
 
 ## Profiles
 

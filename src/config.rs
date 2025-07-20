@@ -127,6 +127,21 @@ pub struct SecretsConfig {
 }
 
 impl Config {
+    /// Validate that a profile name is filesystem-safe
+    pub fn validate_profile_name(profile_name: &str) -> Result<()> {
+        // Check if profile name contains only allowed characters: letters, numbers, dash, underscore
+        let valid_pattern = regex::Regex::new(r"^[a-zA-Z0-9_-]+$").unwrap();
+
+        if !valid_pattern.is_match(profile_name) {
+            return Err(anyhow::anyhow!(
+                "Profile name '{}' is not filesystem-safe. Allowed characters: letters, numbers, dash (-), underscore (_).",
+                profile_name
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Load configuration from a TOML file
     pub fn from_file(path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)
@@ -370,8 +385,10 @@ impl Config {
 
     /// Add a new profile
     #[allow(dead_code)]
-    pub fn add_profile(&mut self, name: String, config: ProfileConfig) {
+    pub fn add_profile(&mut self, name: String, config: ProfileConfig) -> Result<()> {
+        Self::validate_profile_name(&name)?;
         self.profiles.insert(name, config);
+        Ok(())
     }
 
     /// Remove a profile
@@ -714,7 +731,7 @@ mod tests {
             file_mappings: HashMap::new(),
         };
 
-        config.add_profile("test".to_string(), new_profile);
+        let _ = config.add_profile("test".to_string(), new_profile);
         assert!(config.has_profile("test"));
 
         // Get profile
@@ -839,5 +856,54 @@ mod tests {
         );
         let profile = config.get_profile("default").unwrap();
         assert!(!profile.files.contains(&"not_in_profile.txt".to_string()));
+    }
+
+    #[test]
+    fn test_validate_profile_name() {
+        // Valid profile names
+        assert!(Config::validate_profile_name("work").is_ok());
+        assert!(Config::validate_profile_name("personal").is_ok());
+        assert!(Config::validate_profile_name("work-profile").is_ok());
+        assert!(Config::validate_profile_name("work_profile").is_ok());
+        assert!(Config::validate_profile_name("work123").is_ok());
+        assert!(Config::validate_profile_name("123work").is_ok());
+
+        // Invalid profile names
+        assert!(Config::validate_profile_name("work profile").is_err());
+        assert!(Config::validate_profile_name("work@profile").is_err());
+        assert!(Config::validate_profile_name("work.profile").is_err());
+        assert!(Config::validate_profile_name("work/profile").is_err());
+        assert!(Config::validate_profile_name("work\\profile").is_err());
+        assert!(Config::validate_profile_name("work profile").is_err());
+        assert!(Config::validate_profile_name("").is_err());
+    }
+
+    #[test]
+    fn test_add_profile_with_validation() {
+        let mut config = Config::create_default();
+
+        // Valid profile name
+        let profile_config = ProfileConfig {
+            files: vec!["test.txt".to_string()],
+            directories: vec![],
+            bootstrap_script: None,
+            enabled: true,
+            description: Some("Test profile".to_string()),
+            exclude: Vec::new(),
+            homebrew_formulas: Vec::new(),
+            homebrew_casks: Vec::new(),
+            secrets: Vec::new(),
+            created_on: None,
+            file_mappings: HashMap::new(),
+        };
+
+        assert!(config
+            .add_profile("valid-profile".to_string(), profile_config.clone())
+            .is_ok());
+
+        // Invalid profile name
+        let result = config.add_profile("invalid profile".to_string(), profile_config);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("filesystem-safe"));
     }
 }

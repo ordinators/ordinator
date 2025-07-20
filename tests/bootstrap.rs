@@ -12,23 +12,28 @@ fn test_bootstrap_command_success() {
     // Create a config with a bootstrap script defined
     let config_content = r#"
 [profiles.work]
-bootstrap_script = "bootstrap.sh"
+bootstrap_script = "scripts/work/bootstrap.sh"
 files = []
 "#;
     temp.child("ordinator.toml")
         .write_str(config_content)
         .unwrap();
 
+    // Create the bootstrap script file
+    temp.child("scripts/work/bootstrap.sh")
+        .write_str("#!/bin/bash\necho 'test script'")
+        .unwrap();
+
     // Run bootstrap command
     let mut cmd = common::create_ordinator_command(&temp);
-    cmd.args(["bootstrap", "--profile", "work"]);
+    cmd.args(["bootstrap", "show", "--profile", "work"]);
     let assert = cmd.assert();
 
     // Should show script info and safety level
     assert
         .success()
         .stderr(contains("Bootstrap script info for profile: work"))
-        .stderr(contains("bootstrap.sh"))
+        .stderr(contains("scripts/work/bootstrap.sh"))
         .stderr(contains("Safety level:"))
         .stderr(contains("To run the bootstrap script"));
 }
@@ -40,7 +45,7 @@ fn test_bootstrap_command_nonexistent_profile() {
 
     // Run bootstrap command with non-existent profile
     let mut cmd = common::create_ordinator_command(&temp);
-    cmd.args(["bootstrap", "--profile", "nonexistent"]);
+    cmd.args(["bootstrap", "show", "--profile", "nonexistent"]);
     let assert = cmd.assert();
 
     // Should fail with profile not found error
@@ -56,12 +61,12 @@ fn test_bootstrap_command_no_script_defined() {
 
     // Run bootstrap command with profile that has no bootstrap script
     let mut cmd = common::create_ordinator_command(&temp);
-    cmd.args(["bootstrap", "--profile", "default"]);
+    cmd.args(["bootstrap", "show", "--profile", "default"]);
     let assert = cmd.assert();
 
-    // Should show no script defined message
+    // Should show no script configured message
     assert.success().stderr(contains(
-        "No bootstrap script defined for profile 'default'",
+        "No bootstrap script configured for profile 'default'",
     ));
 }
 
@@ -73,16 +78,21 @@ fn test_bootstrap_command_dry_run() {
     // Create a config with a bootstrap script defined
     let config_content = r#"
 [profiles.work]
-bootstrap_script = "bootstrap.sh"
+bootstrap_script = "scripts/work/bootstrap.sh"
 files = []
 "#;
     temp.child("ordinator.toml")
         .write_str(config_content)
         .unwrap();
 
+    // Create the bootstrap script file
+    temp.child("scripts/work/bootstrap.sh")
+        .write_str("#!/bin/bash\necho 'test script'")
+        .unwrap();
+
     // Run bootstrap command with dry-run
     let mut cmd = common::create_ordinator_command(&temp);
-    cmd.args(["bootstrap", "--profile", "work", "--dry-run"]);
+    cmd.args(["bootstrap", "show", "--profile", "work", "--dry-run"]);
     let assert = cmd.assert();
 
     // Should show DRY-RUN message
@@ -100,16 +110,21 @@ fn test_bootstrap_command_quiet_mode() {
     // Create a config with a bootstrap script defined
     let config_content = r#"
 [profiles.work]
-bootstrap_script = "bootstrap.sh"
+bootstrap_script = "scripts/work/bootstrap.sh"
 files = []
 "#;
     temp.child("ordinator.toml")
         .write_str(config_content)
         .unwrap();
 
+    // Create the bootstrap script file
+    temp.child("scripts/work/bootstrap.sh")
+        .write_str("#!/bin/bash\necho 'test script'")
+        .unwrap();
+
     // Run bootstrap command with quiet flag
     let mut cmd = common::create_ordinator_command(&temp);
-    cmd.args(["bootstrap", "--profile", "work", "--quiet"]);
+    cmd.args(["bootstrap", "show", "--profile", "work", "--quiet"]);
     let assert = cmd.assert();
 
     // Should not show the info messages but still show the command to run
@@ -127,17 +142,22 @@ fn test_bootstrap_command_with_edit_flag() {
     // Create a config with a bootstrap script defined
     let config_content = r#"
 [profiles.work]
-bootstrap_script = "bootstrap.sh"
+bootstrap_script = "scripts/work/bootstrap.sh"
 files = []
 "#;
     temp.child("ordinator.toml")
         .write_str(config_content)
         .unwrap();
 
+    // Create the bootstrap script file
+    temp.child("scripts/work/bootstrap.sh")
+        .write_str("#!/bin/bash\necho 'test script'")
+        .unwrap();
+
     // Mock EDITOR environment variable
     let mut cmd = common::create_ordinator_command(&temp);
     cmd.env("EDITOR", "echo"); // Use echo as a mock editor
-    cmd.args(["bootstrap", "--profile", "work", "--edit"]);
+    cmd.args(["bootstrap", "edit", "--profile", "work"]);
     let assert = cmd.assert();
 
     // Should show script opened for editing
@@ -166,11 +186,13 @@ files = []
     cmd.args(["apply", "--profile", "work"]);
     let assert = cmd.assert();
 
-    // Should show bootstrap script generation
+    // Should show no bootstrap script found message
     assert
         .success()
-        .stderr(contains("Generated bootstrap script"))
-        .stderr(contains("bootstrap.sh"));
+        .stderr(contains("No bootstrap script found for profile 'work'"))
+        .stderr(contains(
+            "To create one, run: ordinator bootstrap generate --profile work",
+        ));
 }
 
 #[test]
@@ -181,7 +203,7 @@ fn test_bootstrap_script_safety_levels() {
     // Create a config with a bootstrap script defined
     let config_content = r#"
 [profiles.work]
-bootstrap_script = "bootstrap.sh"
+bootstrap_script = "scripts/work/bootstrap.sh"
 files = []
 "#;
     temp.child("ordinator.toml")
@@ -193,13 +215,13 @@ files = []
 sudo apt update
 echo "Dangerous script"
 "#;
-    temp.child("bootstrap.sh")
+    temp.child("scripts/work/bootstrap.sh")
         .write_str(dangerous_script)
         .unwrap();
 
     // Run bootstrap command
     let mut cmd = common::create_ordinator_command(&temp);
-    cmd.args(["bootstrap", "--profile", "work"]);
+    cmd.args(["bootstrap", "show", "--profile", "work"]);
     let assert = cmd.assert();
 
     // Should show dangerous warning
@@ -217,7 +239,7 @@ fn test_bootstrap_script_blocked_level() {
     // Create a config with a bootstrap script defined
     let config_content = r#"
 [profiles.work]
-bootstrap_script = "bootstrap.sh"
+bootstrap_script = "scripts/work/bootstrap.sh"
 files = []
 "#;
     temp.child("ordinator.toml")
@@ -229,13 +251,13 @@ files = []
 rm -rf /
 echo "Blocked script"
 "#;
-    temp.child("bootstrap.sh")
+    temp.child("scripts/work/bootstrap.sh")
         .write_str(blocked_script)
         .unwrap();
 
     // Run bootstrap command
     let mut cmd = common::create_ordinator_command(&temp);
-    cmd.args(["bootstrap", "--profile", "work"]);
+    cmd.args(["bootstrap", "show", "--profile", "work"]);
     let assert = cmd.assert();
 
     // Should show blocked warning
