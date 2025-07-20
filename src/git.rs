@@ -209,7 +209,9 @@ impl GitManager {
         let mut push_options = git2::PushOptions::new();
         push_options.remote_callbacks(callbacks);
 
-        let branch = self.get_default_branch().unwrap_or_else(|_| "main".to_string());
+        let branch = self
+            .get_default_branch()
+            .unwrap_or_else(|_| "main".to_string());
         let refspec = if force {
             format!("+refs/heads/{branch}:refs/heads/{branch}")
         } else {
@@ -263,15 +265,13 @@ impl GitManager {
         let mut fetch_options = git2::FetchOptions::new();
         fetch_options.remote_callbacks(callbacks);
 
-        let branch = self.get_default_branch().unwrap_or_else(|_| "main".to_string());
+        let branch = self
+            .get_default_branch()
+            .unwrap_or_else(|_| "main".to_string());
         let fetch_ref = format!("refs/heads/{branch}:refs/remotes/origin/{branch}");
 
         remote
-            .fetch(
-                &[&fetch_ref],
-                Some(&mut fetch_options),
-                None,
-            )
+            .fetch(&[&fetch_ref], Some(&mut fetch_options), None)
             .with_context(|| "Failed to fetch from remote")?;
 
         // Merge or rebase
@@ -422,8 +422,9 @@ impl GitManager {
             // In test mode, default to 'master' for legacy compatibility
             return Ok("master".to_string());
         }
-        let repo = Repository::open(&self.repo_path)
-            .with_context(|| format!("Failed to open repository at {}", self.repo_path.display()))?;
+        let repo = Repository::open(&self.repo_path).with_context(|| {
+            format!("Failed to open repository at {}", self.repo_path.display())
+        })?;
         // Try to get the remote HEAD symbolic reference
         if let Ok(remote) = repo.find_remote("origin") {
             if let Ok(refspec) = remote.default_branch() {

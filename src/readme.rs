@@ -148,11 +148,14 @@ impl ReadmeManager {
         // Get repository URL and branch
         let git_manager = crate::git::GitManager::new(dotfiles_dir.to_path_buf());
         let repo_url = git_manager.get_origin_url().unwrap_or(None);
-        let branch = git_manager.get_default_branch().unwrap_or_else(|_| "main".to_string());
+        let branch = git_manager
+            .get_default_branch()
+            .unwrap_or_else(|_| "main".to_string());
 
         // Load config for config-aware README generation
         let (config, _) = crate::config::Config::load()?;
-        let generator = READMEGenerator::new_with_repo_url_and_branch(false, false, repo_url, branch);
+        let generator =
+            READMEGenerator::new_with_repo_url_and_branch(false, false, repo_url, branch);
         let content = generator.generate_readme_with_config(&config)?;
         fs::write(&readme_path, content)?;
 
@@ -247,8 +250,10 @@ impl ReadmeManager {
                     content.push_str("\nTo apply a profile:\n```bash\nordinator apply --profile <profile-name>\n```\n\n");
                     // After the profiles section, add Homebrew packages if present in config
                     if let Ok((config, _)) = crate::config::Config::load() {
-                        let homebrew_section = READMEGenerator { repo_url: None, branch: "main".to_string() }
-                            .generate_homebrew_packages_with_config(&config);
+                        let homebrew_section = READMEGenerator {
+                            branch: "main".to_string(),
+                        }
+                        .generate_homebrew_packages_with_config(&config);
                         if !homebrew_section.is_empty() {
                             content.push_str(&homebrew_section);
                         }
@@ -315,7 +320,8 @@ impl ReadmeManager {
         let repo_url = git_manager.get_origin_url().unwrap_or(None);
 
         let branch = "main".to_string(); // fallback for preview
-        let generator = READMEGenerator::new_with_repo_url_and_branch(false, true, repo_url, branch);
+        let generator =
+            READMEGenerator::new_with_repo_url_and_branch(false, true, repo_url, branch);
         let content = generator.generate_readme_with_config(config)?;
 
         // Show preview
@@ -347,7 +353,8 @@ impl ReadmeManager {
             let repo_url = git_manager.get_origin_url().unwrap_or(None);
 
             let branch = "main".to_string(); // fallback for edit
-            let generator = READMEGenerator::new_with_repo_url_and_branch(false, false, repo_url, branch);
+            let generator =
+                READMEGenerator::new_with_repo_url_and_branch(false, false, repo_url, branch);
             let content = generator.generate_readme_with_config(config)?;
             fs::write(&readme_path, content)?;
             eprintln!("Generated README.md for editing");
@@ -369,14 +376,18 @@ impl ReadmeManager {
 
 /// README generator with customization options
 pub struct READMEGenerator {
-    repo_url: Option<String>,
     branch: String,
 }
 
 impl READMEGenerator {
-    /// Create a new README generator with repository URL and branch
-    pub fn new_with_repo_url_and_branch(_interactive: bool, _preview: bool, repo_url: Option<String>, branch: String) -> Self {
-        Self { repo_url, branch }
+    /// Create a new README generator with branch
+    pub fn new_with_repo_url_and_branch(
+        _interactive: bool,
+        _preview: bool,
+        _repo_url: Option<String>,
+        branch: String,
+    ) -> Self {
+        Self { branch }
     }
 
     /// Generate README content from template with config
@@ -468,9 +479,7 @@ impl READMEGenerator {
             "bash <(curl -fsSL https://raw.githubusercontent.com/{{username}}/{{repo}}/{branch}/replicate.sh)"
         );
         let note = "If your repository uses a different default branch (e.g., master), update the one-liner to match your branch name.";
-        format!(
-            "## Quick Install\n\n```bash\n{replicate_oneliner}\n```\n\n> {note}\n\n"
-        )
+        format!("## Quick Install\n\n```bash\n{replicate_oneliner}\n```\n\n> {note}\n\n")
     }
 
     fn generate_profiles_with_config(&self, config: &crate::config::Config) -> String {
