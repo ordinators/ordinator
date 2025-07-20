@@ -72,6 +72,8 @@ This script will:
 - Guide you through secrets/AGE key setup if required
 - Prompt you to run your profile's bootstrap script if one exists
 
+> **Note:** If your repository uses a different default branch (e.g., master), update the one-liner to match your branch name. Ordinator auto-detects the default branch for all onboarding output and generated scripts, so you always get the correct command for your setup.
+
 That's it! Your environment will be replicated and ready to use.
 
 

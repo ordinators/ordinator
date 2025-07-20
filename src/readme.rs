@@ -145,13 +145,14 @@ impl ReadmeManager {
             return Ok(Some(readme_path));
         }
 
-        // Get repository URL
+        // Get repository URL and branch
         let git_manager = crate::git::GitManager::new(dotfiles_dir.to_path_buf());
         let repo_url = git_manager.get_origin_url().unwrap_or(None);
+        let branch = git_manager.get_default_branch().unwrap_or_else(|_| "main".to_string());
 
         // Load config for config-aware README generation
         let (config, _) = crate::config::Config::load()?;
-        let generator = READMEGenerator::new_with_repo_url(false, false, repo_url);
+        let generator = READMEGenerator::new_with_repo_url_and_branch(false, false, repo_url, branch);
         let content = generator.generate_readme_with_config(&config)?;
         fs::write(&readme_path, content)?;
 
@@ -246,7 +247,7 @@ impl ReadmeManager {
                     content.push_str("\nTo apply a profile:\n```bash\nordinator apply --profile <profile-name>\n```\n\n");
                     // After the profiles section, add Homebrew packages if present in config
                     if let Ok((config, _)) = crate::config::Config::load() {
-                        let homebrew_section = READMEGenerator { repo_url: None }
+                        let homebrew_section = READMEGenerator { repo_url: None, branch: "main".to_string() }
                             .generate_homebrew_packages_with_config(&config);
                         if !homebrew_section.is_empty() {
                             content.push_str(&homebrew_section);
@@ -313,7 +314,8 @@ impl ReadmeManager {
         let git_manager = crate::git::GitManager::new(dotfiles_dir.to_path_buf());
         let repo_url = git_manager.get_origin_url().unwrap_or(None);
 
-        let generator = READMEGenerator::new_with_repo_url(false, true, repo_url);
+        let branch = "main".to_string(); // fallback for preview
+        let generator = READMEGenerator::new_with_repo_url_and_branch(false, true, repo_url, branch);
         let content = generator.generate_readme_with_config(config)?;
 
         // Show preview
@@ -344,7 +346,8 @@ impl ReadmeManager {
             let git_manager = crate::git::GitManager::new(dotfiles_dir.to_path_buf());
             let repo_url = git_manager.get_origin_url().unwrap_or(None);
 
-            let generator = READMEGenerator::new_with_repo_url(false, false, repo_url);
+            let branch = "main".to_string(); // fallback for edit
+            let generator = READMEGenerator::new_with_repo_url_and_branch(false, false, repo_url, branch);
             let content = generator.generate_readme_with_config(config)?;
             fs::write(&readme_path, content)?;
             eprintln!("Generated README.md for editing");
@@ -367,12 +370,13 @@ impl ReadmeManager {
 /// README generator with customization options
 pub struct READMEGenerator {
     repo_url: Option<String>,
+    branch: String,
 }
 
 impl READMEGenerator {
-    /// Create a new README generator with repository URL
-    pub fn new_with_repo_url(_interactive: bool, _preview: bool, repo_url: Option<String>) -> Self {
-        Self { repo_url }
+    /// Create a new README generator with repository URL and branch
+    pub fn new_with_repo_url_and_branch(_interactive: bool, _preview: bool, repo_url: Option<String>, branch: String) -> Self {
+        Self { repo_url, branch }
     }
 
     /// Generate README content from template with config
@@ -459,14 +463,14 @@ impl READMEGenerator {
     }
 
     fn generate_quick_install(&self) -> String {
-        let repo_url = self
-            .repo_url
-            .as_deref()
-            .unwrap_or("https://github.com/yourname/dotfiles.git");
-        let install_command = format!("curl -fsSL https://raw.githubusercontent.com/ordinators/ordinator/master/scripts/install.sh | sh && ordinator init {repo_url} && ordinator apply");
-        let pat_example = "https://YOUR_PAT@github.com/username/dotfiles.git";
-
-        format!("## Quick Install\n\n```bash\n{install_command}\n```\n\n### For Private Repositories\n\nIf this is a private repository, you'll need a GitHub Personal Access Token (PAT).\n\nReplace `YOUR_PAT` in the command below with your actual token:\n\n```bash\ngit clone {pat_example} ~/.dotfiles\n```\n\n**Note**: Your PAT will be included in the command. Keep it secure and do not share it with others.\n\n")
+        let branch = &self.branch;
+        let replicate_oneliner = format!(
+            "bash <(curl -fsSL https://raw.githubusercontent.com/{{username}}/{{repo}}/{branch}/replicate.sh)"
+        );
+        let note = "If your repository uses a different default branch (e.g., master), update the one-liner to match your branch name.";
+        format!(
+            "## Quick Install\n\n```bash\n{replicate_oneliner}\n```\n\n> {note}\n\n"
+        )
     }
 
     fn generate_profiles_with_config(&self, config: &crate::config::Config) -> String {

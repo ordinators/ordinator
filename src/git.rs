@@ -44,8 +44,9 @@ impl GitManager {
             self.repo_path.display()
         );
 
+        // Use 'main' as the default initial branch for new repos
         let mut init_opts = RepositoryInitOptions::new();
-        init_opts.initial_head("master");
+        init_opts.initial_head("main");
         init_opts.mkdir(true);
 
         let repo = Repository::init_opts(&self.repo_path, &init_opts).with_context(|| {
@@ -55,7 +56,7 @@ impl GitManager {
             )
         })?;
 
-        // Set up the master branch
+        // Set up the main branch
         let signature = repo
             .signature()
             .unwrap_or_else(|_| git2::Signature::now("Ordinator", "ordinator@localhost").unwrap());
@@ -66,7 +67,7 @@ impl GitManager {
 
         // Create initial commit
         repo.commit(
-            Some("refs/heads/master"),
+            Some("refs/heads/main"),
             &signature,
             &signature,
             "Initial commit",
@@ -208,14 +209,15 @@ impl GitManager {
         let mut push_options = git2::PushOptions::new();
         push_options.remote_callbacks(callbacks);
 
+        let branch = self.get_default_branch().unwrap_or_else(|_| "main".to_string());
         let refspec = if force {
-            "+refs/heads/master:refs/heads/master"
+            format!("+refs/heads/{branch}:refs/heads/{branch}")
         } else {
-            "refs/heads/master:refs/heads/master"
+            format!("refs/heads/{branch}:refs/heads/{branch}")
         };
 
         remote
-            .push(&[refspec], Some(&mut push_options))
+            .push(&[&refspec], Some(&mut push_options))
             .with_context(|| "Failed to push to remote")?;
 
         info!("Changes pushed successfully");
@@ -261,9 +263,12 @@ impl GitManager {
         let mut fetch_options = git2::FetchOptions::new();
         fetch_options.remote_callbacks(callbacks);
 
+        let branch = self.get_default_branch().unwrap_or_else(|_| "main".to_string());
+        let fetch_ref = format!("refs/heads/{branch}:refs/remotes/origin/{branch}");
+
         remote
             .fetch(
-                &["refs/heads/master:refs/remotes/origin/master"],
+                &[&fetch_ref],
                 Some(&mut fetch_options),
                 None,
             )
@@ -287,13 +292,14 @@ impl GitManager {
         }
 
         if analysis.0.is_fast_forward() {
+            let branch_ref = format!("refs/heads/{branch}");
             let mut reference = repo
-                .find_reference("refs/heads/master")
-                .with_context(|| "Failed to find master branch")?;
+                .find_reference(&branch_ref)
+                .with_context(|| format!("Failed to find {branch} branch"))?;
             reference
                 .set_target(fetch_commit.id(), "Fast-forward merge")
                 .with_context(|| "Failed to update reference")?;
-            repo.set_head("refs/heads/master")
+            repo.set_head(&branch_ref)
                 .with_context(|| "Failed to set HEAD")?;
             repo.checkout_head(Some(git2::build::CheckoutBuilder::default().force()))
                 .with_context(|| "Failed to checkout HEAD")?;
@@ -408,6 +414,38 @@ impl GitManager {
                 eprintln!("   Example: ordinator push https://github.com/yourname/dotfiles.git");
             }
         }
+    }
+
+    /// Detect the default branch name (remote HEAD or fallback to 'main')
+    pub fn get_default_branch(&self) -> Result<String> {
+        if Self::is_test_mode() {
+            // In test mode, default to 'master' for legacy compatibility
+            return Ok("master".to_string());
+        }
+        let repo = Repository::open(&self.repo_path)
+            .with_context(|| format!("Failed to open repository at {}", self.repo_path.display()))?;
+        // Try to get the remote HEAD symbolic reference
+        if let Ok(remote) = repo.find_remote("origin") {
+            if let Ok(refspec) = remote.default_branch() {
+                if let Some(branch) = refspec.as_str() {
+                    // Typically returns something like "refs/heads/main" or "refs/heads/master"
+                    if let Some(name) = branch.strip_prefix("refs/heads/") {
+                        return Ok(name.to_string());
+                    }
+                }
+            }
+        }
+        // Fallback: try to get the current local branch
+        if let Ok(head) = repo.head() {
+            if head.is_branch() {
+                if let Some(name) = head.shorthand() {
+                    return Ok(name.to_string());
+                }
+            }
+        }
+        // Fallback: default to 'main' and print a warning
+        warn!("Could not detect default branch; falling back to 'main'");
+        Ok("main".to_string())
     }
 }
 
