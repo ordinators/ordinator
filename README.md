@@ -74,16 +74,6 @@ This script will:
 
 That's it! Your environment will be replicated and ready to use.
 
-## How It Works
-
-When you run `ordinator apply`, Ordinator:
-
-1. **Generates the profile's bootstrap script** (if defined), which contains additional setup steps such as installing tools or configuring system settings.
-2. **Decrypts and copies secrets** (if secrets management is configured and not skipped) - secrets are decrypted in memory and copied to target locations with secure permissions (600).
-3. **Installs Homebrew packages** defined in the profile (if package management is configured and not skipped).
-4. **Symlinks all tracked files** for the selected profile from your dotfiles repository into their correct locations in your home directory, backing up any existing files if configured. **Files are stored in the repository as hash-based filenames (files/<profile>/<hash>_<filename>), and the mapping to the original path is tracked in the config.**
-5. **Performs safety checks** to avoid overwriting important files unless you use the `--force` flag.
-6. **Supports dry-run mode** so you can preview all changes without making modifications by adding the `--dry-run` flag.
 
 
 

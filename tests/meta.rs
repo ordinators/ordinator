@@ -481,7 +481,7 @@ fn test_cli_subcommand_arguments() {
         vec!["secrets", "scan"],
         vec!["age", "validate"],
         vec!["readme", "default"],
-        vec!["bootstrap"],
+        vec!["bootstrap", "show"],
         vec!["generate-script"],
     ];
 
@@ -1047,7 +1047,7 @@ fn test_cli_bootstrap_with_edit() {
     let (_config_guard, _test_mode_guard) = common::setup_test_environment_with_config(&temp, None);
 
     let mut cmd = common::create_ordinator_command(&temp);
-    cmd.args(["bootstrap", "--profile", "default", "--edit"]);
+    cmd.args(["bootstrap", "edit", "--profile", "default"]);
     cmd.assert().success();
 }
 
@@ -1570,7 +1570,7 @@ fn test_cli_dry_run_combinations() {
         vec!["--dry-run", "brew", "install"],
         vec!["--dry-run", "age", "encrypt", "test.txt"],
         vec!["--dry-run", "generate-script"],
-        vec!["--dry-run", "bootstrap"],
+        vec!["--dry-run", "bootstrap", "show"],
     ];
 
     for args in dry_run_commands {
@@ -1769,7 +1769,7 @@ fn test_cli_success_message_formatting() {
         vec!["profiles"],
         vec!["secrets", "list"],
         vec!["readme", "default"],
-        vec!["bootstrap"],
+        vec!["bootstrap", "show"],
         vec!["generate-script"],
     ];
 

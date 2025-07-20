@@ -124,14 +124,6 @@ ordinator repair                       # Fixes broken symlinks
 - ✅ Improved error messages and debug output
 - ✅ Added comprehensive test coverage for symlink scenarios
 - ✅ Fixed test isolation issues with `ORDINATOR_HOME` environment variable
-- ✅ Added profile-specific file storage with hash-based filenames
-- ✅ Implemented enhanced conflict resolution with backup creation
-- ✅ Added dry-run mode support for all apply operations
-- ✅ Added verbose and quiet mode support for better user experience
-- ✅ Enhanced symlink repair logic with detailed debugging
-- ✅ Added colorized output for better visual feedback
-- ✅ Implemented proper error handling for missing source files
-- ✅ Added comprehensive debug logging for troubleshooting
 
 ---
 
@@ -1006,47 +998,47 @@ Phase 4.11 (Optimized Homebrew Installation) is complete. Homebrew package insta
 **Testable:** ✅
 
 **Tasks:**
-- [ ] Enforce that all profile names must be filesystem-safe: only letters, numbers, dash (-), and underscore (_). Reject any profile name that does not match this pattern.
-- [ ] Add `[install_script] script = "$ORDINATOR_HOME/<profile>/bootstrap.sh"` to config for each profile's setup script.
-- [ ] Add optional `setup_script` field to each profile in config for profile-specific scripts (default to `$ORDINATOR_HOME/<profile>/bootstrap.sh`).
-- [ ] Remove automatic bootstrap script generation from `ordinator init`. Instead, after init completes, display a message suggesting 'ordinator bootstrap generate --profile <profile>' as an available next step.
-- [ ] When generating a bootstrap script for a profile, also generate a blank `bootstrap-secrets.env` file in the same profile directory.
-- [ ] Ensure all `bootstrap-secrets.env` files (in base and all profile subfolders) are included in `.gitignore`.
-- [ ] Implement fallback logic: use profile-specific script if present, otherwise use global script.
-- [ ] On `ordinator apply` or `ordinator bootstrap`, print the correct script path for the user to run.
-- [ ] Never execute scripts automatically; always require manual execution.
-- [ ] Set generated script permissions to `700` (owner executable).
-- [ ] Validate that referenced script files exist and are readable; print clear info if not.
-- [ ] Add comments to generated scripts about sourcing secrets securely and not storing secrets in plaintext.
-- [ ] Update documentation (CONFIGURATION.md, COMMANDS.md, README) to explain the setup script workflow, fallback logic, and security best practices.
-- [ ] Add unit and integration tests for config parsing, fallback logic, and CLI output.
-- [ ] Ensure backward compatibility for users with only a global script.
-- [ ] Implement the full ordinator bootstrap command family:
-    - `ordinator bootstrap --profile <profile>`: Prints the resolved path to the bootstrap script for the selected profile, with a clear instruction for running it. If the script does not exist, prints an info message notifying the user that no script was detected and proceeds without error.
+- [x] Enforce that all profile names must be filesystem-safe: only letters, numbers, dash (-), and underscore (_). Reject any profile name that does not match this pattern.
+- [x] Add `[install_script] script = "$ORDINATOR_HOME/<profile>/bootstrap.sh"` to config for each profile's setup script.
+- [x] Add optional `setup_script` field to each profile in config for profile-specific scripts (default to `$ORDINATOR_HOME/<profile>/bootstrap.sh`).
+- [x] Remove automatic bootstrap script generation from `ordinator init`. Instead, after init completes, display a message suggesting 'ordinator bootstrap generate --profile <profile>' as an available next step.
+- [x] When generating a bootstrap script for a profile, also generate a blank `bootstrap-secrets.env` file in the same profile directory.
+- [x] Ensure all `bootstrap-secrets.env` files (in base and all profile subfolders) are included in `.gitignore`.
+- [x] Implement fallback logic: use profile-specific script if present, otherwise use global script.
+- [x] On `ordinator apply` or `ordinator bootstrap`, print the correct script path for the user to run.
+- [x] Never execute scripts automatically; always require manual execution.
+- [x] Set generated script permissions to `700` (owner executable).
+- [x] Validate that referenced script files exist and are readable; print clear info if not.
+- [x] Add comments to generated scripts about sourcing secrets securely and not storing secrets in plaintext.
+- [x] Update documentation (CONFIGURATION.md, COMMANDS.md, README) to explain the setup script workflow, fallback logic, and security best practices.
+- [x] Add unit and integration tests for config parsing, fallback logic, and CLI output.
+- [x] Ensure backward compatibility for users with only a global script.
+- [x] Implement the full ordinator bootstrap command family:
+    - `ordinator bootstrap show --profile <profile>`: Prints the resolved path to the bootstrap script for the selected profile, with a clear instruction for running it. If the script does not exist, prints an info message notifying the user that no script was detected and proceeds without error.
     - `ordinator bootstrap generate --profile <profile> [--force]`: Generates the default template script at `$ORDINATOR_HOME/<profile>/bootstrap.sh` and a blank `bootstrap-secrets.env` in the same directory. Refuses to overwrite unless `--force` is given. Prints the path to the generated script.
     - `ordinator bootstrap edit --profile <profile>`: Opens the resolved script in `$EDITOR`. If the script does not exist, prints a helpful info message and suggests `ordinator bootstrap generate`. If `$EDITOR` is not set, prints a clear error or falls back to `vi`.
     - All commands use profile-specific script logic. If neither exists, print a clear info message and proceed without error.
 
 **UX/Documentation:**
-- [ ] Profile names must be filesystem-safe: only letters, numbers, dash (-), and underscore (_). Any attempt to create or use a profile with an invalid name will be rejected with a clear error message.
-- [ ] After `ordinator init`, display a message such as: "Next step: To create a setup/bootstrap script for your profile, run 'ordinator bootstrap generate --profile <profile>'"
-- [ ] CLI output after `apply`/`bootstrap` should clearly state which script to run.
-- [ ] If no script is configured, print an info message and proceed (do not fail or error).
-- [ ] Document the recommended pattern for handling secrets (encrypted file, sourced at runtime).
-- [ ] Add onboarding notes and CLI help for new users, including profile name requirements.
-- [ ] Always print the full path and a clear instruction for running the script.
-- [ ] If the script is missing, always suggest the generate command as an option.
-- [ ] Never execute scripts automatically; always require manual execution.
+- [x] Profile names must be filesystem-safe: only letters, numbers, dash (-), and underscore (_). Any attempt to create or use a profile with an invalid name will be rejected with a clear error message.
+- [x] After `ordinator init`, display a message such as: "Next step: To create a setup/bootstrap script for your profile, run 'ordinator bootstrap generate --profile <profile>'"
+- [x] CLI output after `apply`/`bootstrap` should clearly state which script to run.
+- [x] If no script is configured, print an info message and proceed (do not fail or error).
+- [x] Document the recommended pattern for handling secrets (encrypted file, sourced at runtime).
+- [x] Add onboarding notes and CLI help for new users, including profile name requirements.
+- [x] Always print the full path and a clear instruction for running the script.
+- [x] If the script is missing, always suggest the generate command as an option.
+- [x] Never execute scripts automatically; always require manual execution.
 
 **Security:**
-- [ ] Never store secrets in setup scripts; recommend sourcing an encrypted secrets file.
-- [ ] Warn users in docs and script comments about not putting secrets in plaintext scripts.
-- [ ] Ensure all `bootstrap-secrets.env` files are in `.gitignore`.
+- [x] Never store secrets in setup scripts; recommend sourcing an encrypted secrets file.
+- [x] Warn users in docs and script comments about not putting secrets in plaintext scripts.
+- [x] Ensure all `bootstrap-secrets.env` files are in `.gitignore`.
 
 **Testing:**
-- [ ] Test all fallback scenarios: profile-specific script, global script, neither present.
-- [ ] Test script and secrets file generation, permissions, and info handling when script is missing.
-- [ ] Test that invalid profile names are rejected everywhere (creation, script generation, apply, etc.) and that error messages are clear.
+- [x] Test all fallback scenarios: profile-specific script, global script, neither present.
+- [x] Test script and secrets file generation, permissions, and info handling when script is missing.
+- [x] Test that invalid profile names are rejected everywhere (creation, script generation, apply, etc.) and that error messages are clear.
 
 **Acceptance Criteria:**
 ```
@@ -1078,7 +1070,7 @@ ordinator apply --profile laptop
 
 | Command                                 | Action/Output                                      |
 |------------------------------------------|----------------------------------------------------|
-| ordinator bootstrap --profile work       | Print path to work profile script, or info if missing |
+| ordinator bootstrap show --profile work | Print path to work profile script, or info if missing |
 | ordinator bootstrap generate --profile work | Create default script and blank secrets file if missing |
 | ordinator bootstrap edit --profile work  | Open script in $EDITOR, or info if missing         |
 
@@ -1092,9 +1084,25 @@ ordinator apply --profile laptop
 # This script is intended to be run manually after ordinator apply --profile work.
 # Edit this file to add your custom setup logic (install plugins, configure tools, etc).
 #
-# SECURITY: Never put secrets or API keys directly in this script.
-#           Instead, store secrets in the encrypted bootstrap-secrets.env file
-#           and source it at runtime if needed (see below).
+# ⚠️  SECURITY WARNING ⚠️
+# This script will be committed to your Git repository in PLAINTEXT format.
+# NEVER put secrets, API keys, passwords, or any sensitive information directly in this script.
+# 
+# Instead, store secrets in the encrypted bootstrap-secrets.env file (which is gitignored)
+# and source it at runtime if needed (see example below).
+#
+# Examples of what NOT to put in this script:
+# - API keys (AWS_ACCESS_KEY_ID, GITHUB_TOKEN, etc.)
+# - Passwords or private keys
+# - Database credentials
+# - Any other sensitive information
+#
+# Examples of what IS safe to put in this script:
+# - System configuration (defaults write, etc.)
+# - Tool setup commands
+# - Non-sensitive environment variables
+# - Custom application configuration
+# - Plugin installations for tools
 
 set -euo pipefail
 
@@ -1114,6 +1122,11 @@ fi
 # --- User Customization Section ---
 
 # Add your setup steps below this line
+# Examples:
+# defaults write com.apple.dock autohide -bool true
+# npm install -g typescript
+# git config --global user.name "Your Name"
+# git config --global user.email "your.email@example.com"
 
 # --- End User Customization Section ---
 
