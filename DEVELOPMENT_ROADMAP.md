@@ -1149,20 +1149,20 @@ echo "========================================"
 **Testable:** ✅
 
 **Tasks:**
-- [ ] On `ordinator init`, generate a `replicate.sh` script at the root of the user's dotfiles repo.
-- [ ] In the generated README, add a one-liner using the main branch by default:
+- [x] On `ordinator init`, generate a `replicate.sh` script at the root of the user's dotfiles repo.
+- [x] In the generated README, add a one-liner using the main branch by default:
   ```bash
   bash <(curl -fsSL https://raw.githubusercontent.com/<username>/<repo>/main/replicate.sh)
   ```
-- [ ] Add a note in the README: "If your repository uses a different default branch (e.g., master), update the one-liner to match your branch name."
-- [ ] Auto-detect the default branch name (using `git remote show origin | awk '/HEAD branch/ {print $NF}'`) for internal use (e.g., CLI output, onboarding messages, or advanced scripting).
-- [ ] Ensure the replicate.sh script uses the detected branch name for any internal git operations or URLs.
-- [ ] Document the rationale for using main by default and the branch detection logic for robustness.
+- [x] Add a note in the README: "If your repository uses a different default branch (e.g., master), update the one-liner to match your branch name."
+- [x] Auto-detect the default branch name (using git2 or remote HEAD) for internal use (e.g., CLI output, onboarding messages, or advanced scripting).
+- [x] Ensure the replicate.sh script uses the detected branch name for any internal git operations or URLs.
+- [x] Document the rationale for using main by default and the branch detection logic for robustness.
 
 **UX/Documentation:**
-- [ ] README always shows the main branch in the one-liner, with a clear note about updating for custom branch names.
-- [ ] CLI and onboarding output use the detected branch name for accuracy.
-- [ ] Users are never left with a broken one-liner due to branch mismatch.
+- [x] README always shows the main branch in the one-liner, with a clear note about updating for custom branch names.
+- [x] CLI and onboarding output use the detected branch name for accuracy.
+- [x] Users are never left with a broken one-liner due to branch mismatch.
 
 **Acceptance Criteria:**
 ```
@@ -1176,6 +1176,9 @@ bash <(curl -fsSL https://raw.githubusercontent.com/<username>/<repo>/main/repli
 
 # If the branch cannot be detected, default to main and print a warning.
 ```
+
+**Completion Statement:**
+Phase 5.2 (Replication Script and Branch Detection) is complete. Ordinator now generates a replicate.sh script and updates the README and onboarding output to use the detected default branch for all replication and setup instructions. This ensures users always get a working one-liner and robust onboarding, regardless of their branch configuration.
 
 ---
 

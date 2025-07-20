@@ -232,6 +232,13 @@ pub enum Commands {
         #[command(subcommand)]
         subcommand: AgeCommands,
     },
+
+    /// Generate a replicate.sh script for easy repo replication
+    ReplicateScript {
+        /// Force overwrite if replicate.sh already exists
+        #[arg(long)]
+        force: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -692,6 +699,16 @@ pub async fn run(args: Args) -> Result<()> {
                         } else {
                             eprintln!("Generated README.md with correct repository URL");
                         }
+
+                        // Print replicate.sh one-liner with detected branch
+                        let branch = git_manager
+                            .get_default_branch()
+                            .unwrap_or_else(|_| "main".to_string());
+                        let replicate_oneliner = format!(
+                            "bash <(curl -fsSL https://raw.githubusercontent.com/{{username}}/{{repo}}/{branch}/replicate.sh)"
+                        );
+                        eprintln!("\nQuick replication one-liner (update {{username}}/{{repo}} as needed):\n  {replicate_oneliner}");
+                        eprintln!("If your repository uses a different default branch (e.g., master), update the one-liner to match your branch name.\n");
 
                         info!("Repository initialization completed");
                         eprintln!("Repository initialization completed");
@@ -3323,6 +3340,35 @@ pub async fn run(args: Args) -> Result<()> {
                     }
                 }
             }
+            Ok(())
+        }
+        Commands::ReplicateScript { force } => {
+            use crate::config::Config;
+            use crate::git::GitManager;
+            use std::fs;
+
+            let (_config, config_path) = Config::load()?;
+            let dotfiles_path = config_path.parent().unwrap().to_path_buf();
+            let git_manager = GitManager::new(dotfiles_path.clone());
+            let branch = git_manager
+                .get_default_branch()
+                .unwrap_or_else(|_| "main".to_string());
+            let repo_url = git_manager
+                .get_origin_url()?
+                .unwrap_or_else(|| "https://github.com/yourname/dotfiles.git".to_string());
+            let replicate_path = dotfiles_path.join("replicate.sh");
+
+            if replicate_path.exists() && !force {
+                eprintln!("replicate.sh already exists. Use --force to overwrite.");
+                return Ok(());
+            }
+
+            let script = format!(
+                "#!/usr/bin/env bash\n\n# Ordinator Replication Script\n# This script clones your dotfiles repo and prepares it for setup.\n\nset -e\n\nREPO_URL=\"{repo_url}\"\nBRANCH=\"{branch}\"\nTARGET=\"$HOME/.dotfiles\"\n\nif [ -d \"$TARGET/.git\" ]; then\n  echo \"Dotfiles repo already exists at $TARGET\"\nelse\n  git clone --branch \"$BRANCH\" \"$REPO_URL\" \"$TARGET\"\nfi\n\ncd \"$TARGET\"\necho \"Next steps:\"\necho \"  1. Review the configuration: cat ordinator.toml\"\necho \"  2. Apply your dotfiles: ordinator apply\"\necho \"  3. (Optional) Set up secrets: ordinator secrets setup\"\n"
+            );
+            fs::write(&replicate_path, script)?;
+            fs::set_permissions(&replicate_path, std::fs::Permissions::from_mode(0o755))?;
+            println!("Generated replicate.sh at {}", replicate_path.display());
             Ok(())
         }
     }

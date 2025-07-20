@@ -1,6 +1,6 @@
 [package]
 name = "ordinator"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 authors = ["Anthony Norfleet <anthony.norfleet@gmail.com>"]
 description = "Dotfiles and Environment Manager for macOS"
@@ -55,7 +55,7 @@ dirs = "5.0"
 tempfile = "3.8"
 
 # HTTP downloads for repository bootstrap
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", features = ["rustls-tls"] }
 
 # Archive extraction for repository bootstrap
 flate2 = "1.0"

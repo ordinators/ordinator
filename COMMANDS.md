@@ -1356,6 +1356,29 @@ ordinator version
 - Displays Ordinator version
 - Shows build information and dependencies
 
+### `ordinator replicate-script`
+
+Generate a replicate.sh script for easy repository replication.
+
+```bash
+ordinator replicate-script [--force]
+```
+
+**Options:**
+- `--force` - Overwrite replicate.sh if it already exists
+
+**What it does:**
+- Generates a `replicate.sh` script at the root of your dotfiles repository
+- The script uses the detected default branch for all git operations and URLs
+- The script is idempotent and safe to run multiple times
+- Prints the path to the generated script
+
+**Example:**
+```bash
+ordinator replicate-script --force
+# Output: Generated replicate.sh at /path/to/your/dotfiles/replicate.sh
+```
+
 ## Configuration
 
 Commands use configuration from `ordinator.toml` file. Key configuration options:

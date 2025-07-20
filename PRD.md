@@ -112,6 +112,16 @@
 - CI/CD includes automated testing, code formatting, and static analysis
 - Homebrew installation logic queries installed packages and forms a single install command for missing formulas and casks.
 
+## Replication Script & Branch Detection (Phase 5.2)
+
+- Ordinator generates a `replicate.sh` script at the root of your dotfiles repository on `ordinator init`.
+- The script uses the detected default branch (auto-detected from the remote, or falls back to 'main') for all git operations and URLs.
+- The onboarding output and generated README now include a one-liner for quick replication:
+  bash <(curl -fsSL https://raw.githubusercontent.com/<username>/<repo>/<branch>/replicate.sh)
+- The README and CLI output include a note: "If your repository uses a different default branch (e.g., master), update the one-liner to match your branch name."
+- Branch detection is performed using the git2 library and remote HEAD, with fallback to the current branch or 'main'.
+- This ensures users are never left with a broken one-liner due to branch mismatch, and onboarding is robust for any repo configuration.
+
 ---
 
 ## 7. Open Questions (Resolved)
